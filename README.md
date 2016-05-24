@@ -33,10 +33,10 @@ perhaps [JSON](https://en.wikipedia.org/wiki/JSON).)
 A small example can be found in [the examples directory](examples/skeleton/).
 
 More information can be found in the original whitepapers about the
-iMatix Application Framework can be found on the [legacy iMatix
-website](http://imatix-legacy.github.io/):
+iMatix Application Framework.  These whitepapers can be found on
+the [legacy iMatix website](http://imatix-legacy.github.io/):
 
-*   [The iMatix Application Framework](http://imatix-legacy.github.io/twp/iaf.pdf)
+*   [The iMatix Application Framework](http://imatix-legacy.github.io/twp/iaf.pdf) (iAF)
 
 *   [The iAF Presentation Framework Language](http://imatix-legacy.github.io/twp/iafpfl.pdf) (PFL)
 
