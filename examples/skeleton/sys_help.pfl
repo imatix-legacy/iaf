@@ -1,0 +1,16 @@
+<screen name = "help">
+<page name = "help" title = "" >
+<toolbar/>
+<form>
+    <text>&lt;center&gt;</text>
+    <text script = "shadedbox.gsl" what = "top" title = "Help" width = "60%" />
+    <text script = "shadedbox.gsl" what = "left" />
+    <text before = "2">The Help pages are under preparation.
+    Please feel free to explore the application and try its functions.</text>
+
+    <text script = "shadedbox.gsl" what = "right"  />
+    <text script = "shadedbox.gsl" what = "bottom" />
+</form>
+</page>
+</screen>
+

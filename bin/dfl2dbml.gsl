@@ -1,0 +1,53 @@
+.template 0
+/*
+        dfl2dbml.gsl
+
+        Created: 2000/02/07
+        Revised: 2000/04/17
+*/
+
+include "mod_dfl.gsl"
+dfl_load (fname + ".dfl")
+
+for dfl
+    for table as dfltable
+        echo "Processing $(dfltable.name)..."
+        new table to root
+            .name        = dfltable.name
+            .fileio      = dfltable.name
+            .description = dfltable.description
+            .created     = date
+
+            for dfltable.field as dflfield where defined (dflfield.name) & defined (dflfield.type)
+                new field to table
+                    .name    = dflfield.name
+                    .type    = "$(dflfield.TYPE)"
+                    .size    = dflfield.size ?
+                    .decimal = dflfield.decs ?
+                endnew
+            endfor
+            for dfltable.index
+                new key to table
+                    .name = index.name
+                    if index.name = "primary"
+                        .duplicates = "FALSE"
+                    else
+                        .duplicates = "TRUE"
+                    endif
+                    for index.field as dflfield
+                        new field to key
+                            .name = dflfield.name
+                        endnew
+                    endfor
+                endnew
+            endfor
+        endnew
+        
+    endfor
+endfor
+
+for table
+    save table as table.name + ".dbm"
+endfor
+
+.endtemplate

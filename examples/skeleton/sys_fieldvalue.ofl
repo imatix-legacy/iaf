@@ -1,0 +1,10 @@
+<object name = "fieldvalue" >
+    <query name = "byfield" index = "byfield" view = "detail"  />
+    <require>
+        <field name = "shownvalue" />
+        <field name = "encoding"   />
+    </require>        
+</object>
+
+
+

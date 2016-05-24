@@ -1,0 +1,222 @@
+Microsoft Developer Studio Workspace File, Format Version 6.00
+# WARNING: DO NOT EDIT OR DELETE THIS WORKSPACE FILE!
+
+###############################################################################
+
+Project: "libscl"=.\libscl\libscl.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+}}}
+
+###############################################################################
+
+Project: "scl_xmlstore"=.\xmlstore\scl_xmlstore.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name libscl
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "scl_security"=.\security\scl_security.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name libscl
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "scl_sys"=.\sys\scl_sys.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name libscl
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "scl_symbol"=.\symbol\scl_symbol.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name libscl
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "scl_date"=.\date\scl_date.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name libscl
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "scl_mail"=.\mail\scl_mail.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name libscl
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "scl_workflow"=.\workflow\scl_workflow.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name libscl
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "scl_upload"=.\upload\scl_upload.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name libscl
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "scl_string"=.\string\scl_string.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name libscl
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "scl_directory"=.\directory\scl_directory.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name libscl
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "scl_translation"=.\translation\scl_translation.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name libscl
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "scl_bits"=.\bits\scl_bits.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name libscl
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "scl_search"=.\search\scl_search.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name libscl
+    End Project Dependency
+}}}
+
+###############################################################################
+Global:
+
+Package=<5>
+{{{
+}}}
+
+Package=<3>
+{{{
+}}}
+
+###############################################################################

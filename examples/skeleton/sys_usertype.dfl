@@ -1,0 +1,9 @@
+<table name = "usertype" description = "Application User Type" >
+    <field name = "id"          domain = "recordid"   >Record id</field>
+    <field name = "name"        domain = "longname"   >User type Name</field>
+    <field                      domain = "audit"     />
+    <index name = "byname">
+        <field name = "name"        />
+    </index>
+</table>
+

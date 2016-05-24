@@ -1,0 +1,8 @@
+<object name = "module" >
+    <query name = "byname" index = "byname" view = "detail"  />
+    <require>
+        <field name = "name"      />
+        <field name = "homepage"  />
+    </require>            
+</object>
+

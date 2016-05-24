@@ -1,0 +1,59 @@
+#   Draws a 3D shaded table box
+#
+if what = "top"
+    if defined (width)
+    ><table border=0 cellspacing=0 cellpadding=0 width=$(width)>
+    else
+    ><table border=0 cellspacing=0 cellpadding=0>
+    endif
+    ><tr>
+    ><td bgcolor="<%=Session ("MENUHEADCOLOR")%>" colspan=3></td>
+    ><td bgcolor=#000000><img border=0 height=5 width=1 src="images/dot.gif"></td>
+    ><td><img border=0 height=5 width=4 src="images/dot.gif"></td>
+    ></tr><tr>
+    ><td bgcolor="<%=Session ("MENUHEADCOLOR")%>" width=10>&nbsp;</td>
+    if defined (width)
+    ><td bgcolor="<%=Session ("MENUHEADCOLOR")%>" width=100% nowrap><font color="white" size=$(fontsize?4)><b>$(title:)</b></td>
+    else
+    ><td bgcolor="<%=Session ("MENUHEADCOLOR")%>" nowrap><font color="white" size=$(fontsize?4)><b>$(title:)</b></td>
+    endif
+    ><td bgcolor="<%=Session ("MENUHEADCOLOR")%>" width=10>&nbsp;</td>
+    ><td bgcolor=#000000><img border=0 height=1 width=1 src="images/dot.gif"></td>
+    ><td bgcolor=#999999><img border=0 height=1 width=4 src="images/dot.gif"></td>
+    ></tr><tr>
+    ><td bgcolor="<%=Session ("MENUHEADCOLOR")%>" colspan=3></td>
+    ><td bgcolor=#000000><img border=0 height=5 width=1 src="images/dot.gif"></td>
+    ><td bgcolor=#999999><img border=0 height=5 width=4 src="images/dot.gif"></td>
+    ></tr><tr>
+    ><td bgcolor="<%=Session ("MENUBODYCOLOR")%>" height=10 colspan=3>&nbsp;</td>
+    ><td bgcolor=#000000><img border=0 height=1 width=1 src="images/dot.gif"></td>
+    ><td bgcolor=#999999><img border=0 height=1 width=4 src="images/dot.gif"></td>
+
+elsif what = "left"
+    ><tr>
+    ><td bgcolor="<%=Session ("MENUBODYCOLOR")%>" width=10>&nbsp;</td>
+    if defined (nowrap)
+    ><td bgcolor="<%=Session ("MENUBODYCOLOR")%>" nowrap>
+    else
+    ><td bgcolor="<%=Session ("MENUBODYCOLOR")%>">
+    endif
+    
+elsif what = "right"
+    ></td>
+    ><td bgcolor="<%=Session ("MENUBODYCOLOR")%>"><img border=0 height=1 width=10 src="images/dot.gif"></td>
+    ><td bgcolor=#000000><img border=0 height=1 width=1 src="images/dot.gif"></td>
+    ><td bgcolor=#999999><img border=0 height=1 width=4 src="images/dot.gif"></td>
+
+elsif what = "bottom"
+    ><tr>
+    ><td bgcolor="<%=Session ("MENUBODYCOLOR")%>" height=10 colspan=3>&nbsp;</td>
+    ><td bgcolor=#000000><img border=0 height=1 width=1 src="images/dot.gif"></td>
+    ><td bgcolor=#999999><img border=0 height=1 width=4 src="images/dot.gif"></td>
+    ></tr><tr>
+    ><td bgcolor=#000000 colspan=4><img border=0 height=1 src="images/dot.gif"></td>
+    ><td bgcolor=#999999><img border=0 height=1 width=4 src="images/dot.gif"></td>
+    ></tr><tr>
+    ><td><img border=0 height=1 src="images/dot.gif"></td>
+    ><td bgcolor=#999999 colspan=4><img border=0 height=4 src="images/dot.gif"></td>
+    ></tr></table>
+endif

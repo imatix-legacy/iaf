@@ -1,0 +1,120 @@
+Specifications for Command-Line ODBC Access Program - iafodbc.exe
+
+Principal functions:
+
+  - export data
+  - import data
+  - access database catalog for table descriptions
+  - execute dynamic SQL statement
+  - execute SQL SELECT statement
+
+Command-line arguments:
+
+    -d database         ODBC Data Source name
+
+    -u user             Connect username (if required)
+
+    -p password         Connect password (if required)
+
+
+    -e listfile         Export tables listed in the list file, which has
+                        the same structure as for the -l switch.  Each
+                        exported table is placed in a file whose name is
+                        calculated from the table name (possibly hashed to
+                        8 characters).  The exported table data contains
+                        the table structure in both native and portable
+                        formats.
+
+                        If lisfile parameter is missing, export all tables.
+
+    -i listfile         Import tables listed in the list file; this is the
+                        mirror operation to -e.
+
+                        If lisfile parameter is missing, try to find a export
+                        file for all tables in target database and
+                        import if find.
+
+    -g tablename        Get structure of table name, which may be prefixed
+                        by a tablespace if appropriate.  Results are sent
+                        to stdout unless -o is specified.  Structure of
+                        table is DBML, by default in portable format unless
+                        -f option is used.  The DBML file has this
+                        structure (? verify this):
+
+                        DBML
+                            TABLE
+                                FIELD
+                                KEY
+                                    FIELD
+
+    -l listfile         Get structure of tables listed in XML file, which
+                        is structured as follows:
+
+                        REQUEST (no attributes)
+                            TABLE (NAME)
+
+                        The table name may be prefixed by a tablespace if
+                        appropriate.  '*' and '?' in table names are
+                        expanded to match existing tables.
+
+    -f format           Specifies output format for DBML files, options are
+                        'portable' and 'native'.  (Remark: can we extend
+                        DBML to contain both native and portable formats
+                        for fields where known?)
+
+    -o output           Specifies output file for actions.  Without this,
+                        output is sent to the stdout.  The format of the
+                        output file depends on the action used.
+
+    -x sqlfile          Execute the contents of the SQL file.  The SQL file
+                        is plain text, and SQL statements are delimited by
+                        ';', not newlines.  The file can contain multiple
+                        SQL statements.
+
+    -s filename         Execute a formatted SELECT statement, and return
+                        the data as an XML file.  The SELECT statement is
+                        defined as an XML file with this structure:
+
+                        SELECT (TABLE, WHERE, ORDERBY)
+                            COLUMN (NAME)
+
+                        The returned XML file has this structure:
+
+                        RESULT (TABLE, ROWS, TIMEMS)
+                            ROW (no attributes)
+                                COLUMN (VALUE)
+
+    -m maxrows          Maximum desired rows for a select or export.
+
+    -t maxtime          Maximum desired time for a select, export or import,
+                        in msecs.
+
+
+    -r dbmlfile         Review tables listed in the DBML file: this
+                        function creates the tables if they do not exist,
+                        and if they already exist, it modifies them to
+                        match the new definition.  Note that 'modification'
+                        can be quite complex, and possible slow for large
+                        tables.
+
+
+    The iafodbc switches that are handled as actions are:
+
+    -g  (get)
+    -l  (list)
+    -x  (execute)
+    -s  (select)
+    -e  (export)
+    -r  (review)
+    -i  (import)
+
+    The iafodbc switches that act as options to actions are:
+
+    -f  for get and list actions
+    -o  for all actions
+    -r  for select and export actions
+    -t  for select and export and import actions
+    -en HTML encode exported data
+
+    Other actions, such as dropping tables, clearing table data, creating
+    new tables, etc. can be done by running dynamic SQL statements.

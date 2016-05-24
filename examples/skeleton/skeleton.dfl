@@ -1,0 +1,26 @@
+<dfl
+    name        = "starling"
+    description = "iAF Skeleton Application"
+    author      = "iMatix Corporation"
+    prefix      = "db">
+    
+<rule name = "clean ids" />
+<inherit filename = "std_domain.dfl"       />
+
+<!--  sys : system-module  -->
+<include filename = "sys_currency.dfl"      />
+<include filename = "sys_email.dfl"         />
+<include filename = "sys_form.dfl"          />
+<include filename = "sys_field.dfl"         />
+<include filename = "sys_fieldvalue.dfl"    />
+<include filename = "sys_fieldrule.dfl"     />
+<include filename = "sys_fieldrole.dfl"     />
+<include filename = "sys_language.dfl"      />
+<include filename = "sys_module.dfl"        />
+<include filename = "sys_modulerole.dfl"    />
+<include filename = "sys_prefs.dfl"         />
+<include filename = "sys_user.dfl"          />
+<include filename = "sys_usertype.dfl"      />
+<include filename = "sys_userrole.dfl"      />
+</dfl>
+

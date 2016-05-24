@@ -1,0 +1,41 @@
+ Volume in drive C is WINDOWS2000
+ Volume Serial Number is 3C4A-EF3A
+
+ Directory of C:\Imatix\products\iaf\src\scl\sources
+
+22/12/2000  13:33               13,103 fcrypt.c
+02/10/2002  09:32               78,578 ggcode.c
+02/10/2002  09:32               37,455 ggcomm.c
+02/10/2002  09:32               53,565 ggeval.c
+02/10/2002  09:32                5,630 ggfile.c
+02/10/2002  09:32               11,867 ggfunc.c
+02/10/2002  09:32                8,354 ggobjt.c
+02/10/2002  09:32               76,988 ggpars.c
+02/10/2002  09:32                9,237 ggstrn.c
+19/09/2002  17:08               13,275 sflcons.c
+19/09/2002  17:08                4,088 sflconv.c
+19/09/2002  17:08               12,531 sflcvdp.c
+19/09/2002  17:08                3,813 sflcvsb.c
+19/09/2002  17:08                9,606 sflcvtp.c
+19/09/2002  17:08               43,922 sfldate.c
+19/09/2002  17:08               54,143 sfldir.c
+19/09/2002  17:08               19,209 sflenv.c
+20/09/2002  15:15               97,489 sflfile.c
+19/09/2002  17:08               20,281 sflfind.c
+19/09/2002  17:08               84,210 sflhttp.c
+19/09/2002  17:08                7,638 sfllist.c
+01/10/2002  17:53               42,073 sflmem.c
+19/09/2002  17:08                7,991 sflnode.c
+19/09/2002  17:08               78,503 sflstr.c
+19/09/2002  17:08               33,842 sflsymb.c
+19/09/2002  17:08               21,821 sfltok.c
+12/05/2002  16:24               41,985 sfluhttp.c
+19/09/2002  17:08               57,927 sflunic.c
+12/05/2002  16:24               35,717 sflusymb.c
+04/10/2002  19:06               27,882 sfluxml.c
+04/10/2002  18:20               67,365 sfluxmll.c
+19/09/2002  17:08               28,717 sflxml.c
+19/09/2002  17:08               62,183 sflxmll.c
+04/10/2002  13:12                9,447 uconsole.c
+              34 File(s)      1,180,435 bytes
+               0 Dir(s)  14,280,670,208 bytes free

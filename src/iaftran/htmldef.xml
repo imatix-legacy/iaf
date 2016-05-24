@@ -1,0 +1,321 @@
+<markup
+    name    = "HTML"
+    version = "4.0"
+    script  = "markstat.gsl" >
+<extension value = "html"  />
+<extension value = "htm"   />
+<extension value = "asp"   />
+<extension value = "shtml" />
+<tag name        = "%"
+     end_tag     = "FALSE"
+     end_token   = "%"
+     script      = "SERVER_SCRIPT"
+     description = "ASP Script" />
+<tag name        = "!--FML"
+     end_tag     = "FALSE"
+     end_token   = "--"
+     parse_str   = "TRUE"
+     script      = "CLIENT_SCRIPT"
+     description = "FML tag in iMatix Studio screen" />
+
+<tag name        = "!--"
+     end_tag     = "FALSE"
+     end_token   = "--"
+     script      = "CLIENT_SCRIPT"
+     description = "Comment" />
+<tag name        = "A"
+     link        = "TRUE"
+     description = "anchor " />
+
+<tag name        = "ABBR"
+     description = "abbreviated form (e.g., WWW, HTTP, etc.)" />
+
+<tag name        = "ACRONYM"
+     description = "" />
+
+<tag name        = "ADDRESS"
+     description = "information on author " />
+
+<tag name        = "APPLET"
+     description = "Java applet " />
+
+<tag name        = "AREA"
+     end_tag     = "FALSE"
+     description = "client-side image map area " />
+
+<tag name        = "B"
+     skip        = "TRUE"
+     description = "bold text style" />
+
+<tag name        = "BASE"
+     end_tag     = "FALSE"
+     description = "document base URI " />
+
+<tag name        = "BASEFONT"
+     end_tag     = "FALSE"
+     description = "base font size " />
+
+<tag name        = "BDO"
+     description = "I18N BiDi over-ride " />
+
+<tag name        = "BIG"
+     description = "large text style" />
+
+<tag name        = "BLOCKQUOTE"
+     description = "long quotation " />
+
+<tag name        = "BODY"
+     description = "document body " />
+
+<tag name        = "BR"
+     end_tag     = "FALSE"
+     description = "forced line break " />
+
+<tag name        = "BUTTON"
+     description = "push button " />
+
+<tag name        = "CAPTION"
+     description = "table caption " />
+
+<tag name        = "CENTER"
+     description = "shorthand for DIV align=center " />
+
+<tag name        = "CITE"
+     description = "citation" />
+
+<tag name        = "CODE"
+     description = "computer code fragment" />
+
+<tag name        = "COL"
+     end_tag     = "FALSE"
+     description = "table column " />
+
+<tag name        = "COLGROUP"
+     description = "table column group " />
+
+<tag name        = "DD"
+     description = "definition description " />
+
+<tag name        = "DEL"
+     description = "deleted text " />
+
+<tag name        = "DFN"
+     description = "instance definition" />
+
+<tag name        = "DIR"
+     description = "directory list" />
+
+<tag name        = "DIV"
+     description = "generic language/style container " />
+
+<tag name        = "DL"
+     description = "definition list " />
+
+<tag name        = "DT"
+     description = "definition term " />
+
+<tag name        = "EM"
+     skip        = "TRUE"
+     description = "emphasis" />
+
+<tag name        = "FIELDSET"
+     description = "form control group " />
+
+<tag name        = "FONT"
+     description = "local change to font " />
+
+<tag name        = "FORM"
+     description = "interactive form " />
+
+<tag name        = "FRAME"
+     end_tag     = "FALSE"
+     description = "subwindow " />
+
+<tag name        = "FRAMESET"
+     description = "window subdivision" />
+
+<tag name        = "H1"
+     description = "heading " />
+
+<tag name        = "H2"
+     description = "heading " />
+
+<tag name        = "H3"
+     description = "heading " />
+
+<tag name        = "H4"
+     description = "heading " />
+
+<tag name        = "H5"
+     description = "heading " />
+
+<tag name        = "H6"
+     description = "heading " />
+
+<tag name        = "HEAD"
+     description = "document head " />
+
+<tag name        = "HR"
+     end_tag     = "FALSE"
+     description = "horizontal rule " />
+
+<tag name        = "HTML"
+     description = "document root element " />
+
+<tag name        = "I"
+     skip        = "TRUE"
+     description = "italic text style" />
+
+<tag name        = "IFRAME"
+     description = "inline subwindow " />
+
+<tag name        = "IMG"
+     end_tag     = "FALSE"
+     parse_str   = "TRUE"
+     description = "Embedded image " />
+
+<tag name        = "INPUT"
+     end_tag     = "FALSE"
+     description = "form control " />
+
+<tag name        = "INS"
+     description = "inserted text" />
+
+<tag name        = "ISINDEX"
+     end_tag     = "FALSE"
+     description = "single line prompt " />
+
+<tag name        = "KBD"
+     description = "text to be entered by the user" />
+
+<tag name        = "LABEL"
+     description = "form field label text " />
+
+<tag name        = "LEGEND"
+     description = "fieldset legend " />
+
+<tag name        = "LI"
+     description = "list item " />
+
+<tag name        = "LINK"
+     end_tag     = "FALSE"
+     description = "a media-independent link " />
+
+<tag name        = "MAP"
+     description = "client-side image map " />
+
+<tag name        = "MENU"
+     description = "menu list " />
+
+<tag name        = "META"
+     end_tag     = "FALSE"
+     parse_str   = "TRUE"
+     description = "generic metainformation " />
+
+<tag name        = "NOFRAMES"
+     description = "alternate content container for non frame-based rendering " />
+
+<tag name        = "NOSCRIPT"
+     description = "alternate content container for non script-based rendering " />
+
+<tag name        = "OBJECT"
+     description = "generic embedded object " />
+
+<tag name        = "OL"
+     description = "ordered list " />
+
+<tag name        = "OPTGROUP"
+     description = "option group " />
+
+<tag name        = "OPTION"
+     end_tag     = "FALSE"
+     description = "selectable choice " />
+
+<tag name        = "P"
+     end_tag     = "FALSE"
+     description = "paragraph " />
+
+<tag name        = "PARAM"
+     end_tag     = "FALSE"
+     description = "named property value " />
+
+<tag name        = "PRE"
+     description = "preformatted text " />
+
+<tag name        = "Q"
+     description = "short inline quotation " />
+
+<tag name        = "S"
+     description = "strike-through text style" />
+
+<tag name        = "SAMP"
+     description = "sample program output, scripts, etc." />
+
+<tag name        = "SCRIPT"
+     description = "script statements "
+     script      = "CLIENT_SCRIPT" />
+
+<tag name        = "SELECT"
+     description = "option selector " />
+
+<tag name        = "SMALL"
+     description = "small text style" />
+
+<tag name        = "SPAN"
+     description = "generic language/style container " />
+
+<tag name        = "STRIKE"
+     description = "strike-through text" />
+
+<tag name        = "STRONG"
+     description = "strong emphasis" />
+
+<tag name        = "STYLE"
+     description = "style info " />
+
+<tag name        = "SUB"
+     description = "subscript" />
+
+<tag name        = "SUP"
+     description = "superscript " />
+
+<tag name        = "TABLE"
+     description = "160;" />
+
+<tag name        = "TBODY"
+     description = "table body " />
+
+<tag name        = "TD"
+     description = "table data cell" />
+
+<tag name        = "TEXTAREA"
+     description = "multi-line text field " />
+
+<tag name        = "TFOOT"
+     description = "table footer " />
+
+<tag name        = "TH"
+     description = "table header cell" />
+
+<tag name        = "THEAD"
+     description = "table header " />
+
+<tag name        = "TITLE"
+     description = "document title " />
+
+<tag name        = "TR"
+     description = "table row " />
+
+<tag name        = "TT"
+     description = "teletype or monospaced text style" />
+
+<tag name        = "U"
+     skip        = "TRUE"
+     description = "underlined text style" />
+
+<tag name        = "UL"
+     description = "unordered list " />
+
+<tag name        = "VAR"
+     description = "instance of a variable or program argument" />
+</markup>

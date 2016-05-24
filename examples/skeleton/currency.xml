@@ -1,0 +1,11 @@
+<data>
+<currency isocode = "AUD" name = "Australian Dollars"   />
+<currency isocode = "BEF" name = "Belgian Francs"       />
+<currency isocode = "CAD" name = "Canadian Dollars"     />
+<currency isocode = "FRF" name = "French Francs"        />
+<currency isocode = "NLG" name = "Dutch Guilders"       />
+<currency isocode = "NZD" name = "New Zealand Dollars"  />
+<currency isocode = "UKP" name = "UK Pounds"            />
+<currency isocode = "USD" name = "US Dollars"           />
+</data>
+

@@ -1,0 +1,48 @@
+<screen object = "language" style = "list"   alpha = "1"  />
+<screen object = "language" style = "select" alpha = "1"  />
+<screen object = "language" style = "create" >
+    <use object = "language" />
+    <invoke macro = "language_pass_data" />
+    <handler event = "on_accept" >
+        fld_language_code = lcase (trim (fld_language_code))
+        <if condition = "fld_language_code &lt;&gt; &quot;&quot;">
+        <fetch object = "language" view = "summary">
+            <missing>
+                cur_message = "Please enter a valid language code or select from the list"
+                cur_error   = "code"
+            </missing>
+        </fetch>
+        </if>
+    </handler>
+</screen>
+
+<screen object = "language" style = "detail" name = "language_detail" />
+
+<macro name = "language_pass_data" >
+    <handler event = "on_global" >
+    Session ("language_code")     = fld_language_code
+    Session ("language_name")     = fld_language_name
+    Session ("language_codepage") = fld_language_codepage
+    Session ("language_charset")  = fld_language_charset
+    Session ("language_lcid")     = fld_language_lcid
+    Session ("codepage")          = fld_language_codepage
+    Session ("charset")           = fld_language_charset
+    Session ("lcid")              = fld_language_lcid
+    </handler>
+</macro>
+
+<macro name = "language_validate">
+<use object = "language"/>
+<handler event = "on_accept" >
+    fld_language_code = lcase (trim (Request.Form ("language")))
+    <if condition = "fld_language_code &lt;&gt; &quot;&quot;">
+        <fetch object = "language" view = "summary">
+        <missing>
+            cur_message = "Please enter a valid language code or select from the list"
+            cur_error   = "language"
+        </missing>
+        </fetch>
+    </if>
+</handler>
+</macro>
+

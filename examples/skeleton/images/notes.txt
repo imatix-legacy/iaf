@@ -1,0 +1,3 @@
+Grey scale saturation:
+    Hue:        160
+    Saturation: 60

@@ -1,0 +1,33 @@
+<screen object = "fieldvalue" style = "list"   >
+    <invoke macro = "fieldvalue" />
+</screen>
+
+<screen object = "fieldvalue" style = "select" >
+    <invoke macro = "fieldvalue" />
+</screen>
+
+<screen object = "fieldvalue" style = "create" >
+    <invoke macro = "fieldvalue" />
+</screen>
+
+<screen object = "fieldvalue" style = "update" >
+    <invoke macro = "fieldvalue" />
+</screen>
+
+<macro name = "fieldvalue" >
+<macro_attr name = "detail" value = "fieldvalue_update" />
+<macro_attr name = "item"   value = "Form Field Value"  />
+<macro_attr name = "query"  value = "byfield"           />
+<var name = "fld_field_name"   />
+<handler event = "on_init" >
+    fld_field_name           = Session ("field_name")
+    fld_fieldvalue_fieldid   = Session ("field_id")
+</handler>
+<match name = "fieldid" />
+<page name = "*"><form>
+<layout append = "0" >
+<field name = "field_name" label = "Field name" size = "50" attr = "plain" />
+</layout>
+</form></page>
+</macro>
+

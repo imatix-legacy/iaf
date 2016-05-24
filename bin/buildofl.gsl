@@ -1,0 +1,60 @@
+#
+#   buildofl.gsl
+#
+#   Load DFL and OFL files, generate object handling code and save the
+#   exploded OFL tree as testout.ofl.
+#
+#   Written: 2000/08/01  iMatix Corporation
+#   Revised: 2001/08/15  iMatix Corporation
+#
+#   Arguments to script:
+#
+#   -ofl:       name of OFL file, without extension
+#   -model:     lite    (pure ASP/ODBC),
+#               c       (ofl module in c)
+#               fulldev (VB components and stored procedures)
+#               full    (VB components under MTS and stored procedures)
+
+include "mod_ofl.gsl"
+ofl_load ("$(ofl).ofl")
+
+#   Load incremental rebuild list if any
+for root.ofl
+    if exists ("rebuild.ofl")
+        xml to root as build_object from "rebuild.ofl"
+        for object
+            if count (root.build_object, count.name = object.name)
+                object.build = 1
+            else
+                object.build = 0
+            endif
+        endfor
+    else
+        for object
+            object.build = 1
+        endfor
+    endif
+endfor
+
+model ?= "lite"
+if model = "lite"
+    platform = "asp"
+    generate_objects ()
+elsif model = "c"
+    include "oflobjc.gsl"
+    generate_c_objects ()
+elsif model = "fulldev"
+    platform = "vbsp"
+    generate_vb_project_group ()
+    generate_objects ()
+elsif model = "full"
+    platform = "vbsp"
+    mts      = 1
+    generate_vb_project_group ()
+    generate_objects ()
+else
+    abort "Supported models are 'lite' (ASP/ODBC) and 'full' (VB/MTS/SQLServer)."
+endif
+
+save root-> ofl as "testout.ofl"
+

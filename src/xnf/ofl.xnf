@@ -1,0 +1,551 @@
+<?xml version="1.0"?>
+<xnf name = "OFL" >
+An OFL (Object Framework Language) file describes the objects in an iAF
+application.  Objects are things that can be viewed as separate entities
+within the application by the users (such as customers, products,
+and suppliers).  They are based on a database table (their root table,
+defined in DFL), but can also bring in related fields from other table
+(such as address details from an "address" table referenced by a foreign
+key on the root table).  Thus the objects give a higher level view of
+the information in the database, making it more relevant to what the
+users in the system expect to see.
+
+Multiple "views" can be defined on the object to display different sets
+of fields appropriate to different situations (or different users).
+These views can either be updatable, or display only.  The core iAF
+scripts expect there will be a "create" view and a "delete" view.
+Generally there are also "summary" and "details" views defined, plus
+any specialised views.  Multiple "queries" can also be defined for the
+object which provide a way for the user to obtain a list of objects, and
+select one of them for further action (eg, updating it or relating it to
+another object).  These queries are based on the views defined on the
+object which specify which fields should be shown in the result list.
+
+Objects can inherit default information from classes, helping to normalise
+the definition of the objects so that each thing is specified only in
+one place.   
+
+The OFL file builds on the tables and other definitions from the DFL
+(Database Framework Language) file, and in turn is used by the PFL
+(Presentation Framework Language) files.  By convention the DFL, OFL,
+and PFL files all have the same basename which serves to link them
+together as part of the same application.  OFL files are processed by
+the mod_ofl.gsl iAF module, usually run from the buildofl.gsl script.
+
+<entity name = "ofl" tag = "ofl" >
+  The 'ofl' element contains the object, class, and view definitions
+  to describe the entities in the application which are visible to the
+  user.  It builds on the application's DFL file that defines the
+  database tables, fields, indexes and relationships between the tables.
+  The OFL file permits textual inclusion (with 'include') and a smarter
+  inheritance of 'class' elements (with 'inherit') in a similiar way to
+  the DFL file (which inherits 'domain' elements).
+
+  A plain text description of the application the OFL file belongs to
+  may be provided between the 'ofl' start and end tags, and this will be
+  used when generating documentation from the OFL file.
+    <allow entity = "include"   />
+    <allow entity = "inherit"   />
+    <allow entity = "class"     />
+    <allow entity = "object"   occurs = "1+" />
+    <attr name = "name" required = "1" >
+      The short name of the iAF application to which this OFL file belongs.
+      This is used to ensure that the right OFL file is being processed
+      when PFL files refer to the OFL file.
+    </attr>
+    <attr name = "dfl" >
+      The full name of the file containing the DFL file that this OFL
+      builds upon.  This is used to automatically load the correct DFL
+      file when processing the OFL file.  If not supplied the default
+      value will be the name of the OFL file, with the extension changed
+      to ".dfl".
+    </attr>
+    <attr name = "description" >
+      A description of the iAF application to which this OFL file
+      belongs, for the benefit of someone looking at the OFL file.
+    </attr>
+    <attr name = "author" >
+      The name, and preferably email address, of the person who wrote
+      the OFL file.  The recommended format is 
+      "Full Name &lt;email@address&gt;".
+    </attr>
+    <attr name = "script" >
+      The default processings script to use.  If not specified, then
+      a processing script will need to be specified on the GSL command
+      line.  "buildofl.gsl" cannot be specified here, as it expects
+      command line arguments which will not be present when running
+      gslgen against an OFL file.  However a local wrapper script can be
+      specified which defines the arguments that "buildofl.gsl" requires,
+      and then invokes that GSL script.
+    </attr>
+    <attr name = "written" >
+      The date (in ISO standard date format) that the OFL file was first
+      created.  The expected format is YYYYMMDD.  This field and the
+      "revised" field can be used in generated documentation to identify
+      which version of the file is being described.
+    </attr>
+    <attr name = "revised" >
+      The date (in ISO standard date format) that the OFL file was last
+      revised.  The expected format is YYYYMMDD.  This field and the
+      "written" field can be used in generated documentation to identify
+      which version of the file is being described.
+    </attr>
+</entity>
+
+<entity name = "include" tag = "include" >
+  The 'include' element permits textual-inclusion from another file.
+  The specified file (in XML format) is loaded and inserted into the XML
+  tree in place of the 'include' element.  The specified file may
+  contain a "forest" of XML trees, such that there is more than one top
+  level element in the XML file.  All of the XML trees in the specified
+  file will be loaded and placed into the current XML tree in place of
+  the 'include' element.  The 'include' element makes it possible to
+  split the OFL definitions across multiple text files for easier
+  editing, and also to allow reuse of common definitions.  However
+  because a straight textual-inclusion is performed, care must be taken
+  to ensure that the result of the inclusion will still give a valid OFL
+  file; if more selective inclusion is required the 'inherit' element
+  may be more appropriate to inherit classes from another file.
+  <attr name = "filename" required = "1" >
+    The name of the XML-format file to be included in place of the
+    'include' element.
+  </attr>
+</entity>
+
+<entity name = "inherit" tag = "inherit" >
+  The 'inherit' element permits reference to a base set of classes which
+  should be used if the classes are not already defined in the OFL file.
+  The specified file (in OFL format, as a single XML tree with a 'ofl'
+  element at the top level) is processed looking for 'class' elements
+  which are in the specfified file but not already in OFL being
+  processed.  When a new class is found, it is copied from the
+  specified OFL into the tree of OFL file being processed.  Classes that
+  already exist in the OFL file being processed are skipped.  The
+  'inherit' element is used for building larger iAF applications based on
+  common OFL definitions and on smaller iAF applications.  Unlike the
+  'include' element only 'class' elements will be copied from the
+  specified file, and the specified file must be a full OFL file.
+  <attr name = "filename" required = "1" >
+    The name of the OFL-format file to read additional 'class' elements from.
+  </attr>
+</entity>
+
+<entity name = "class" tag = "class" >
+  The 'class' element is used to define a base set of properties which
+  can be applied to 'object' elements if they do not specify that
+  property.  Classes are usually used to supply a default set of views
+  for objects which do not supply their own versions of those views.
+  One class can be marked as the "default" class, which means that its
+  properties will be applied to all objects which do not specify that
+  another class applies to them.  (This avoids the need to specify for
+  each 'object' element that it derives from the default class.)  Only
+  one 'class' element may be marked as the default; if more than one is
+  marked as a default, the iAF generation scripts will indicate an error
+  and stop generation of the application.
+  <allow entity = "view"   />
+  <allow entity = "query"  />
+  <attr name = "name" required = "1" >
+    The name of the 'class' used to refer to the class from 'object'
+    elements.
+  </attr>
+  <attr name = "default" default="0" >
+    If supplied and set to "1" marks this class as the default one to be
+    applied to all objects which do not specify another class.  
+    <restrict value = "0" >not the default class</restrict>
+    <restrict value = "1" >the default class</restrict>
+  </attr>
+</entity>
+
+<entity name = "object" tag = "object" >
+  The 'object' element defines an entity that can be presented to, and
+  manipulated by, the user (such as a customer, supplier, product, etc).
+  Objects have views (which are ways of looking at the object and
+  manipulating the object which show more or less detail), and may also
+  have queries (to search for objects matching some criteria).  Objects
+  are based on tables in the associated DFL file, of the same name, but
+  can also draw on other tables in the DFL file for additional data to
+  display (and in some cases update).  Object definitions are also based
+  on 'class' elements, which contain the default 'view' and 'query'
+  elemnts to use for the object.
+
+  A plain text description of the object can be provided between the 
+  'object' start and end tags.  This description will be used when
+  generating documentation.
+  <allow entity = "view"         />
+  <allow entity = "query"        />
+  <allow entity = "require"    occurs = "0/1" />
+  <allow entity = "subselect"    />
+  <attr name = "name" required = "1" >
+    The name of the object.  This name is used to refer to the object in
+    the PFL files.  It is also used to locate the base 'table' for the
+    object in the DFL file.
+  </attr>
+  <attr name = "description" >
+    A one line description of the object for display to the application
+    user.  The 'object' name will be used instead of the description if
+    not provided.
+  </attr>
+  <attr name = "class" >
+    The name of the 'class' that this object belongs to (and from which
+    it gets its default properties, views and queries).  If not
+    specified the 'class' marked as the default will be used.
+  </attr>
+  <attr name = "item" >
+    A short description of the object.  The default value is inherited
+    from the root DFL 'table' description, but it can be overridden here
+    if required.  It is used to identify the object to the user in some
+    situations.
+  </attr>
+</entity>
+
+<entity name = "view" tag = "view" >
+  The 'view' element is used to define a way of presenting the object to
+  the user, and giving them an opportunity to manipulate it.  Common views
+  are "summary" (used in queries) and "detail" (used for manipulation
+  of the object), as well as specialised views such as "create" and
+  "delete" for starting and ending an object's life span.  As an aid to
+  normalisation of the object definitions 'view' elements can be marked
+  as being the same as another existing view (on the same object),
+  except for the properties which are directly specified.  This is
+  often used to create "detail" and "update" views which are the same,
+  except that the former does not allow changes while the latter does,
+  which is controlled by a single property on the view.
+
+  <allow entity = "view-field" occurs = "1+"/>
+  <attr name = "name" required = "1" >
+    The name of the view used to refer to it within the iAF application.
+    Common view names are "create", "delete", "detail" and "summary",
+    but you can use additional view names by referencing them from the
+    PFL file.
+  </attr>
+  <attr name = "read" default = "0" >
+    Indicates whether the object is read from the database through this
+    view.  It is usually set to "1" (visible) except on "create" views
+    (where there is no existing object to read in) and "delete" views.
+    <restrict value = "0" >object is not shown through this view</restrict>
+    <restrict value = "1" >object is read and displayed</restrict>
+  </attr>
+  <attr name = "write" default = "0" >
+    Indicates whether the object can be updated through this view (ie,
+    that the changes will be written back to the database).
+    <restrict value = "0" >object can not be updated through this view</restrict>
+    <restrict value = "1" >object can be updated through this view</restrict>
+  </attr>
+  <attr name = "delete" default = "0" >
+    Indicates whether the object can be deleted through this view.
+    <restrict value = "0" >object cannot be deleted through this view</restrict>
+    <restrict value = "1" >object can be deleted through this view</restrict>
+  </attr>
+  <attr name = "sameas" >
+    Specifies another 'view' on this 'object' (or in this 'class') that
+    the view should inherit definitions from.  This is typically used to
+    define a single base view which has all the required fields in it,
+    and then derive "create", "detail", "delete", etc views from it.
+    This improves data normalisation, and reduces the amount of typing
+    required.
+  </attr>
+</entity>
+
+<entity name = "view-field" tag = "field" >
+  The 'field' element specifies the name of a field to include in a
+  'view'.  Typically only the name of the field is required as the 
+  result of the information about the field can be found on the 'table' 
+  associated with the object defined in the DFL file.  If necessary the 
+  source of the field can be specified, as well as default values, and 
+  an indication of whether the field is user visible, or hidden from the 
+  user (and used only to track state).
+  <allow entity = "table" occurs = "0/1" />
+  <allow entity = "rule"    />
+  <attr name = "name" required = "1" >
+    The name of the field to include in the view, or that is required,
+    or that is being accessed from another table.  The name should
+    generally match a 'field' named on the associated 'table' in the DFL
+    file; if it does not the source of the values for the field must be
+    specified.
+  </attr>
+  <attr name = "hidden" default = "0" >
+    If specified and set to "1", then the field will not be displayed
+    for the user, but will be a hidden field in the HTML used to track
+    state information.  (This is relevant only when the field is in a
+    'view'.)
+    <restrict value = "0" >the field is visible</restrict>
+    <restrict value = "1" >the field is hidden</restrict>
+  </attr>
+  <attr name = "default" >
+    The default value for the field, if it is not specified on the
+    associated 'field' in the DFL 'table'.  This is typically required
+    only on hidden fields, as most other fields refer to a field from
+    the DFL file which has its own default value.  (This is relevant
+    only when the field is in a 'view'.)
+  </attr>
+  <attr name = "source" >
+    If the field named does not match a field on the associated 'table'
+    (defined in the associated DFL file), then the source of the field
+    must be specified.  This is either the name of the database table
+    that the field should be retrieved from (in database internal
+    format, including the prefix: see the DFL reference for details on
+    the prefix system used by iAF), or SQL like "count (*)" which
+    specifies how the database should derive the value.  (This is
+    relevant only when the field is in a 'view'.)
+  </attr>
+</entity>
+
+<entity name = "table" tag = "table" >
+  The 'table' element specifies another table that is associated with
+  a 'field' within a 'view'.  This is used to refer to additional
+  information that should be displayed (such as a description associated
+  with a foreign key field on the base 'table' of the 'object').
+  <allow entity = "table-field" occurs = "1+" />
+  <attr name = "name" required = "1" >
+    The name of the 'table' (defined in the DFL file) which contains the
+    extra fields to be displayed.
+  </attr>
+</entity>
+
+<entity name = "table-field" tag = "field" >
+  The table 'field' element specifies the name of a field in an
+  associated 'table' which should be displayed along with the main
+  field.
+  <attr name = "name" required = "1" >
+    The name of the field (of the table being referenced) that
+    should be displayed along side the field that is referencing it.
+  </attr>
+</entity>
+
+<entity name = "rule" tag = "rule" >
+  Rules can be used to specify display properties for fields in a 'view', 
+  where these properties are not already specified on the fields on 
+  the associated 'table' (or where those display properties need to be
+  overridden).  Conceptually the same set of criteria apply to the
+  'rule' in the OFL file as apply to the 'rule' in the DFL file, but in
+  practice only "show" rules are relevant to the OFL file, so they are
+  the only ones listed here.
+  <attr name = "name" required = "1" >
+    The name of the type of 'rule' being specified.  The name is used to
+    hook the processing of the rule into the appropriate other parts of
+    the iAF application.
+    <restrict value = "show" >A rule affecting what is displayed</restrict>
+  </attr>
+  <attr name = "when" required = "1" >
+    Specifies when the rule should be applied.
+    <restrict value = "all"    >any time the field is touched</restrict>
+    <restrict value = "layout" >when laying out pages</restrict>
+  </attr>
+  <attr name = "what" required = "1" >
+    A parameter for the rule definition.  For "show" rules, it specifies 
+    what should be shown, or what aspect of the thing shown should be 
+    controlled, in combination with the "value" attribute. 
+    <restrict value = "label"    >display label for the field</restrict>
+    <restrict value = "prefix"   >a string to prefix the field name with when making the display label</restrict>
+    <restrict value = "showsize" >the size to display the field</restrict>
+    <restrict value = "join"     >indicates a join should be performed</restrict>
+    <restrict value = "default"  >specifies the default value to display</restrict>
+    <restrict value = "attr"     >specifies an attribute of the way to display the field</restrict>
+  </attr>
+  <attr name = "value" required = "1" >
+    A parameter for the rule definition.  For "show" rules it is used in 
+    combination with the "what" attribute, and specifies the size, range 
+    or type of things to display.
+  </attr>
+</entity>
+
+<entity name = "query" tag = "query" >
+  The 'query' element defines a way of searching for objects.  Queries
+  often have names like "byname" or "bytype" to indicate the primary
+  criteria used in the search.  The query also refers to a 'view' which
+  is used to display the results of the search, and usuaully an 'index'
+  which defines the fields that are used in the query.  (The 'index'
+  is defined in the DFL file on the 'table' associated with the object.)
+  Queries are typically defined by reference to an index defined in the 
+  database (via the DFL file) to ensure that the queries are always 
+  answered by the database from an index, and thus are efficient.
+  Queries generally just use the default condition generated from the
+  fields on the index (and the values the user supplies for them), but
+  if required the conditions for the query can be specified explicitly,
+  including reference to subselects to locate relevant data.
+  <allow entity = "subselect-ref"  />
+  <attr name = "name" required = "1" >
+    The name of the query, so that it can be referred to in the PFL
+    file.
+  </attr>
+  <attr name = "index" >
+    Specifies the index with the search criteria for the query.  If not
+    defined the primary index on the root database table is used, but if
+    "clean ids" are being used the primary index is simply on the "id"
+    field so creating and specifying an explicit index is recommended.  
+  </attr>
+  <attr name = "view" >
+    Specifies the view that describes what fields should be shown in the
+    results of the query.  The default is to display the fields in the
+    "summary" view, but usually an explicit view should be specified.
+  </attr>
+  <attr name = "arg1" >
+    If it is necessary to override the default search criteria used by
+    the query, this specifies the name of the first argument for the query.
+  </attr>
+  <attr name = "arg1_type" >
+    If it is necessary to override the default search criteria used by
+    the query, this specifies the type of the first argument for the query.
+  </attr>
+  <attr name = "arg2" >
+    If it is necessary to override the default search criteria used by
+    the query, this specifies the name of the second argument for the query.
+  </attr>
+  <attr name = "arg2_type" >
+    If it is necessary to override the default search criteria used by
+    the query, this specifies the name of the second argument for the query.
+  </attr>
+  <attr name = "arg3" >
+    If it is necessary to override the default search criteria used by
+    the query, this specifies the name of the second argument for the query.
+  </attr>
+  <attr name = "arg3_type" >
+    If it is necessary to override the default search criteria used by
+    the query, this specifies the name of the second argument for the query.
+  </attr>
+  <attr name = "arg4" >
+    If it is necessary to override the default search criteria used by
+    the query, this specifies the name of the second argument for the query.
+  </attr>
+  <attr name = "arg4_type" >
+    If it is necessary to override the default search criteria used by
+    the query, this specifies the name of the second argument for the query.
+  </attr>
+  <attr name = "arg5" >
+    If it is necessary to override the default search criteria used by
+    the query, this specifies the name of the second argument for the query.
+  </attr>
+  <attr name = "arg5_type" >
+    If it is necessary to override the default search criteria used by
+    the query, this specifies the name of the second argument for the query.
+  </attr>
+  <attr name = "arg6" >
+    If it is necessary to override the default search criteria used by
+    the query, this specifies the name of the second argument for the query.
+  </attr>
+  <attr name = "arg6_type" >
+    If it is necessary to override the default search criteria used by
+    the query, this specifies the name of the second argument for the query.
+  </attr>
+  <attr name = "arg7" >
+    If it is necessary to override the default search criteria used by
+    the query, this specifies the name of the second argument for the query.
+  </attr>
+  <attr name = "arg7_type" >
+    If it is necessary to override the default search criteria used by
+    the query, this specifies the name of the second argument for the query.
+  </attr>
+  <attr name = "arg8" >
+    If it is necessary to override the default search criteria used by
+    the query, this specifies the name of the second argument for the query.
+  </attr>
+  <attr name = "arg8_type" >
+    If it is necessary to override the default search criteria used by
+    the query, this specifies the name of the second argument for the query.
+  </attr>
+  <attr name = "arg9" >
+    If it is necessary to override the default search criteria used by
+    the query, this specifies the name of the second argument for the query.
+  </attr>
+  <attr name = "arg9_type" >
+    If it is necessary to override the default search criteria used by
+    the query, this specifies the name of the second argument for the query.
+  </attr>
+  <attr name = "condition" >
+    If it is necessary to override the default search criteria used by
+    the query, this attribute can be used to specify the search criteria
+    to use in the "WHERE" part of the SQL statement.   The syntax "$(argn)"
+    where 'n' is 1 to 9 should be used to refer to the arguments to the
+    query to permit the iAF application to substitute in the appropriate
+    arguments.
+  </attr>
+  <attr name = "filter" >
+    If defined as "1", the query will include a condition that filters the
+    result set on a filter text argument (provided by the iAF application)
+    under a condition also provided by the application.  The filter
+    condition may take three values: "-", "CONTAIN", and "START".
+  </attr>
+</entity> 
+
+<entity name = "subselect-ref" tag = "subselect" >
+  The 'subselect' (reference) element is used both to refer to a 
+  subselect (from within a 'query' element).  The optional 'pass'
+  elements can be used to specify which fields should be passed to the
+  query.
+  <allow entity = "pass"   />
+  <attr name = "name" required = "1" >
+    The name of the 'subselect' being referred to.
+  </attr>
+</entity>
+
+<entity name = "pass" tag = "pass" >
+  The 'pass' element is used within a 'subselect' element reference to
+  specify which argument should be passed to the subselect.   The name
+  used should be the internal name of the argument, ie "arg1" or "arg2".
+  <attr name = "argument" required = "1">
+    The name of the argument to pass to the 'subselect'.
+    <restrict value = "arg1" >pass the first argument</restrict>
+    <restrict value = "arg2" >pass the second argument</restrict>
+  </attr>
+</entity>
+
+<entity name = "require" tag = "require" >
+  The 'require' element specifies the required fields of an 'object',
+  that is the fields for which the user must supply a value.  Fields
+  which are not marked as required, and do not have default values, will
+  be set to NULL.
+  <allow entity = "require-field" occurs="1+" />
+</entity>
+
+<entity name = "require-field" tag = "field" >
+  The require 'field' element specifies the name of a field that is 
+  required to be set when manipulating the object.  (Fields that are not
+  listed as required may be left empty.)
+  <attr name = "name" required = "1" >
+    The name of the field to that is required.  The name should match 
+    a 'field' of the object (or named on the associated 'table' in the DFL
+    file).
+  </attr>
+</entity>
+
+<entity name = "subselect" tag = "subselect" >
+  The 'subselect' element specifies a subselect (within an 'object'
+  element), that can be referred to by a 'query' element.
+  the 'object' element).  'field' elements are used to specify which
+  fields should be retrieved by the subselect.
+  <allow entity = "subselect-field" />
+  <attr name = "name" required = "1" >
+    The name of the 'subselect' so that it can be referred to from
+    within a query.
+  </attr>
+  <attr name="using1" required = "1" >
+    Specifies an additional criteria for the subselect if required.  
+    Typically used to refer to the "id" primary key.
+  </attr>
+  <attr name="using2" required = "1" >
+    Specifies a second additional criteria for the subselect if required.  
+  </attr>
+  <attr name="value" required = "1" >
+    The SQL required for the subselect statement.  It should use
+    "$(fields)" to refer to the fields (which are defined in 'field'
+    elements within the 'subselect'), "$(arg1)" and "$(arg2)" to
+    refer to the arguments passed to the 'subselect', and "$(using1)"
+    and "$(using2)" to refer to the additional criteria of the subselect.  
+    Note that the table names in the select criteria should refer to the
+    database internal table names, including the DFL prefix, rather than
+    the table names defined in the DFL file.  (See the DFL reference for
+    more details on the "prefix" scheme used by iAF.)
+  </attr>
+</entity>
+
+<entity name = "subselect-field" tag = "field" >
+  The subselect 'field' element specifies the name of a field that is 
+  to be read in when performing a subselect.
+  <attr name = "name" required = "1" >
+    The name of the field to to be included in the subselect.   The
+    field name should exist on the table being selected on.
+    file).
+  </attr>
+</entity>
+
+</xnf>

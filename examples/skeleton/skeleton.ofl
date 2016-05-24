@@ -1,0 +1,25 @@
+<ofl
+    name        = "skeleton"
+    dfl         = "skeleton.dfl"
+    description = "iAF Skeleton Application"
+    author      = "iMatix Corporation"
+    >
+
+<inherit filename = "std_class.ofl"         />
+
+<!--  sys : system module  -->
+<include filename = "sys_currency.ofl"      />
+<include filename = "sys_email.ofl"         />
+<include filename = "sys_form.ofl"          />
+<include filename = "sys_field.ofl"         />
+<include filename = "sys_fieldvalue.ofl"    />
+<include filename = "sys_fieldrule.ofl"     />
+<include filename = "sys_fieldrole.ofl"     />
+<include filename = "sys_language.ofl"      />
+<include filename = "sys_module.ofl"        />
+<include filename = "sys_modulerole.ofl"    />
+<include filename = "sys_prefs.ofl"         />
+<include filename = "sys_user.ofl"          />
+<include filename = "sys_userrole.ofl"      />
+<include filename = "sys_usertype.ofl"      />
+</ofl>

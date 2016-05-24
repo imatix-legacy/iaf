@@ -1,0 +1,90 @@
+/*  CHOOSER 
+ *
+ *  This style implements a 'chooser' list screen.  The user can click
+ *  on an item to select it; the selected item is added to a list of
+ *  items managed by the calling program.
+ */
+
+function style_chooser ()
+    #   Set defaults for called programs
+    screen.view  ?= "summary"
+    screen.query ?= screen.view
+
+    xml '
+<style>
+<use object = "$(object)" />
+<handler event  = "on_init">
+    Session ("select_made") = 0
+    Session ("select_all")  = 0
+    <query name = "$(query)" control = "first">
+        <empty>
+        cur_message = "No $(item) entries exist"
+        return_to_parent
+        </empty>
+    </query>
+</handler>
+<page title = "Select $(item:)" name = "list" view = "$(view)">
+<toolbar>
+  <action name = "all"                    hint = "Add the entire list"          
+          condition = "$(restrict_all?:)" />
+  <action name = "first"    text = "|<"   hint = "Go to the start of the list"  />
+  <action name = "previous" text = "<<"   hint = "Go backwards in the list"     />
+  <action name = "next"     text = ">>"   hint = "Go forwards in the list"      />
+  <action name = "last"     text = ">|"   hint = "Go to the end of the list"    />
+</toolbar>
+<form>
+  <hints>
+  <hint>This screen shows one page of $(item) entries at a time.</hint>
+  <hint>To scroll through the entire list, use the toolbar actions.</hint>
+  <hint>To add a particular $(item), click it.</hint>
+  <hint>To add all the items in this list, click All.  This may take a few
+  seconds.</hint>
+  <hint>Click \'Done\' to finish.</hint>
+  </hints>
+  <summary>
+  <field name = "*" />
+  </summary>
+  <action name = "next" text = "More..." hint = "Show next page"
+          condition = "query_more" />
+  <action name = "done" />
+</form>
+<handler action = "first">
+    <query name = "$(query)" control = "first" />
+</handler>
+<handler action = "last">
+    <query name = "$(query)" control = "last"/>
+</handler>
+<handler action = "next">
+    <query name = "$(query)" control = "gt">
+    <empty>
+        cur_message = "This is the end of the list.  Click |&lt; to scroll back."
+        <query name = "$(query)" control = "last" />
+    </empty>
+    </query>
+</handler>
+<handler action = "previous">
+    <query name = "$(query)" control = "lt">
+    <empty><query name = "$(query)" control = "first" /></empty>
+    </query>
+</handler>
+<handler action = "all">
+    Session ("select_made") = 1
+    Session ("select_all")  = 1
+    return_to_parent
+</handler>
+<handler event = "on_select">
+    Session ("select_made") = 1
+    $(object)_pass_item
+    return_to_parent
+</handler>
+<handler action = "done">
+    return_to_parent
+</handler>
+</page>
+<handler event = "on_filter">
+    <query name = "$(query)" control = "first" />
+</handler>
+</style>
+'
+endfunction
+

@@ -1,0 +1,29 @@
+<esl
+    name        = "iafemail"
+    description = "dotBEER Email Daemon"
+    author      = "Pascal Antonnaux &lt;pascal@imatix.com&gt;"
+    unicode     = "0"
+    version     = "1.0"
+    dfl         = "starling">
+    <queue>
+        <table name = "emailqueue">
+            <field name = "id"         role = "id"        />
+            <field name = "sendat"     role = "sendat"    />
+            <field name = "emaillogid" role = "logid"     />
+            <field name = "revisedts"  />
+        </table>
+    </queue>
+    <log>
+        <table name = "emaillog">
+            <field name = "id"         role = "id"        />
+            <field name = "sender"     role = "senderid"  />
+            <field name = "recipients" role = "recipients"/>
+            <field name = "subject"    role = "subject"   />
+            <field name = "body"       role = "body"      />
+            <field name = "status"     role = "status"    />
+            <field name = "message"    role = "message"   />
+            <field name = "sentat"     role = "sendat"    />
+            <field name = "createdts"  />
+        </table> 
+    </log>
+</esl>

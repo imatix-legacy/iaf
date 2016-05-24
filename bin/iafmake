@@ -1,0 +1,92 @@
+#   iafmake
+#
+#   This script does an incremental build
+#   It bases itself on testout.?fl
+
+require_file ("testout.dfl");
+require_file ("testout.ofl");
+require_file ("testout.pfl");
+
+#   Check for modified tables, objects, and screens
+print "Reviewing changes to project...\n";
+$dfl_count = get_rebuild_list ("table",  "dfl");
+$ofl_count = get_rebuild_list ("object", "ofl");
+$pfl_count = get_rebuild_list ("screen", "pfl");
+
+if ($dfl_count > 0 || $ofl_count > 0 || $pfl_count > 0) {
+    system "gslgen -q iafmake";
+    system "build inc";
+}
+else {
+    print "No changes to project\n";
+}
+exit;
+
+#   Subroutines
+
+sub require_file {
+    local ($filename) = @_;
+    if (!-f $filename) {
+        print "$filename is missing - cannot do incremental build\n";
+        exit;
+    }
+}
+
+sub get_rebuild_list {
+    local ($item, $ext) = @_;
+
+    print "Changed $item\s:\n";
+    opendir DIR, ".";
+    open    XML, ">rebuild.$ext";
+    $time  = file_time ("testout.$ext");
+    $items = 0;
+    foreach (grep (/\.$ext$/, readdir (DIR))) {
+        $file = $_;
+        if (file_time ($file) > $time) {
+            open FILE, $file;
+            while (<FILE>) {
+                if (/<$item/) {
+                    $expect_name = 1;
+                    $name   = "";
+                    $style  = "";
+                    $object = "";
+                }
+                if ($expect_name) {
+                    $name = $1   if /name\s*=\s*"([^"]*)"/   && $name   eq "";
+                    $style = $1  if /style\s*=\s*"([^"]*)"/  && $style  eq "";
+                    $object = $1 if /object\s*=\s*"([^"]*)"/ && $object eq "";
+                }
+                if (/<$item.*>/ || /\/>/ || /<\/$item/) {
+                    if ($name eq "" && $style ne "" && $object ne "") {
+                        $name = "$object\_$style";
+                    }
+                    if ($name ne "" && $expect_name) {
+                        print " - $name\n";
+                        print XML "<$item name = \"$name\"/>\n";
+                        $items++;
+                        $expect_name = 0;
+                    }
+                }
+            }
+            close FILE;
+            if ($expect_name) {
+                print "Error - missing $(item) name in $file\n";
+                exit;
+            }
+        }
+    }
+    closedir DIR;
+    close    XML;
+    if ($items == 0) {
+        unlink "rebuild.$ext";
+        print " - no changes\n";
+    }
+    return $items;
+}
+
+sub file_time {
+    local ($filename) = @_;
+    @stats = stat ($filename);
+    return ($stats [9]);
+}
+

@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<config 
+    description = "iafwatch Daemon configuration">
+    <main
+        run             = "1"
+        schedule        = "60"
+        service_name    = "iafwatch"
+        service_text    = "iafwatch Daemon"
+        debug           = "1"
+        trace_file      = "iafwatch.log"
+    />
+    <http
+        url     = "http://127.0.0.1/us/login.asp?op=I"
+        agent   = "Mozilla/4.0 (compatible;iMatix iafWatch robot)"
+        cookie  = "ASPSESSIONIDQQGQQIRK=IHHNHJDBXXXXXXXXXXXXXXXX"
+        timeout = "15"
+    />
+    <launch_if_fail>
+        <process value = "kill /f dllhost"/>
+    </launch_if_fail>   
+</config>
+

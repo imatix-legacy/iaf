@@ -1,0 +1,83 @@
+#   Expands all dependencies in rebuild lists
+#
+
+>Loading project structure...
+if exists ("rebuild.dfl")
+    xml to root from "rebuild.dfl"
+endif
+if exists ("rebuild.ofl")
+    xml to root from "rebuild.ofl"
+endif
+if exists ("rebuild.pfl")
+    xml to root from "rebuild.pfl" 
+endif
+xml to root from "testout.dfl"
+xml to root from "testout.ofl"
+xml to root from "testout.pfl"
+
+#   Expand list of modified objects to include all that
+#   are based on or use modified tables in their views.
+if count (root.table)
+  >Calculating dependent objects...
+  for root.ofl
+    for object
+        if count (root.table,  count.name = root_table) \
+        &  count (root.object, count.name = object.name) = 0
+            xml to root '<object name = "$(object.name)"/>'
+            > - $(object.name)
+        endif
+        for view
+            for view-> table.field where count (table)
+                for table
+                    if count (root.table,  count.name = table.name) \
+                    &  count (root.object, count.name = object.name) = 0
+                        xml to root '<object name = "$(object.name)"/>'
+                        > - $(object.name)
+                    endif
+                endfor
+            endfor
+        endfor
+    endfor
+  endfor
+endif
+
+#   Build list of all screens that use the modified objects
+if count (root.object)
+  >Calculating dependent screens...
+  for root.pfl
+    for screen
+        for use
+            if count (root.object, count.name = use.object) \
+            &  count (root.screen, count.name = screen.name) = 0
+                xml to root '<screen name = "$(screen.name)"/>'
+                > - $(screen.name)
+            endif
+        endfor
+    endfor
+  endfor
+endif
+
+#   Create rebuild list for iafodbc operations
+output "request.xml"
+><request>
+for root.dfl
+for root.table
+    ><table name = "$(prefix)$(name)" />
+endfor
+endfor
+></request>
+
+#   Rewrite rebuild.ofl and rebuild.pfl
+if count (root.object)
+    output "rebuild.ofl"
+    for root.object
+        ><object name = "$(name)" />
+    endfor
+endif
+
+if count (root.screen)
+    output "rebuild.pfl"
+    for root.screen
+        ><screen name = "$(name)" />
+    endfor
+endif

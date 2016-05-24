@@ -1,0 +1,19 @@
+<screen object = "currency" style = "select" alpha = "1" />
+<screen object = "currency" style = "list"   alpha = "1" />
+<screen object = "currency" style = "create" />
+<screen object = "currency" style = "detail" />
+
+<macro name = "currency_validate">
+<use object = "currency"/>
+<handler event = "on_accept" >
+    fld_currency_isocode = ucase (trim (Request.Form ("currency")))
+    <if condition = "fld_currency_isocode &lt;&gt; &quot;&quot;">
+    <fetch object = "currency" view = "summary">
+    <missing>
+    cur_message = "Please enter a valid currency code or select from the list"
+    cur_error   = "currency"
+    </missing>
+    </fetch>
+    </if>
+</handler>
+</macro>

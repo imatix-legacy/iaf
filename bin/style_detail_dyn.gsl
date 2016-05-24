@@ -1,0 +1,107 @@
+/*  DETAIL_DYN
+ *
+ *  This style implements a 'work with' detail screen with a form
+ *  component.
+ */ 
+function style_detail_dyn ()
+    #   Set defaults for called programs 
+    screen.create ?= "$(object)_create"
+    screen.view   ?= "detail"
+    screen.query  ?= screen.view
+    screen.initial = "detail"
+
+    xml '
+<style>
+<use object = "$(object)" />
+<var name   = "form_data" />
+<var name   = "form_id"   />
+<handler event = "on_global" source = "sub_formio.asp" />
+<handler event = "on_init">
+    $(object)_recv_key
+    <fetch view = "$(view)">
+        <ok>
+        form_fetch Session ("form_parent_name"), Session ("form_parent_id"), Session ("form_object_name"), ""
+        form_data = fld_$(object)_formdata
+        form_id   = Session ("form_id")
+        </ok>
+    </fetch>
+</handler>
+<handler event = "on_return">
+    Session ("form_id") = form_id
+</handler>
+
+<page title = "$(item:) Details" name = "detail" view = "$(view)">
+<toolbar>
+  <action name = "first"    text = "|<"   hint = "Show the first $(item)"   />
+  <action name = "previous" text = "<<"   hint = "Show the previous $(item)"/>
+  <action name = "next"     text = ">>"   hint = "Show the next $(item)"    />
+  <action name = "last"     text = ">|"   hint = "Show the last $(item)"    />
+  <action name = "create"   text = "New"  hint = "Create a new $(item)"     
+          condition = "$(restrict_create?:)" shortcut = "N" />
+  <action name = "edit"     hint = "Change this $(item)"
+          condition = "$(restrict_modify?:)" shortcut = "E" />
+  <action name = "delete"   hint = "Delete this $(item)" confirm = "Okay to delete $(item)?" 
+          condition = "$(restrict_delete?:)" />
+</toolbar>
+<form>
+  <hints>
+  <hint>You can edit this $(item), or scroll to look at others.  Use the toolbar
+  actions to scroll through the $(item) list.</hint>
+  </hints>
+  <layout>
+    <field name = "*" />
+    <text join = "1">&lt;% form_display "output", 0, "" %&gt;</text>
+    <action name = "edit" toolbar = "1" hint = "Change this $(item)"
+          condition = "$(restrict_modify?:)" />
+    <action name = "cancel" join = "1" text = "Done" />
+  </layout>
+</form>
+<handler action = "next"    ><query name = "$(query)" control = "gt"    limit = "1" /></handler>
+<handler action = "previous"><query name = "$(query)" control = "lt"    limit = "1" /></handler>
+<handler action = "first"   ><query name = "$(query)" control = "first" limit = "1" /></handler>
+<handler action = "last"    ><query name = "$(query)" control = "last"  limit = "1" /></handler>
+<handler action = "cancel">
+    return_to_parent
+</handler>
+<handler action = "create">
+    chain_to "$(create)"
+</handler>
+<handler action = "edit">
+    cur_page = "modify"
+</handler>
+<handler action = "delete">
+    <delete>
+        <ok>return_to_parent</ok>
+    </delete>
+</handler>
+</page>
+
+<page title = "Edit $(item:) Details" name = "modify" view = "$(view)">
+<form mode = "input">
+  <hints>
+  <hint>Click Ok to save your changes, or Cancel to discard them.</hint>
+  </hints>
+  <layout>
+    <field name = "*" />
+    <text join = "1">&lt;% form_display "input", cur_userid, "" %&gt;</text>
+    <action name = "update" toolbar = "1" text = "Ok" fields = "1" hint = "Save your changes now" />
+    <action name = "cancel" join = "1"                             hint = "Lose your changes"     />
+  </layout>
+</form>
+<handler event = "on_getdata">
+    form_accept check_required_fields
+</handler>
+<handler action = "update">
+    fld_$(object)_formdata = form_data
+    <update>
+        <ok>cur_page = "detail"</ok>
+    </update>
+</handler>
+<handler action = "cancel" getdata = "0">
+    cur_page = "detail"
+</handler>
+</page>
+</style>
+'
+endfunction
+

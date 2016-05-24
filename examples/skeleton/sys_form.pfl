@@ -1,0 +1,168 @@
+<!-- Form Module
+
+    form_update displays and updates the form specified in:
+
+    Session ("form_parent_name") - name of parent object, e.g. "customer"
+    Session ("form_parent_id")   - id of parent object, e.g. 12
+    Session ("form_object_name") - name of form object, e.g. "submission"
+    Session ("form_parent_desc") - description of parent, e.g. "Client Company"
+    Session ("form_object_desc") - description of object, e.g. "Candidate"
+
+    If the form is not defined, form_update will try to inherit from another
+    form where the parent object and id are specified by:
+    
+    Session ("form_inherit_name") - name of parent object
+    Session ("form_inherit_id")   - id of parent object
+                                    
+-->
+
+<screen object = "form" style = "detail" >
+    <invoke macro = "form" />
+</screen>
+
+<screen name = "form_update" style = "browse" >
+    <use object = "form"      />
+    <use object = "field"     />
+    <use object = "fieldvalue"/>
+    <var name = "form_data" />
+    <var name = "form_mode" type = "textual" value = "design"/>
+    <handler event = "on_global" source = "sub_formio.asp"     />
+    <handler event = "on_global" source = "sub_inherit_form.asp" />
+
+    <handler event = "on_init" replace = "1" >
+    fld_parent_desc     = Session ("form_parent_desc")
+    fld_object_desc     = Session ("form_object_desc")
+    fld_form_parentname = Session ("form_parent_name")
+    fld_form_objectname = Session ("form_object_name")
+    fld_form_parentid   = Session ("form_parent_id")
+    <query name = "byobject" control = "eq" limit = "1" />
+    <step>
+    if query_count = 0 then
+        if Session ("form_inherit_name") &lt;&gt; "" then
+            form_inherit
+        else
+            fld_form_id = 0
+        end if
+    end if
+    if fld_form_id = 0 then
+        </step>
+        <create/>
+        <step>
+        fld_form_id = Session ("id")
+    end if
+    Session ("form_id") = fld_form_id
+    pForm.value = ""
+    </step>
+    </handler>
+       
+    <invoke macro = "form" />
+    <page name = "detail" >
+    <toolbar>
+        <action name = "new"   shortcut = "N" />
+        <action name = "reset" hint = "Reset form to initial default" confirm = "Okay to reset this form to its initial default?" 
+                condition = "Session (&quot;form_inherit_name&quot;) &lt;&gt; &quot;&quot;" />
+    </toolbar>
+    <form>
+     <hints>
+     <hint>Dynamic forms provide a customisable set of data capture fields.</hint>
+     <hint>You can add, remove, and modify the fields on this form.</hint>
+     <hint>To inspect and change the properties for any field on the form, click on
+     the field's name.</hint>
+     </hints>
+     <layout>
+     <line/>
+     <text join = "1">&lt;% form_display form_mode, 0, "" %&gt;</text>
+     <line/>
+     </layout>
+    </form>
+    <handler action = "reset" >
+        <delete/>
+        <step>
+        form_inherit
+        Session ("form_id") = fld_form_id
+        pForm.value = ""
+        </step>
+    </handler>
+    
+    <handler action = "edit">
+    Session ("id") = cur_argval
+    pForm.value = ""  ' Force form reload after field modification
+    chain_to "field_update"
+    </handler>
+
+    <handler action = "new">
+    pForm.value = ""  ' Force form reload after field modification
+    chain_to "field_create"
+    </handler>
+    </page>
+</screen>
+
+<screen name = "form_popup" >
+<var name = "form_data" />
+<handler event = "on_global" source = "sub_formio.asp" />
+<handler event = "on_init">
+    form_fetch Session ("form_parent_name"), Session ("form_parent_id"), Session ("form_object_name"), ""
+    form_data = ""
+    If CInt (pForm.attr ("count", 0)) = 0 or CInt (pFields.attr ("count", 0)) = 0 Then
+        Session ("form_data")  = ""
+        Session ("form_input") = TRUE
+        return_to_parent
+    End if
+</handler>
+<handler event = "on_showpage" page = "input" >
+    page_title = Session ("form_title")
+    Session ("form_input") = FALSE
+</handler>
+<page name = "input">
+<form mode = "input">
+  <text>&lt;center&gt;</text>
+  <text script = "shadedbox.gsl" what = "top" title = "<%=Session (&quot;form_title&quot;)%>" width = "80%" />
+  <text script = "shadedbox.gsl" what = "left" />
+  <text before = "2"/>
+  <layout>
+    <text join = "1">&lt;% form_display "input", 0, "" %&gt;</text>
+    <action name = "ok"     fields = "1" />
+    <action name = "cancel" getdata = "0" join = "1"   />
+  </layout>
+  <text before = "1"/>
+  <text script = "shadedbox.gsl" what = "right"  />
+  <text script = "shadedbox.gsl" what = "bottom" />
+</form>
+<handler action = "cancel">
+    return_to_parent
+</handler>
+<handler event = "on_getdata">
+    form_accept check_required_fields
+</handler>
+<handler action = "ok">
+    Session ("form_data")  = form_data
+    Session ("form_input") = TRUE
+    return_to_parent
+</handler>
+</page>
+</screen>
+
+<macro name = "form" >
+<macro_attr name = "object" value = "form"              />
+<macro_attr name = "detail" value = "form_update"       />
+<macro_attr name = "item"   value = "Dynamic Form"      />
+<macro_attr name = "query"  value = "byobject"          />
+<var name = "fld_parent_desc" />
+<var name = "fld_object_desc" />
+<handler event = "on_init" >
+    fld_parent_desc     = Session ("form_parent_desc")
+    fld_object_desc     = Session ("form_object_desc")
+    fld_form_parentname = Session ("form_parent_name")
+    fld_form_objectname = Session ("form_object_name")
+    fld_form_parentid   = Session ("form_parent_id")
+</handler>
+<match name = "parentname" />
+<match name = "parentid"   />
+<page name = "*"><form>
+<layout append = "0" >
+<field name = "parent_desc" label = "Form defined within" size = "50" attr = "plain" />
+<field name = "object_desc" label = "Form applies to"     size = "50" attr = "plain" />
+</layout>
+</form></page>
+</macro>
+

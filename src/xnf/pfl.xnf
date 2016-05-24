@@ -1,0 +1,2551 @@
+<xnf name = "PFL">
+A PFL file defines the presentation layer for an application.  The
+mod_pfl.gsl script works on this definition to generate the front-end
+application layer.
+
+<entity name = "pfl" tag = "pfl" >
+  The pfl item contains the set of screens that define the presentation
+  layer of the application.
+    <allow entity = "pfl include" />
+    <allow entity = "screen"      />
+    <allow entity = "defaults"    />
+
+    <attr name = "name" required = "1" >
+    Specifies the name of the application.  The application name should
+    be a short abbrevation that can be used in the generated code for
+    naming files if necessary.
+    </attr>
+
+    <attr name = "ofl" required = "1" >
+    Specifies the name of the OFL file for the application. A PFL file
+    always has a matching OFL file.
+    </attr>
+
+    <attr name = "description">
+    Provides a description of the application, used as a comment.
+    </attr>
+
+    <attr name = "author">
+    Gives the name of the author of the PFL file.  It is used as a comment.
+    </attr>
+</entity>
+
+<entity name = "pfl include" tag = "include" >
+  The include item specifies the name of an PFL fragment to be included
+  in the main PFL file.  An PFL include file does not contain a root pfl
+  item, but a set of entity, class, function, or errorhandler entities.
+  The PFL processor will load partial PFL files specified in any include
+  entities before processing the remainder of the PFL file.
+    <attr name = "filename" required = "1" >
+    Specifies the full or relative name of a partial PFL file.
+    </attr>
+</entity>
+
+<entity name = "screen" tag = "screen" >
+  Specifies the name of a screen.  One screen is implemented as a single
+  program, consisting of one or more pages that share common data and
+  code.
+    <body entity = "screen element" />
+
+    <attr name = "name" required = "1" short = "Name of screen, unique in PFL">
+    Specifies the name of the screen, or program.  iAF implements each
+    PFL screen as a program.  This name should not have any file extension.
+    It should be unique within the PFL file.
+    </attr>
+    
+    <attr name = "item" short = "What item the screen shows">
+    Specifies the name of the item shown on the screen.  This attribute
+    is used by error messages, in prompts, and for default titles.  It
+    should be a singular item, e.g. 'Country', 'Contract', etc.
+    </attr>
+    
+    <attr name = "main" default = "0"  short = "If 1, screen is application main program">
+    Specifies whether the screen is the application main program.  An
+    interactive application must have one main program.  The difference
+    between a main and non-main program is that a main program does not
+    expect to be called from another program.  It expects no parameters,
+    and never returns.  A sub program (all other programs) expect arguments
+    from their parent program, and will return to it when they exit.
+        <restrict value = "0">screen is not the main program</restrict>
+        <restrict value = "1">screen is the main program</restrict>
+    </attr>
+    
+    <attr name = "style" short = "Name of style if screen is based on one">
+    Specifies the name of the screen style, if any.  The use of styles is
+    explained later, along with an explanation of each style and how to use
+    it.
+    </attr>
+    
+    <attr name = "skin">
+    Specifies the name of a skin, which is a HTML page used for the screen
+    design and layout (but not dynamic content).  The skin is used when the
+    application is generated.  For details on skinning, see the iAF doc.
+    When a screen is skinned, the hints, sidebar_left, and sidebar_right
+    attributes are ignored.
+    </attr>
+    
+    <attr name = "labelwidth" short = "Width of label column for layouts">
+    Specifies the width of the label column in a detail (two column) layout
+    block.  This can be overridden on a page by page basis in the page
+    item.  The label width can be specified as a percentage or as a number
+    of pixels.  Percentages work best.  This attribute is normally inherited
+    from the defaults definitions.  If it is not defined there, it must be
+    defined in each screen.
+    </attr>
+    
+    <attr name = "formattrs" >
+    Specifies TABLE attributes used for page forms.  The default value for
+    this attribute is designed to draw forms with horizontal separators. 
+    </attr>
+    
+    <attr name = "initial">
+    Specifies the initial page for the screen.  The default is the first page
+    defined in the screen.  The programmer can switch from page to page by
+    changing the value of the cur_page standard variable.
+    </attr>
+    
+    <attr name = "query" short = "Default query for the screen">
+    Specifies the default query name for the screen.  This can be overwritten
+    in individual query statements if needed.
+    </attr>
+    
+    <attr name = "limit" default = "20" short = "Default limit for all queries">
+    Specifies the default limit for queries.  This is used for summary screens
+    and should be kept low enough that a full query can be shown on one web page
+    without the user needing to scroll.
+    </attr>
+
+    <attr name = "hints" default = "1" short = "If 0, screen does not show hints">
+    Specifies whether the screen hints appear or not.  You can disable hints for
+    screens where there is not much space.
+        <restrict value = "0">hints are not added to screen</restrict>
+        <restrict value = "1">hints are added as specified in screen form</restrict>
+    </attr>
+
+    <attr name = "hintswidth" short = "Width of hints text">
+    Specifies the width of the hints column.  The hints width can be specified
+    as a percentage or as a number of pixels.  Percentages work best.  This
+    attribute is normally inherited from the defaults definitions.  If it is
+    not defined there, it must be defined in each screen.
+    </attr>
+    
+    <attr name = "sidebar_left">
+    Specifies whether or not the screen shows a left sidebar graphic.  This attribute
+    may optionally contain the name of an image file to show at the left of the screen.
+    </attr>
+    
+    <attr name = "sidebar_right">
+    Specifies whether or not the screen shows a right sidebar graphic.  This attribute
+    may optionally contain the name of an image file to show at the right of the screen.
+    </attr>
+    
+    <attr name = "banner_color">
+    Defines color used for banner texts.  This attribute is ignored if the screen is
+    skinned, in which case the 'banner' style is used for all banners.
+    </attr>
+    <attr name = "formbg_color">
+    Defines color used for form backgrounds.  This attribute is ignored if the screen
+    is skinned, in which case the 'layout_field' style is used.
+    </attr>
+    <attr name = "thead_color">
+    Defines color used for table headings.  This attribute is ignored if the screen
+    is skinned, in which case the 'summary_heading' style is used.
+    </attr>
+    <attr name = "trow1_color">
+    Defines color used for table odd rows.  This attribute is ignored if the screen
+    is skinned, in which case the 'summary_row1' style is used.
+    </attr>
+    <attr name = "trow2_color">
+    Defines color used for table even rows.  This attribute is ignored if the screen
+    is skinned, in which case the 'summary_row2' style is used.
+    </attr>
+    <attr name = "datesplit">
+    By default, input date fields are shown split into three select fields.
+    If this attribute is set to 0, input date fields are shown as a single
+    input field, which must then be validated by application code.
+    </attr>
+    <attr name = "file_filter" short = "Optional file filter for attachments">
+    This specifies a list of extensions that are accepted for the attachment
+    fields in the screen.  This is a list like: "htm,txt,rtf,html,jpg".
+    </attr>
+    
+    <rule name = "parse">
+    if count (pfl.screen, count.name ?= screen.name) > 1
+        error ("screen '$(name)' is not unique")
+    endif
+    for pfl-> defaults.property
+        screen.$(property.name) ?= property.value
+    endfor
+    for pfl-> defaults.global 
+        copy . to screen
+    endfor
+
+    screen.datesplit ?= 1
+    if !defined (screen.skin)
+        screen.banner_color ?= "#525a7b"
+        screen.formbg_color ?= "#e7e1ed"
+        screen.thead_color  ?= "#525a7b"
+        screen.trow1_color  ?= "#e7e1ed"
+        screen.trow2_color  ?= "#ffffff"
+    endif
+    </rule>
+</entity>
+
+<entity name = "screen element" >
+  All screen elements can be inherited from the screen style.
+    <allow entity = "use"                   />
+    <allow entity = "var"                   />
+    <allow entity = "enum"                  />
+    <allow entity = "global"                />
+    <allow entity = "match"                 />
+    <allow entity = "queryarg"              />
+    <allow entity = "page"                  occurs = "1+" />
+    <allow entity = "screen handler"        />
+</entity>
+
+<entity name = "use" tag = "use" >
+  Specifies the name of an object that the screen works with.  The
+  objects must be listed so that the screen can correctly bind with them
+  at initialisation time.  The first object listed acts as the default
+  for pages that do not explicitly refer to an object.
+    <attr name = "object" required = "1"  short = "Name of object to use">
+    Tells the iAF code generator the name of the object to bind to.
+    The object must be defined in the application OFL file.
+    </attr>
+
+    <rule name = "parse">
+    if count (ofl.object, name = use.object) = 0
+        pfl_parse_error ("'$(use.object)' is not a defined object")
+    elsif count (screen.use, object = use.object) > 1 & item () > 1
+        use.object = ""
+    endif
+    </rule>
+</entity>
+
+<entity name = "var" tag = "var" >
+  Declares a variable for use by the program.  All fields in all object views
+  used in the program are automatically defined as variables.  You must define
+  any other (non-object) fields shown on the screen.  You should also define
+  any variables that you need to save in the program's context.
+    <attr name = "name" required = "1" >
+    Specifies the name of the variable.  The name should be a valid variable
+    name in the language being used.
+    </attr>
+
+    <attr name = "type" default = "textual" short = "Variable type - textual, numeric,...">
+    Specifies the type of the variable.
+        <restrict value = "textual"  >variable holds a textual value</restrict>
+        <restrict value = "textbox"  >variable holds a long text value</restrict>
+        <restrict value = "numeric"  >variable holds a numeric value</restrict>
+        <restrict value = "date"     >variable holds a date value</restrict>
+        <restrict value = "time"     >variable holds a time value</restrict>
+        <restrict value = "boolean"  >variable holds a true / false value</restrict>
+        <restrict value = "timestamp">variable holds a timestamp (date/time) value</restrict>
+    </attr>
+
+    <attr name = "value" short = "Initial value for the variable">
+    Specifies the initial value for the variable.  The variable is reset to
+    this value when the program initialises, i.e. imediately after it is called
+    from another program.  If the variable is of type date or numeric, the value
+    between quotes is interpreted as a number, otherwise it is interpreted as a
+    string.  The default initial value is zero for numeric and date variables,
+    and "" for string variables.
+    </attr>
+
+    <attr name = "domain">
+    If specified, takes type information from the domain.  The domain must be
+    defined in the application DFL.  Note that this will be overridden by the
+    type information coming from a field in the case that the variable is also
+    shown in a page.
+    </attr>
+
+    <attr name = "occurs" short = "If defined, variable is created as an array">
+    Defines the variable as an array.  Array variables are created with a fixed
+    maximum size.  It can be useful to define array variables to keep track of
+    items coming - for instance - from a summary screen.
+    </attr>
+
+    <rule name = "parse">
+    if count (screen.var, count.name ?= var.name) > 1
+        pfl_parse_error ("variable '$(name)' is not unique")
+    elsif defined (var.domain)
+        if count (dfl.domain, count.name = var.domain) = 0
+            pfl_parse_error ("Domain '$(domain)' not found in DFL")
+        endif
+        for dfl.domain where name = var.domain
+            var.type = domain.type
+        endfor
+    endif
+    </rule>
+</entity>
+
+<entity name = "global" tag = "global" >
+  Defines a global application variable.  Such variables can be changed
+  in any program and are passed around to all programs.
+    <attr name = "name" required = "1">
+    Specifies the name of the variable.  The name should be a valid variable
+    name in the language being used.
+    </attr>
+
+    <attr name = "type" default = "textual" >
+    Specifies the type of the global variable.
+        <restrict value = "textual"  >variable holds a textual value</restrict>
+        <restrict value = "textbox"  >variable holds a long text value</restrict>
+        <restrict value = "numeric"  >variable holds a numeric value</restrict>
+        <restrict value = "date"     >variable holds a date value</restrict>
+        <restrict value = "time"     >variable holds a time value</restrict>
+        <restrict value = "boolean"  >variable holds a true / false value</restrict>
+        <restrict value = "timestamp">variable holds a timestamp (date/time) value</restrict>
+    </attr>
+
+    <attr name = "initial">
+    Specifies the initial value for the variable.  If the variable is of type
+    date or numeric, the value between quotes is interpreted as a number,
+    otherwise it is interpreted as a string.  The default initial value is
+    zero for numeric and date variables, and "" for string variables.
+    </attr>
+</entity>
+
+<entity name = "enum" tag = "enum" >
+  Requests an enumerated set of constants for the specified domain.  This
+  can be useful when passing enumerated domain values to called programs
+  or in other cases where the enumeration is not automatically available
+  through the use of the field in a form.  The enumeration is always based
+  on a DFL domain name, i.e. a 'domain' item defined in the application's
+  DFL file.
+    <attr name = "domain" required = "1">
+    Name of a domain defined in the application's DFL file.
+    </attr>
+    <rule name = "parse">
+    if count (screen.enum, count.domain ?= enum.domain) > 1
+        pfl_parse_error ("domain '$(domain)' is used more than once in screen")
+    endif
+    </rule>
+</entity>
+
+<entity name = "match" tag = "match" >
+  Defines a query match value.  Match values are passed to object handlers
+  when doing queries, and define index constant values.  Matches are used
+  mainly when doing queries on objects through an index consisting of two
+  or more fields, in which case the initial fields can be matched to some
+  fixed values.  When you specify a match at the screen level it is applied
+  to all queries used in that screen.
+    <attr name = "name" required = "1" short = "Name of field to match">
+    Name of field to match.  This corresponds to one of the fields defined in
+    the object view used for the query.  Matches defined on fields that are
+    not present in the view (and specifically, the index) have no effect.  To
+    check the match used for any query, look at the generated code for the
+    screen.
+    </attr>
+
+    <attr name = "value" short = "Value to use for match field">
+    A match value.  There are several ways to set the value of a match field
+    before the query.  You can explicitly set the match field (the object view
+    field) with a value before using the &lt;query&gt; statement.  You can
+    initialise the match field in the on_init handler.  Lastly, you can use
+    this value attribute.  In general, initialise the match field in the on_init
+    handler when you're sure it's never modified by a query.  Use a 'value'
+    attribute when the match field may be changed by a query.
+    </attr>
+</entity>
+
+<entity name = "queryarg" tag = "queryarg" >
+  Defines a query 'argument'.  You can define your own SQL conditions in
+  the OFL file, using replacable arguments that are not part of the object
+  view.  To pass these from the front-end program to the object handler, you
+  define 'queryarg' items for the query.  You can also define queryarg items
+  at the screen level, in which case they are passed to all queries.
+  Query arguments are passed in the OAL (Object Access Language) message
+  to the object handler, in the OAL header.
+    <attr name = "name" required = "1" short = "Name of query argument">
+    Specifies the name of the argument.  This can be any suitable name, and
+    does not need to be distinct from one of the object fields, although it
+    is good practice to keep it so.  I.e. using 'id' as a query argument would
+    be rather confusing.
+    </attr>
+
+    <attr name = "value" required = "1" short = "Value to use - assumed to be numeric">
+    Specifies the value for the query argument.  By default the query argument
+    is assumed to be numeric.  If you need to pass a textual value, you must
+    explicitly add quotes around the value string, using the HTML encoding, e.g.
+    "&amp;quot;value&amp;quot".
+    </attr>
+</entity>
+
+<entity name = "page" tag = "page" >
+  Specifies the name of a screen page.  A screen has at least one and often
+  multiple pages.  There is no limit to the number of pages you can define in
+  a screen, but the program size increases accordingly, so over ten pages or
+  so would start to be excessive.  Each page can show a mix of data and
+  actions as required by the user interface designer.  The first page in the
+  screen is shown by default (unless the on_init event handler specifies
+  another page by setting the cur_page variable).
+    <body entity = "page element" />
+
+    <attr name = "title" short = "Page title text">
+    The screen title.  This text is shown on the screen itself, and also in the
+    URL for the page.  It should be something meaningful.
+    </attr>
+
+    <attr name = "name" default = "unnamed" short = "Name of page, if screen has more than one">
+    This is the page name, and is optional if the screen only has one page (the
+    single page then being called 'unnamed').  If you define more than one page
+    each must be named so that the page navigation functions (i.e. playing with
+    the cur_page variable) work correctly.
+    </attr>
+
+    <attr name = "object" short = "Object used for page">
+    The name of the object shown on this page.  If not specified, takes the value
+    of the first 'use' for the screen.  The page object is used by default for all
+    actions that affect an object (query, fetch, update, delete, etc.).
+    </attr>
+
+    <attr name = "view" short = "View used for page">
+    The name of the default view used for the page.  You need to define this if
+    you use the fetch, query, update, create, or delete statements in the page.
+    </attr>
+
+    <rule name = "parse">
+    if count (screen.page, count.name ?= page.name) > 1
+        pfl_parse_error ("page '$(page.name)' is not unique")
+    endif
+    if !defined (page.object) & count (screen.use)
+        page.object = screen-> use.object
+    endif
+    if count (page.toolbar) = 0
+        for page. as child
+            new toolbar before child
+            endnew
+            last
+        endfor
+    endif
+
+    #   Define all object view fields as screen vars
+    if defined (page.view)
+        assume_screen_view (object, page.view)
+    endif
+    if count (field)
+        pfl_parse_error ("do not define 'field' items at the page level")
+    endif
+    </rule>
+    <rule name = "code" when = "before" >
+    generate_page_start ()
+    </rule>
+    <rule name = "code" when = "after" >
+    generate_page_end ()
+    </rule>
+</entity>
+
+<entity name = "page element"  >
+  All pages have this structure: an optional toolbar, a mandatory form, and
+  zero or more handlers.
+    <allow entity = "toolbar"               occurs = "0/1" />
+    <allow entity = "form"                  occurs = "1"   />
+    <allow entity = "page handler"          />
+</entity>
+
+<entity name = "toolbar" tag = "toolbar" >
+  The toolbar contains the actions that the user can use in any specific page.
+  It is generally shown at the top of the page, depending on the code generator.
+  The toolbar contains some standard actions like 'Back' and 'Help', and
+  programmer-defined actions.  The entire toolbar can be hidden by setting
+  the visible attribute to "0".
+    <allow entity = "toolbar action"        />
+    <attr name = "visible" default = "1">
+    If this attribute is set to "0" the toolbar is hidden.  This can be used for
+    pages where the standard actions are not required.
+        <restrict value = "0">toolbar is hidden on this page</restrict>
+        <restrict value = "1">toolbar is visible</restrict>
+    </attr>
+
+    <rule name = "code" when = "before" >
+    generate_toolbar_start ()
+    </rule>
+    <rule name = "code" when = "after" >
+    generate_toolbar_end ()
+    </rule>
+</entity>
+
+<entity name = "toolbar action" tag = "action" >
+  Specifies the actions that appears on the toolbar.  One 'action' item
+  defines one action on the toolbar, and corresponds to one action handler.
+    <attr name = "name" required = "1" short = "Name of action, unique in page">
+    The name of action, which should be unique on the page.
+    </attr>
+
+    <attr name = "text" short = "Prompt shown for action">
+    The displayed prompt, which defaults to the action name, formatted with
+    a leading capital letter.
+    </attr>
+
+    <attr name = "fields" default = "0" short = "If 1, checks required fields">
+    By default, actions do not check that required fields are filled-in.  If
+    you want an action to check these, set the fields attribute to "1".  In
+    this case, each required field is validated by JavaScript code before the
+    page is returned to the server.  All actions that update the database and
+    expect data coming from the screen should have this attribute set to "1".
+        <restrict value = "0">check required fields</restrict>
+        <restrict value = "1">don't check required fields</restrict>
+    </attr>
+
+    <attr name = "confirm" default = "" short = "End-user confirmation message, if any">
+    Normally, actions are sent back to the application without confirmation.
+    To add a confirmation step, set the confirm attribute to the message you
+    wish to display.  When the user clicks on the action, they get this message
+    and must then choose either 'Ok' or 'Cancel'.  if they click 'Cancel', the
+    browser continues without sending the page back to the application.
+    </attr>
+
+    <attr name = "active" default = "1" short = "If 0, action is disabled">
+    Specifies whether the action is enabled or disabled.  Normally we do not
+    show disabled actions, but it may suit your user-interface model to do so.
+        <restrict value = "0">action is disabled and appears as plain text</restrict>
+        <restrict value = "1">action is enabled and works normally</restrict>
+    </attr>
+
+    <attr name = "condition" short = "Condition to show action">
+    This is a condition in the implementation language (e.g. VBScript).  If the
+    condition is true, the action is shown.  If false, the action is hidden.
+    This attribute lets you control the visibility of actions at runtime.
+    </attr>
+
+    <attr name = "shortcut" default = "" short = "Browser shortcut key">
+    If the browser supports it, this attribute specifies a single letter that
+    is used as a 'shortcut key'.  This currently only works with some versions
+    of MS Internet Explorer, which implements this using the Alt key (e.g.
+    Alt+B).
+    </attr>
+
+    <attr name = "hint" short = "Rollover hint text">
+    If specified, this text shows as a popup and on the browser status bar
+    when the mouse hovers over the action.  If not supplied, it defaults to
+    the action name.
+    </attr>
+
+    <attr name = "url" short = "Show this URL in pop-up window">
+    Normally, actions are returned to the application in the cur_action
+    variable.  If you set the url attribute to the address of a web page
+    clicking on the action causes a secondary window to open up and load
+    the specified page.  The application does not get any action from the
+    browser - this is done locally at the browser side.
+    </attr>
+
+    <rule name = "parse">
+    if count (toolbar.action, count.name = action.name) > 1
+        pfl_parse_error ("action '$(action.name)' is not unique in toolbar")
+    endif
+    action_defaults ()
+    </rule>
+    <rule name = "code">
+    generate_toolbar_action ()
+    </rule>
+</entity>
+
+<entity name = "form" tag = "form" >
+  Specifies the form on a page.  All pages have this structure: an optional
+  toolbar, exactly one form, and zero or more handlers.  The form encloses
+  all the content of the page after the toolbar.  Forms are defined as
+  output only, in which case the user cannot modify anything displayed on
+  the form, or as input, in which case the form can be a mixture of output
+  (i.e. text) and input fields.
+    <body entity = "form element" />
+    <attr name = "mode" default = "output" short = "If 'input', gets data from screen">
+        <restrict value = "output">form shows output data only</restrict>
+        <restrict value = "input" >form can accept input data</restrict>
+    </attr>
+
+    <rule name = "parse">
+    expand_wildcards_if_any ()
+    </rule>
+    <rule name = "code" when = "before" >
+    generate_form_start ()
+    </rule>
+    <rule name = "code" when = "after" >
+    generate_form_end ()
+    </rule>
+</entity>
+
+<entity name = "form element" >
+  Data, text, and action fields defined in the form (not in a summary or
+  layout block) are formatted without line breaks, as continuous text.  This
+  lets you design totally arbitrary HTML layouts containing fields, actions,
+  and other form elements.
+    <allow entity = "form banner"           occurs = "0/1" />
+    <allow entity = "form hints"            occurs = "0/1" />
+    <allow entity = "form field"            />
+    <allow entity = "form text"             />
+    <allow entity = "form line"             />
+    <allow entity = "form action"           />
+    <allow entity = "form if block"         />
+    <allow entity = "layout block"          />
+    <allow entity = "summary block"         />
+    <allow entity = "page index"            />
+</entity>
+
+<entity name = "form banner" tag = "banner" >
+  Specifies a graphic or text title displayed at the top of the form.  The banner 
+  is centered.  For the smoothest display you will want to specify the height
+  and width of the image file.  The form banner is not shown on skinned screens.
+    <attr name = "image" >
+    This is the name of the image file.  Specify the filename with a relative
+    path based on the application URL.  For example, if images are placed in
+    a subdirectory called 'images', use a filename like 'images/mybanner.gif'.
+    Absolute filenames are problematic as soon as you try to run more than one
+    application on the same web server.
+    </attr>
+
+    <attr name = "label" >
+    The text label for the image.
+    </attr>
+
+    <attr name = "width">
+    The width in pixels of the image file, if known.  It is a good idea
+    to specify the width and height of image files to avoid the web page
+    'shifting' as image files are loaded.
+    </attr>
+
+    <attr name = "height">
+    The height in pixels of the image file.
+    </attr>
+
+    <attr name = "text" >
+    This is the text to show for a text banner.
+    </attr>
+
+    <rule name = "parse">
+    banner.label ?= "Form banner"
+    </rule>
+    <rule name = "code">
+    generate_form_banner ()
+    </rule>
+</entity>        
+
+<entity name = "form hints" tag = "hints">
+  If you define a hints block in the form, it appears at the left side of
+  the form.  The application can, at runtime, show or hide hints depending
+  on the user's preferences.
+    <body entity = "form hint element"  />
+    <rule name = "parse">
+    form.hints = 1
+    </rule>
+    <rule name = "code" when = "before">
+    generate_start_form_hints ()
+    </rule>
+    <rule name = "code" when = "after">
+    generate_end_form_hints ()
+    </rule>
+</entity>
+
+<entity name = "form hint element" >
+  Hints can contain actions.  If you embed these in the form hint, as is
+  usual, you must continue or finish the paragraph with a text entity.
+    <allow entity = "form hint"             />
+    <allow entity = "form hint text"        />
+    <allow entity = "form action"           />
+    <allow entity = "form field"            />
+    <allow entity = "form hint if block"    />
+</entity>        
+
+<entity name = "form hint" tag = "hint" cdata = "1" >
+  Each hint is shown as a paragraph of text.  The hints should be short
+  informative descriptions of the main data and actions that the screen
+  provides.  Typically, four to five hints per page is sufficient.
+    <rule name = "code">
+    generate_form_hint ()
+    </rule>
+</entity>        
+
+<entity name = "form hint text" class = "text" >
+    <rule name = "code">
+    generate_form_hint_text ()
+    </rule>
+</entity>
+
+<entity name = "form hint if block" class = "if-block" >
+    <body entity = "form hint element" />
+</entity>        
+
+<entity name = "form field" class = "field" >
+  Specifies a data field, input or output.  The field is shown as
+  part of the surrounding HTML text, with no tabular layout.
+    <allow entity = "form lookup block"     />
+    <allow entity = "sublist block"         />
+    <allow entity = "field rule"            />
+    <allow entity = "field value"           />
+    <rule name = "parse">
+    parse_top_level_field ("plain")
+    </rule>
+    <rule name = "code">
+    generate_form_field ()
+    </rule>
+</entity>        
+
+<entity name = "form lookup block" class = "lookup" >
+    <allow entity = "form lookup field"     occurs = "1+" />
+    <rule name = "parse" when = "after">
+    parse_lookup_block ()
+    </rule>
+    <rule name = "code" when = "before">
+    generate_start_form_lookup_block ()
+    </rule>
+    <rule name = "code" when = "after">
+    generate_end_form_lookup_block ()
+    </rule>
+</entity>        
+
+<entity name = "form lookup field" class = "field" >
+  Each field in the lookup block is retrieved from the child table as
+  defined in the object OFL view.  A lookup field cannot contain further
+  blocks.  
+    <allow entity = "field rule"            />
+    <allow entity = "field value"           />
+    <rule name = "code">
+    generate_form_lookup_field ()
+    </rule>
+</entity>
+
+<entity name = "field rule" tag = "rule" cdata = "1" >
+  Inserts some programmer-defined code to calculate or manipulate the
+  field.  Field rules are executed before showing the field.
+</entity>
+
+<entity name = "field value" tag = "value" >
+  Defines one value for a multi-valued field.  Values are usually inherited
+  from the DFL domain definition for fields, but you can define them in the
+  PFL for non-database fields.  The values are shown as select lists or
+  lists of radio options, depending on the style setting.
+    <attr name = "key" required = "1">
+    This specifies the internal value stored for this option.
+    </attr>
+    <attr name = "label">
+    This specifies the label shown on the screen.  If omitted, it defaults
+    to the same as the key.
+    </attr>
+    <attr name = "condition" short = "Condition to show value">
+    This is a condition in the implementation language (e.g. VBScript).  If the
+    condition is true, the action is shown.  If false, the value is hidden.
+    This attribute lets you control the visibility of values at runtime.
+    </attr>
+</entity>
+
+<entity name = "sublist block" tag = "sublist" >
+  Specifies a fields coming from a sublist (child) table of the current
+  field.  The sublist block can specify the table - by default it's the
+  first child table for the field.
+    <attr name = "table">
+    Specifies the table on which the sublist block is based.  By default
+    this is the first table defined in the OFL object view for the parent
+    field.
+    </attr>
+    <attr name = "occurs" default = "5">
+    Sublist blocks are always shown as an input grid, of one or more lines
+    showing each field in the sublist.
+    </attr>
+    <body entity = "sublist element" />
+    <rule name = "parse">
+    expand_wildcards_if_any ()
+    sublist.parent = field.name
+    </rule>
+    <rule name = "code" disconnect = "1">
+    generate_sublist_block ()
+    </rule>
+</entity>        
+
+<entity name = "sublist element" >
+  Each sublist block line can show fields, text items, actions, and can
+  contain condition 'if' blocks.
+    <allow entity = "sublist field"         />
+    <allow entity = "sublist text"          />
+    <allow entity = "sublist action"        />
+    <allow entity = "sublist if block"      />
+</entity>        
+
+<entity name = "sublist field" class = "field" >
+  Specifies a data field, input or output.  The field is shown in the
+  sublist column layout.
+    <allow entity = "sublist lookup block"  />
+    <allow entity = "field rule"            />
+    <allow entity = "field value"           />
+    <rule name = "code">
+    generate_sublist_field ()
+    </rule>
+</entity>        
+
+<entity name = "sublist lookup block" class = "lookup" >
+    <allow entity = "sublist lookup field"  occurs = "1+" />
+    <rule name = "parse" when = "after">
+    parse_lookup_block ()
+    </rule>
+    <rule name = "code" when = "before">
+    generate_start_sublist_lookup_block ()
+    </rule>
+    <rule name = "code" when = "after">
+    generate_end_sublist_lookup_block ()
+    </rule>
+</entity>        
+
+<entity name = "sublist lookup field" class = "field" >
+  Each field in the lookup block is retrieved from the child table as
+  defined in the object OFL view.  A lookup field cannot contain further
+  blocks.  
+    <allow entity = "field rule"            />
+    <allow entity = "field value"           />
+    <rule name = "code">
+    generate_sublist_lookup_field ()
+    </rule>
+</entity>
+
+<entity name = "sublist text" class = "text" >
+    <rule name = "code">
+    generate_sublist_text ()
+    </rule>
+</entity>
+
+<entity name = "sublist action" class = "action" >
+    <rule name = "parse">
+    action_defaults ()
+    </rule>
+    <rule name = "code">
+    generate_sublist_action ()
+    </rule>
+</entity>
+
+<entity name = "sublist if block" class = "if-block" >
+    <body entity = "sublist element" />
+</entity>
+
+<entity name = "form text" class = "text" >
+    <rule name = "code">
+    generate_form_text ()
+    </rule>
+</entity>
+
+<entity name = "form line" tag = "line" >
+  Outputs a HTML horizontal rule.
+    <rule name = "code">
+    generate_form_line ()
+    </rule>
+</entity>
+
+<entity name = "form action" class = "action" >
+    <rule name = "parse">
+    action_defaults ()
+    </rule>
+    <rule name = "code">
+    generate_form_action ()
+    </rule>
+</entity>
+
+<entity name = "form if block" class = "if-block" >
+    <body entity = "form element" />
+</entity>        
+
+<entity name = "layout block" tag = "layout" >
+  Starts a layout block where fields are shown with label and value in two
+  blocks.  Layout blocks are used for viewing or editing the details of an
+  object.  If you use multiple layout blocks in a page you may find that
+  they do not align.  You can control the width of the label column by
+  setting the labelwidth attribute of the screen or page.
+    <body entity = "layout element" />
+    <rule name = "parse">
+    expand_wildcards_if_any ()
+    </rule>
+    <rule name = "code" when = "before">
+    generate_start_layout ()
+    </rule>
+    <rule name = "code" when = "after">
+    generate_end_layout ()
+    </rule>
+</entity>        
+
+<entity name = "layout element" >
+  Layout blocks cannot contain further layout blocks.
+    <allow entity = "layout field"          />
+    <allow entity = "layout text"           />
+    <allow entity = "layout line"           />
+    <allow entity = "layout action"         />
+    <allow entity = "layout if block"       />
+</entity>        
+
+<entity name = "layout field" class = "field" >
+  Specifies a data field, input or output.  The field is shown in a
+  two-column layout with the label on the left and value on the right.
+    <allow entity = "layout lookup block"   />
+    <allow entity = "sublist block"         />
+    <allow entity = "field rule"            />
+    <allow entity = "field value"           />
+    <rule name = "parse">
+    parse_top_level_field ("layout")
+    </rule>
+    <rule name = "code">
+    generate_layout_field ()
+    </rule>
+</entity>
+
+<entity name = "layout lookup block" class = "lookup" >
+    <allow entity = "layout lookup field"   occurs = "1+" />
+    <rule name = "parse" when = "after">
+    parse_lookup_block ()
+    </rule>
+    <rule name = "code" when = "before">
+    generate_start_layout_lookup_block ()
+    </rule>
+    <rule name = "code" when = "after">
+    generate_end_layout_lookup_block ()
+    </rule>
+</entity>        
+
+<entity name = "layout lookup field" class = "field" >
+  Each field in the lookup block is retrieved from the child table as
+  defined in the object OFL view.  A lookup field cannot contain further
+  blocks.  
+    <allow entity = "field rule"            />
+    <allow entity = "field value"           />
+    <rule name = "code">
+    generate_layout_lookup_field ()
+    </rule>
+</entity>
+
+<entity name = "layout text" class = "text" >
+    <rule name = "code">
+    generate_layout_text ()
+    </rule>
+</entity>
+
+<entity name = "layout line" tag = "line" >
+  Outputs a HTML horizontal rule.
+    <rule name = "code">
+    generate_layout_line ()
+    </rule>
+</entity>
+
+<entity name = "layout action" class = "action" >
+    <rule name = "parse">
+    action_defaults ()
+    </rule>
+    <rule name = "code">
+    generate_layout_action ()
+    </rule>
+</entity>
+
+<entity name = "layout if block" class = "if-block" >
+    <body entity = "layout element" />
+</entity>        
+
+<entity name = "summary block" tag = "summary" >
+  A summary block shows fields and elements for a set of objects returned
+  from a query.
+    <attr name = "alpha">
+    This specifies whether or not the summary block is preceded by an alpha
+    lookup line.  This lets the user scroll quickly to a particular page,
+    by letter.  Alpha lookups are only allowed when the list is displayed
+    using a textual key.
+    </attr>
+    <attr name = "filter">
+    This specifies whether or not the summary block is preceded by a filter
+    box or not.  The filter box consists of an input field and a set of
+    actions: 'Starts with', and 'Contains'.  If the user enters a value
+    in the input field and selects the action, the program sets the two
+    variables 'cur_filtertext', and 'cur_filterwhat', and invokes the
+    screen 'on_filter' event handler.  The cur_filtertext variable holds
+    the value of the filter field, the cur_filterwhat variable holds either
+    "START" or "CONTAIN".
+    </attr>
+    <attr name = "checklist">
+    This enables a check column at the start of the summary block with the
+    field name 'checklist'.  This column must be managed by the programmer.
+    </attr>
+    <attr name = "control">
+    This optionally specifies the variable used to control the size of the
+    summary array.  If the control variable is specified, the generated code
+    makes no use of the database query results.
+    </attr>
+
+    <body entity = "summary element" />
+    <rule name = "parse" when = "before">
+    if defined (summary.alpha)
+        screen.alpha = 1
+    endif
+    if defined (summary.filter)
+        screen.filter = 1
+    endif
+    expand_wildcards_if_any ()
+
+    #   Implement checklist field
+    if checklist ?= 1
+        for summary.field as first where item () = 1
+            new field before first
+               field.name  = "checklist"
+               field.type  = "boolean"
+               field.label = ""
+            endnew
+        endfor
+        new var to screen
+            var.name   = "fld_checklist"
+            var.type   = "boolean"
+            var.occurs = screen.limit? 20
+            var.value  = 0
+        endnew
+    endif
+    </rule>
+    <rule name = "parse" when = "after">
+    if count (field, count.attr = "click" | count.attr = "input") = 0
+        for field where hidden = 0 & attr = "plain"
+            attr = "click"
+            last
+        endfor
+    endif
+    </rule>
+    <rule name = "code" disconnect = "1">
+    generate_summary_block ()
+    </rule>
+</entity>        
+
+<entity name = "summary element" >
+  Each summary block line can show fields, text items, actions, and can
+  contain condition 'if' blocks.
+    <allow entity = "summary field"         />
+    <allow entity = "summary text"          />
+    <allow entity = "summary action"        />
+    <allow entity = "summary if block"      />
+</entity>        
+
+<entity name = "summary field" class = "field" >
+  Specifies a data field, input or output.  The field is shown in
+  the summary tabular form.
+    <allow entity = "summary lookup block"  />
+    <allow entity = "field rule"            />
+    <allow entity = "field value"           />
+    <rule name = "parse">
+    parse_top_level_field ("summary")
+    </rule>
+    <rule name = "code">
+    generate_summary_field ()
+    </rule>
+</entity>        
+
+<entity name = "summary lookup block" class = "lookup" >
+    <allow entity = "summary lookup field"  occurs = "1+" />
+    <rule name = "parse" when = "after">
+    parse_lookup_block ()
+    </rule>
+    <rule name = "code" when = "before">
+    generate_start_summary_lookup_block ()
+    </rule>
+    <rule name = "code" when = "after">
+    generate_end_summary_lookup_block ()
+    </rule>
+</entity>        
+
+<entity name = "summary lookup field" class = "field" >
+  Each field in the lookup block is retrieved from the child table as
+  defined in the object OFL view.  A lookup field cannot contain further
+  blocks.  
+    <allow entity = "field rule"            />
+    <allow entity = "field value"           />
+    <rule name = "code">
+    generate_summary_lookup_field ()
+    </rule>
+</entity>
+
+<entity name = "summary text" class = "text" >
+    <rule name = "code">
+    generate_summary_text ()
+    </rule>
+</entity>
+
+<entity name = "summary action" class = "action" >
+    <rule name = "parse">
+    action_defaults ()
+    </rule>
+    <rule name = "code">
+    generate_summary_action ()
+    </rule>
+</entity>
+
+<entity name = "summary if block" class = "if-block" >
+    <body entity = "summary element" />
+</entity>
+
+<entity name = "page index" tag = "index" >
+  The page index, if specified, creates an index of all the pages in the screen,
+  with the current page highlighted.  The other pages are formatted as actions
+  that allow the user to select them.  You must specify the index item on each
+  page where you want it to appear, e.g. at the top of the form.
+    <attr name = "name" short = "Prompt for page index">
+    This text is shown on the page index - by default it is the page name.  The
+    page index may be translated.
+    </attr>
+    <rule name = "parse">
+    index.name ?= "$(page.Name)"
+    </rule>
+    <rule name = "code" when = "before" >
+    generate_page_index ()
+    </rule>
+</entity>        
+
+<entity name = "screen handler" tag = "handler" cdata = "1" >
+  Defines a screen-level event or action handler.  Action handlers can
+  be specified at the page or screen level, with page handlers overriding
+  screen handlers.  The page attribute on a screen handler defines that
+  handler at the specified page level.  Event handlers must be specified
+  at the appropriate level - the 'screen' events and 'page' events are
+  separate.
+  
+    <attr name = "action" short = "Name of action handled">
+    Specifies the name of the action handled.  Every handler must specify either
+    an action or an event.  If the action is not handled by a page handler, it
+    is passed to a screen handler, if present.
+    </attr>
+
+    <attr name = "event" short = "Name of event handled">
+    Specifies the name of the event handled.  Every handler must specify either
+    an action or an event.
+        <restrict value = "on_global"     >at the start of the program</restrict>
+        <restrict value = "on_init"       >when the program initializes</restrict>
+        <restrict value = "on_exit"       >when the program terminates</restrict>
+        <restrict value = "on_return"     >after returning from a called program</restrict>
+        <restrict value = "on_returnto"   >after a multi-level return</restrict>
+        <restrict value = "on_savecontext">when the program saves its context</restrict>
+        <restrict value = "on_loadcontext">when the program reloads its context</restrict>
+        <restrict value = "on_clrcontext" >when the program clears its context</restrict>
+        <restrict value = "on_oalerror"   >after an OAL error</restrict>
+        <restrict value = "on_fetch"      >after fetching an object</restrict>
+        <restrict value = "on_create"     >before creating any object</restrict>
+        <restrict value = "on_update"     >before updating any object</restrict>
+        <restrict value = "on_accept"     >when getting data from the screen for create/update</restrict>
+        <restrict value = "on_delete"     >before deleting any object</restrict>
+        <restrict value = "on_lookup"     >before making a lookup call</restrict>
+        <restrict value = "on_chainto"    >before calling a program</restrict>
+        <!-- These page events can also be handled at the screen level -->
+        <restrict value = "on_initpage"   >when initializing the page</restrict>
+        <restrict value = "on_showpage"   >before showing a page</restrict>
+        <restrict value = "on_getdata"    >after showing a page</restrict>
+        <restrict value = "on_title"      >output this code in place of page title</restrict>
+        <restrict value = "on_toolbar"    >output this code before normal toolbar</restrict>
+        <restrict value = "on_click"      >when clicking on a click field</restrict>
+        <restrict value = "on_select"     >when selecting from a list</restrict>
+        <restrict value = "on_goback"     >when clicking on the standard 'Back' action</restrict>
+        <restrict value = "on_showrow"    >when displaying a summary row</restrict>
+        <restrict value = "on_filter"     >When the summary filter box is used</restrict>
+    </attr>
+
+    <attr name = "page" short = "Apply handler to this page only">
+    It can be convenient to place all handlers at the screen level.  This attribute
+    lets you specify the handler at the screen level, but apply it to a specific
+    page.
+    </attr>
+
+    <attr name = "source" short = "Name of file containing handler code">
+    This specifies the name of a source file containing the code for the handler.
+    The contents of this file are included as-is in the program.  Generally used
+    with the on_global handler to include subroutines.
+    </attr>
+
+    <attr name = "getdata" default = "1" short = "If 0, don't read form fields">
+    Specifies whether the handler expects data to be taken from the form.  Some
+    actions (e.g. 'Cancel') may not need this.
+        <restrict value = "0">do not take data off the form</restrict>
+        <restrict value = "1">take data of the form, update all fields</restrict>
+    </attr>
+
+    <attr name = "object" short = "For on_fetch handler, object fetched">
+    Defines the name of a specific object, only for the on_fetch event handler.
+    </attr>
+  
+    <body entity = "handler statement" />
+    <rule name = "parse">
+    if defined (action) & count (screen.handler, count.action ?= handler.action) > 1
+        pfl_parse_error ("handler for '$(action)' is not unique in screen")
+    endif
+    handler.getdata ?= 1
+    if defined (page)
+        for screen.page where name = page
+            if (append?0) = 0
+                for handler as page_handler where \
+                    (defined (page_handler.action) & action ?= handler.action) | \
+                    (defined (page_handler.event)  & event ?=  handler.event)
+                    delete page_handler
+                endfor
+            endif
+            handler.tag = "this"
+            copy handler to page
+            for handler where tag ?= "this"
+                pfl_parse_page_handler ("handler")
+                handler.tag = undef?
+            endfor
+        endfor
+    elsif defined (action)
+        if substr (action,0,2,) = "on_"
+            echo "Warning: in $(screen.name), action '$(action)' looks like an event"
+        endif
+    elsif defined (event)
+        if event = "on_fetch"
+            if !defined (handler.object)
+                if count (screen.use)
+                    handler.object = screen-> use.object
+                endif
+            endif
+            if !defined (handler.view)
+                if count (screen.page)
+                    handler.view = screen-> page.view
+                endif
+            endif
+        endif
+    else
+        pfl_parse_error ("handler must specify either action or event")
+    endif
+    </rule>
+    <rule name = "parse" when = "after" >
+    if defined (page)
+        delete handler
+    endif
+    </rule>
+    <rule name = "code" disconnect = "1"/> 
+</entity>
+
+<entity name = "page handler" tag = "handler" cdata = "1" >
+  Defines a page-level event or action handler.  Action handlers can
+  be specified at the page or screen level, with page handlers overriding
+  screen handlers.  Event handlers must be specified at the appropriate
+  level - the 'screen' events and 'page' events are separate.
+  
+    <attr name = "action" short = "Name of action handled">
+    Specifies the name of the action handled.  Every handler must specify either
+    an action or an event.  If the action is not handled by a page handler, it
+    is passed to a screen handler, if present.
+    </attr>
+
+    <attr name = "event" short = "Name of event handled">
+    Specifies the name of the event handled.  Every handler must specify either
+    an action or an event.
+        <restrict value = "on_initpage">when initializing the page</restrict>
+        <restrict value = "on_showpage">before showing a page</restrict>
+        <restrict value = "on_getdata" >after showing a page</restrict>
+        <restrict value = "on_title"   >output this code in place of page title</restrict>
+        <restrict value = "on_toolbar" >output this code before normal toolbar</restrict>
+        <restrict value = "on_click"   >when clicking on a click field</restrict>
+        <restrict value = "on_select"  >when selecting from a list</restrict>
+        <restrict value = "on_goback"  >when clicking on the standard 'Back' action</restrict>
+        <restrict value = "on_showrow" >when displaying a summary row</restrict>
+    </attr>
+
+    <attr name = "source" short = "Name of file containing handler code">
+    This specifies the name of a source file containing the code for the handler.
+    The contents of this file are included as-is in the program.  Generally used
+    with the on_global handler to include subroutines.
+    </attr>
+
+    <attr name = "getdata" default = "1" short = "If 0, don't read form fields">
+    Specifies whether the handler expects data to be taken from the form.  Some
+    actions (e.g. 'Cancel') may not need this.
+        <restrict value = "0">do not take data off the form</restrict>
+        <restrict value = "1">take data of the form, update all fields</restrict>
+    </attr>
+
+    <body entity = "handler statement" />
+    <rule name = "parse">
+    if defined (action) & count (page.handler, count.action ?= handler.action) > 1
+        pfl_parse_error ("handler for '$(action)' is not unique in page")
+    endif
+    handler.getdata ?= 1
+    if defined (action)
+        if substr (action,0,2,) = "on_"
+            echo "Warning: in $(screen.name), action '$(action)' looks like an event"
+        endif
+    elsif !defined (event)
+        pfl_parse_error ("handler must specify either action or event")
+    endif
+    </rule>
+    <rule name = "code" disconnect = "1"/> 
+</entity>
+
+<entity name = "handler statement" >
+  A handler is implemented as a series of 'statements', which can be built
+  up hierarchically to any level of complexity.  Note that if you want to
+  output source code intermixed with other statements (like 'if') you must
+  use the 'step' block to delimit each block of source code, since the GSL
+  XML loader otherwise combines all fragments of an item's value into a
+  single value string.  I.e. all your source code will be output at the
+  start of the handler.
+    <allow entity = "query statement"       />
+    <allow entity = "create statement"      />
+    <allow entity = "fetch statement"       />
+    <allow entity = "update statement"      />
+    <allow entity = "delete statement"      />
+    <allow entity = "import statement"      />
+    <allow entity = "step statement"        />
+    <allow entity = "if statement"          />
+    <allow entity = "save statement"        />
+</entity>
+
+<entity name = "query statement" tag = "query" >
+  Specifies an OAL query request.  The query returns a set of data objects
+  that can be shown in a summary screen, or in a detail screen (in which
+  case only the first object will be shown if there are several).  Any query
+  depends on an index, and the index fields must be set-up accordingly before
+  the query statement is executed.  You can set-up index fields by placing
+  values in them, or specifying them as 'match' fields.
+    <attr name = "object" short = "Object to query">
+    Specifies the name of the object to query.  The default is the first
+    'use' specified for the screen.
+    </attr>
+
+    <attr name = "name" short = "Name of query">
+    Specifies the name of the name of query, which must match a query
+    defined in the objects OFL definition.  The default is the screen
+    query, if defined, otherwise "summary".
+    </attr>
+
+    <attr name = "view" short = "Query view used">
+    By default, this is taken from the object query.  You can override
+    it but this is generally not a good idea.
+    </attr>
+    
+    <attr name = "control" default = "first" short = "Query position control">
+    Defines the query control, as passed to the object handler.
+        <restrict value = "first">return first page of items</restrict>
+        <restrict value = "last" >return last page of items</restrict>
+        <restrict value = "gt"   >return next page of items</restrict>
+        <restrict value = "lt"   >return previous page of items</restrict>
+        <restrict value = "ge"   >return page of items greater-or-equal to the index</restrict>
+        <restrict value = "le"   >return page of items less-than-or-equal to the index</restrict>
+        <restrict value = "eq"   >return page of items equal to the index</restrict>
+        <restrict value = "same" >return same page as previously fetched</restrict>
+    </attr>
+
+    <attr name = "limit">
+    Specifies the limit of the query.  This is usually 1 for single fetches
+    and 20 or so for displayed data.  There is always a limit, since it is
+    not technically wise to allow an unlimited query on a database.
+    </attr>
+
+    <allow entity = "match"                 />
+    <allow entity = "queryarg"              />
+    <allow entity = "found statement"       occurs = "0/1" />
+    <allow entity = "each statement"        occurs = "0/1" />
+    <allow entity = "empty statement"       occurs = "0/1" />
+    <allow entity = "error statement"       occurs = "0/1" />
+    <rule name = "parse">
+    if defined (query.object)
+        if count (screen.use, count.object = query.object) = 0
+            pfl_parse_error ("query object '$(object)' not in screen 'use' list")
+        endif
+    else
+        if count (screen.use)
+            query.object = screen-> use.object
+        else
+            pfl_parse_error ("no object specified for query or for screen")
+        endif
+    endif
+    query.limit ?= screen.limit? 20
+    query.name  ?= screen.query? "summary"
+    for ofl.object where name = object
+        if count (query, count.name = query.name) = 0
+            pfl_parse_error ("query '$(query.name)' does not exist in $(object)")
+        endif
+        for query as objquery where name = query.name
+            query.view  = objquery.view
+            query.index = objquery.index
+            objquery.used = 1
+        endfor
+    endfor
+    #   Inherit match and queryarg information from screen
+    for screen.match    where count (query.match,    count.name = match.name) = 0
+        copy match to query
+    endfor
+    for screen.queryarg where count (query.queryarg, count.name = queryarg.name) = 0
+        copy queryarg to query
+    endfor
+    if count (screen.query, count.name = query.name & count.object = query.object) = 0
+        if defined (query.view)
+            copy query to screen
+            assume_screen_view (object, query.view)
+        endif
+    endif
+    </rule>
+    <rule name = "code">
+    generate_query_statement ()
+    </rule>
+</entity>
+
+<entity name = "found statement" tag = "found" cdata = "1" >
+  Defines a code block that is output if the parent query statement returned
+  one or more items.  Such a code block can itself contain further code blocks.
+    <body entity = "handler statement"  />
+    <rule name = "code" when = "before" >
+    generate_start_found_statement ()
+    </rule>
+    <rule name = "code" when = "after" >
+    generate_end_found_statement ()
+    </rule>
+</entity>
+
+<entity name = "each statement" tag = "each" cdata = "1" >
+  Defines a code block that is output for each item returned by the parent
+  query statement.  Such a code block can itself contain further code blocks.
+    <body entity = "handler statement"  />
+    <rule name = "code" when = "before" >
+    generate_start_each_statement ()
+    </rule>
+    <rule name = "code" when = "after" >
+    generate_end_each_statement ()
+    </rule>
+</entity>
+
+<entity name = "empty statement" tag = "empty" cdata = "1" >
+  Defines a code block that is output if the parent query statement returned
+  zero items.  Such a code block can itself contain further code blocks.
+    <body entity = "handler statement"  />
+    <rule name = "code" when = "before" >
+    generate_start_empty_statement ()
+    </rule>
+    <rule name = "code" when = "after" >
+    generate_end_empty_statement ()
+    </rule>
+</entity>
+
+<entity name = "create statement" tag = "create" >
+  Specifies an OAL create request. All required fields in the object's create view
+  must be filled-in before the create statement is executed.
+    <attr name = "object" short = "Name of object to create">
+    Specifies the name of the object to create.  The default is the first 'use'
+    specified for the screen.
+    </attr>
+
+    <allow entity = "ok statement"          occurs = "0/1" />
+    <allow entity = "error statement"       occurs = "0/1" />
+    <rule name = "parse">
+    if defined (create.object)
+        if count (screen.use, count.object = create.object) = 0
+            pfl_parse_error ("create object '$(object)' not in screen 'use' list")
+        endif
+    else
+        if count (screen.use)
+            create.object = screen-> use.object
+        else
+            pfl_parse_error ("no object specified for create or for screen")
+        endif
+    endif
+    assume_screen_view (object, "create")
+    </rule>
+    <rule name = "code">
+    generate_create_statement ()
+    </rule>
+</entity>
+
+<entity name = "ok statement" tag = "ok" cdata = "1">
+  Defines a code block that is output if the parent create, fetch, update,
+  or delete statememt was successful.  Such a code block can itself contain
+  further code blocks.
+    <body entity = "handler statement"  />
+    <rule name = "code" when = "before" >
+    generate_start_ok_statement ()
+    </rule>
+    <rule name = "code" when = "after" >
+    generate_end_ok_statement ()
+    </rule>
+</entity>
+
+<entity name = "error statement" tag = "error" cdata = "1" >
+  Defines a code block that is output if the parent query, create, fetch,
+  update,or delete statement was not successful.  Such a code block can
+  itself contain further code blocks.
+    <body entity = "handler statement"  />
+    <rule name = "code" when = "before" >
+    generate_start_error_statement ()
+    </rule>
+    <rule name = "code" when = "after" >
+    generate_end_error_statement ()
+    </rule>
+</entity>
+
+<entity name = "fetch statement"   tag = "fetch" >
+  Specifies an OAL fetch request. The object's primary index must be set before
+  the fetch statement is executed.
+    <attr name = "object" short = "Name of object to fetch">
+    Specifies the name of the object to fetch.  The default is the first 'use'
+    specified for the screen.
+    </attr>
+
+    <attr name = "view" default = "detail" short = "Name of view to fetch">
+    Specifies the name of the view to fetch, the default being 'detail'.    
+    </attr>
+
+    <allow entity = "ok statement"          occurs = "0/1" />
+    <allow entity = "missing statement"     occurs = "0/1" />
+    <allow entity = "error statement"       occurs = "0/1" />
+    <rule name = "parse">
+    if defined (fetch.object)
+        if count (screen.use, count.object = fetch.object) = 0
+            pfl_parse_error ("fetch object '$(object)' not in screen 'use' list")
+        endif
+    else
+        if count (screen.use)
+            fetch.object = screen-> use.object
+        else
+            pfl_parse_error ("no object specified for fetch or for screen")
+        endif
+    endif
+    assume_screen_view (object, fetch.view)
+    </rule>
+    <rule name = "code">
+    generate_fetch_statement ()
+    </rule>
+</entity>
+
+<entity name = "missing statement" tag = "missing" cdata = "1">
+  Defines a code block that is output if the parent fetch statement returned
+  nothing, which is generally an error condition.  Such a code block can itself
+  contain further code blocks.
+    <body entity = "handler statement"  />
+    <rule name = "code" when = "before" >
+    generate_start_missing_statement ()
+    </rule>
+    <rule name = "code" when = "after" >
+    generate_end_missing_statement ()
+    </rule>
+</entity>
+
+<entity name = "update statement"  tag = "update" >
+  Specifies an OAL update request. Before doing an update, you should have fetched
+  the object.  If another process updates the object before you do, the update
+  will fail with an error 'another user already modified this object'.
+    <attr name = "object" short = "Name of object to update">
+    Specifies the name of the object to update.  The default is the first 'use'
+    specified for the screen.
+    </attr>
+
+    <attr name = "view" default = "detail" short = "Name of view to update">
+    Specifies the name of the view to update, the default being 'detail'.    
+    </attr>
+
+    <allow entity = "ok statement"          occurs = "0/1" />
+    <allow entity = "error statement"       occurs = "0/1" />
+    <rule name = "parse">
+    if defined (update.object)
+        if count (screen.use, count.object = update.object) = 0
+            pfl_parse_error ("update object '$(object)' not in screen 'use' list")
+        endif
+    else
+        if count (screen.use)
+            update.object = screen-> use.object
+        else
+            pfl_parse_error ("no object specified for update or for screen")
+        endif
+    endif
+    assume_screen_view (object, update.view)
+    </rule>
+    <rule name = "code">
+    generate_update_statement ()
+    </rule>
+</entity>
+
+<entity name = "delete statement"  tag = "delete" >
+  Specifies an OAL delete request.
+    <attr name = "object" short = "Name of object to delete">
+    Specifies the name of the object to delete.  The default is the first 'use'
+    specified for the screen.
+    </attr>
+
+    <allow entity = "ok statement"          occurs = "0/1" />
+    <allow entity = "error statement"       occurs = "0/1" />
+    <rule name = "parse">
+    if defined ([delete].object)
+        if count (screen.use, count.object = [delete].object) = 0
+            pfl_parse_error ("delete object '$(object)' not in screen 'use' list")
+        endif
+    else
+        if count (screen.use)
+            [delete].object = screen-> use.object
+        else
+            pfl_parse_error ("no object specified for delete or for screen")
+        endif
+    endif
+    </rule>
+    <rule name = "code">
+    generate_delete_statement ()
+    </rule>
+</entity>
+
+<entity name = "import statement"  tag = "import" >
+  Generates code to import a table from an external XML file.  The table is
+  first completely wiped, then data is loaded from an XML file with the same
+  name as the table and the extension '.xml'.  The XML file must contain a
+  root item called 'data', then one or more items with the name of the table
+  and attributes corresponding to each of the fields in the item.
+    <rule name = "parse">
+    if defined (import.object)
+        if count (screen.use, count.object = import.object) = 0
+            pfl_parse_error ("import object '$(object)' not in screen 'use' list")
+        endif
+    else
+        if count (screen.use)
+            import.object = screen-> use.object
+        else
+            pfl_parse_error ("no object specified for import or for screen")
+        endif
+    endif
+    </rule>
+    <rule name = "code">
+    generate_import_statement ()
+    </rule>
+</entity>
+
+<entity name = "step statement" tag = "step" cdata = "1">
+  Defines a block of source code that is included in the handler at this point.
+  You need to define 'step' blocks if you mix PFL statements with source code.
+    <body entity = "handler statement"  />
+    <rule name = "code">
+    generate_step_statement ()
+    </rule>
+</entity>
+
+<entity name = "if statement" tag = "if" cdata = "1" >
+  Defines a conditional block.  If the condition is true, it is executed.  If
+  the condition is false it is not executed.
+    <attr name = "condition" required = "1">
+    This is a condition in the implementation language (e.g. VBScript).  If the
+    condition is true, the if block is shown.  If false, the block is hidden.
+    </attr>
+
+    <body entity = "handler statement"  />
+    <rule name = "code" when = "before" >
+    generate_start_if_statement ()
+    </rule>
+    <rule name = "code" when = "after" >
+    generate_end_if_statement ()
+    </rule>
+</entity>
+
+<entity name = "save statement" tag = "save">
+  Generates code that saves the current XML tree in a temporary location.  You
+  cannot nest this statement - if you execute a second save, it overwrites the
+  data saved by the first one.  At the end of the save block, the XML data is
+  reloaded to its prior state.  You can use this - for example - if you do a
+  query, and then for each item you do some further OAL accesses.
+    <body entity = "handler statement"  />
+    <rule name = "code" when = "before" >
+    generate_start_save_statement ()
+    </rule>
+    <rule name = "code" when = "after" >
+    generate_end_save_statement ()
+    </rule>
+</entity>
+
+<entity name = "defaults" tag = "defaults" >
+  Specifies elements that can be used in a screen.  All screen elements
+  can be inherited from the screen style.
+    <allow entity = "property"              />
+    <allow entity = "global"                />
+</entity>
+
+<entity name = "property" tag = "property" >
+  Defines a default value for a screen property.  All property items in
+  the defaults definition are defined as screen attributes, if not already
+  defined in the screen.
+    <attr name = "name">
+    Specifies the name of the screen attribute, which must be one of the
+    attributes allowed, e.g. labelwidth.
+    </attr>
+    <attr name = "value">
+    Specifies the default value for this attribute.
+    </attr>
+</entity>
+
+
+<!-- CLASS DEFINTIONS --------------------------------------------------->
+
+<class name = "if-block" tag = "if" cdata = "1" >
+  Defines a conditional block.  This is useful for showing or hiding some
+  text depending on the state of the program.  You should not use an if
+  block to hide input fields - apply the condition attribute to each such
+  field instead.
+    <attr name = "condition" required = "1">
+    This is a condition in the implementation language (e.g. VBScript).  If the
+    condition is true, the if block is shown.  If false, the block is hidden.
+    </attr>
+
+    <rule name = "parse">
+    if !defined (condition)
+        pfl_parse_error ("no condition defined for if block")
+    endif
+    </rule>
+    <rule name = "code" when = "before">
+    generate_start_if ()
+    </rule>
+    <rule name = "code" when = "after">
+    generate_end_if ()
+    </rule>
+</class>
+
+<class name = "text" tag = "text" cdata = "1" sameas = "form text" >
+  Outputs HTML text, with or without line breaks before and after.
+  Without breaks, the text is stuck together with the preceding
+  and/or following elements.
+
+    <attr name = "label" short = "Label shown for text">
+    Specifies the label used for the text.  By default this is empty.
+    </attr>
+
+    <attr name = "before" default = "0" short = "If 1 or more, blank lines before text">
+    Specifies a number of blank lines to place before the text.  To
+    place the text on a new line, set before = "1".
+    </attr>
+
+    <attr name = "after" default = "0" short = "If 1 or more, blank lines after text">
+    Specifies a number of blank lines to place after the text.
+    </attr>
+
+    <attr name = "color" short = "Text font color">
+    Text font color, if not default.  By default the color is taken from
+    the stylesheet settings for the web page.
+    </attr>
+
+    <attr name = "style" short = "HTML style for text">
+    You can tweak the look and feel of text by working with HTML
+    stylesheets.  If you use the 'style' option, the text is always
+    defined as a paragraph.
+    </attr>
+
+    <attr name = "align" short = "Paragraph alignment">
+    HTML paragraph alignment tag.
+        <restrict value = "left"  >text is left-aligned</restrict>
+        <restrict value = "middle">text is centered</restrict>
+        <restrict value = "right" >text is right-aligned</restrict>
+    </attr>
+
+    <attr name = "script" short = "GSL script that generates HTML output">
+    Specifies the name of a GSL script that generates HTML output.
+    If this is not defined, the text value is taken from the text
+    item value.
+    </attr>
+
+    <attr name = "join" default = "0" short = "If 1, joined to previous text">
+    In layout blocks, specifies whether the text is shown on the same line as
+    the previous field.  You can use this to show several items on the same
+    line.
+        <restrict value = "0">text is shown starting on a new line</restrict>
+        <restrict value = "1">text is shown on the same line as the previous item</restrict>
+    </attr>
+</class>
+
+<class name = "field" tag = "field" >
+    <attr name = "name" required = "1" short = "Name of field">
+    If this name matches the name of a field in the object view, the field shows
+    the value from the object, and operations like create and update will take the
+    value from the screen.  If the name does not match one of the object fields,
+    it is assumed to be a programmer-defined variable, in which case you must
+    define a 'var' item for it.  A shorthand for 'all fields in the view' is "*",
+    and the PFL styles use this extensively.
+    </attr>
+
+    <attr name = "object" short = "Name of object containing field">
+    PFL lets you work with multiple objects in one page.  The first 'use' for
+    the screen defines the default object for all fields.  You can specify a
+    different object explicitly using the object attribute on the field.
+    </attr>
+
+    <attr name = "view" short = "Name of object view">
+    By default, the field comes from the page view.  To override this, set the
+    'view' attribute.  You also need to specify the view if the page does not
+    have a view setting.
+    </attr>
+
+    <attr name = "label" short = "Label shown for field">
+    Specifies the label used for the field.  By default this is taken from the
+    DFL field or domain description.  If that is not defined, it is taken from
+    the field name.
+    </attr>
+
+    <attr name = "join"  short = "If 1, continue on same line as previous">
+    In layout blocks, specifies whether the field is shown on the same line as
+    the previous field.  You can use this to show several fields on the same
+    line.
+        <restrict value = "0">field is shown starting on a new line</restrict>
+        <restrict value = "1">field is shown on the same line as the previous field</restrict>
+    </attr>
+
+    <attr name = "type" short = "Field type">
+    Specifies the type of the field.  This determines how the field is displayed
+    and validated.  If the field is based on an object view field, the type is
+    derived automatically from that and you should not specify it here.
+        <restrict value = "textual"  >field shows a textual value</restrict>
+        <restrict value = "textbox"  >field shows a multiline text value</restrict>
+        <restrict value = "numeric"  >field shows a numeric value</restrict>
+        <restrict value = "date"     >field shows a date value</restrict>
+        <restrict value = "time"     >field shows a time value</restrict>
+        <restrict value = "boolean"  >field shows a true / false value</restrict>
+        <restrict value = "timestamp">field shows a timestamp (date/time) value</restrict>
+    </attr>
+
+    <attr name = "size" short = "Field size, in characters">
+    Defines the size of the field in terms of how much data the field can hold.
+    By default, this is the same as the size of the field on the screen.  You
+    can make the field smaller on the screen using the showsize attribute.
+    </attr>
+
+    <attr name = "showsize" short = "Displayed field size">
+    Defines the displayed size of the field on screen for textual/numeric fields.
+    Date fields, textboxes, boolean fields, and timestamps ignore this attribute.
+    </attr>
+
+    <attr name = "required" short = "If 1, field is mandatory">
+    Specifies whether the field is mandatory or not.  Mandatory fields are only
+    checked when the action has the fields attribute set.  I.e. actions like
+    'Ok' might check that mandatory fields are supplied, while actions like
+    'Cancel' and 'Help' would not.
+        <restrict value = "0">field can be left empty</restrict>
+        <restrict value = "1">field is mandatory</restrict>
+    </attr>
+
+    <attr name = "default" short = "Field's initial value">
+    Defines an initial value for the field.  The field is set to this value
+    whenever the program initialises (i.e. after it is called).  By default,
+    textual fields are set to empty, boolean fields to false, and numeric
+    fields to zero.
+    </attr>
+
+    <attr name = "attr"  short = "Field attribute">
+    Defines the attribute for the field.  There are three basic types: input,
+    output (with various styles), and clickable.  An input field can be edited
+    by the user.  Input fields are only allowed if the form is in input mode.
+    A clickable field returns an 'on_select' action to the program.
+        <restrict value = "input" >field is shown as an editable input field</restrict>
+        <restrict value = "plain" >field is shown as plain output text</restrict>
+        <restrict value = "hilite">field is shown as highlighted output text</restrict>
+        <restrict value = "title" >field is shown as a title</restrict>
+        <restrict value = "click" >field is shown as a clickable hyperlink</restrict>
+    </attr>
+
+    <attr name = "cursor"  short = "If 1, cursor starts here">
+    When a form is input mode, the cursor is by default placed on the first input
+    field.  You can override this (although it is not often useful) and place the
+    cursor on any input field on the screen.  The cursor starts on the first field
+    with the cursor = "1" attribute defined, if any, otherwise it starts on the
+    first input field.
+        <restrict value = "0">cursor does not start here</restrict>
+        <restrict value = "1">cursor starts here</restrict>
+    </attr>
+
+    <attr name = "hidden" short = "If 1, field is hidden">
+    The field is hidden.  It is not shown to the user, but exists on the form.
+    This is useful for defining fields that have lookup blocks: the lookup block
+    may shown, but the parent field kept hidden.  It is also useful for fields
+    that have 'side-effects', such as multi-valued fields where the fact that you
+    include them in the page causes their enumerated domain definitions to be
+    included in the generated program.
+        <restrict value = "0">normal, visible to the user</restrict>
+        <restrict value = "1">hidden and not shown to the user</restrict>
+    </attr>
+
+    <attr name = "html"  short = "If 1, field may show HTML">
+    The field contains HTML text.  It will be 'encoded' when displayed (i.e.
+    special characters like &lt; are converted to their HTML sequences), and
+    will be decoded on input.  If you do not set this attribute for fields
+    that may contain HTML text, the screen can get disrupted.  Only valid when
+    type = "textual".
+        <restrict value = "0">does not contain HTML text</restrict>
+        <restrict value = "1">may contain HTML text</restrict>
+    </attr>
+
+    <attr name = "password" short = "If 1, field holds a password">
+    The field is a password.  It will be masked when the user enters a value
+    and shown as empty on output.  Only valid when type = "textual".
+        <restrict value = "0">not a password field</restrict>
+        <restrict value = "1">shown as a password field</restrict>
+    </attr>
+
+    <attr name = "email" short = "If 1, field contains email address">
+    The field is an e-mail address.  On output, it becomes a clickable field
+    that lets the user send an email (it is formatted as a 'mailto:' URL).
+    Only valid when type = "textual".
+        <restrict value = "0">not an email address</restrict>
+        <restrict value = "1">field is an email address</restrict>
+    </attr>
+
+    <attr name = "attachment" short = "If 1, field contains file attach name">
+    The field is a file attachment.  On output, it is shown as a clickable
+    hyperlink to the referenced file.  On input, it is shown as an 'Upload'
+    field and button. Only valid when type = "textual".
+        <restrict value = "0">not an attachment field</restrict>
+        <restrict value = "1">a file attachment field</restrict>
+    </attr>
+
+    <attr name = "positive" short = "If 1, field may not hold negative values">
+    The field is a positive number (whole or decimal).  Negative values are
+    not permitted.  Only valid when type = "numeric".
+    </attr>
+
+    <attr name = "money" short = "If 1, field shows monetary value">
+    Field contains a money amount.  Money amounts are always stored as integers
+    with two assumed decimals, to avoid rounding errors associated with floating
+    point numbers.  For instance, 100 is stored as 10000.  The routines that
+    display and accept money fields convert the internal value automatically
+    to and from a displayed value with a decimal point.  Only valid when type =
+    "numeric".
+        <restrict value = "0">not a money amount</restrict>
+        <restrict value = "1">defined as money</restrict>
+    </attr>
+
+    <attr name = "startyear" short = "Starting year for date box">
+    Field is a date with a specific year range.  A date input field is shown
+    as three select boxes, for the year, month, and day.  This attribute defines
+    the lower limit of the year select box.  It is expressed as a number of
+    years, positive or negative, e.g. "-10" or "10".  Only valid when type
+    = "date".
+    </attr>
+
+    <attr name = "endyear"   short = "Ending year for date box">
+    Field is a date with a specific year range.  This attribute defines the
+    upper limit of the year select box.  It is expressed as a number of
+    years, positive or negative, e.g. "-10" or "10".  Only valid when type
+    = "date".
+    </attr>
+
+    <attr name = "starthour" short = "Starting hour for time box">
+    Field is a time with a specific hour range.  This attribute defines the
+    start hour.  Only valid when type = "time".
+    </attr>
+
+    <attr name = "endhour"   short = "Ending box for time box">
+    Field is a time with a specific hour range.  This attribute defines the
+    end hour.  Only valid when type = "time".
+    </attr>
+
+    <attr name = "interval"  short = "Minutes interval for time box">
+    Field is a time with a minute interval > 1.  For instance, if the interval
+    is "15", the minute selection box will display 0, 15, 30, and 45.
+    Only valid when type = "time".
+    </attr>
+
+    <attr name = "true"      short = "True text for boolean field">
+    Field is a boolean field.  This attribute defines the text shown on the
+    screen when the boolean field is shown for output, and is 'true'.
+    Only valid when type = "boolean".
+    </attr>
+
+    <attr name = "false"     short = "False text for boolean field">
+    Field is a boolean field.  This attribute defines the text shown on the
+    screen when the boolean field is shown for output, and is 'false'.
+    Only valid when type = "boolean".
+    </attr>
+
+    <attr name = "truncate" short = "If 0, don't truncate long fields">
+    Specifies whether long text fields are truncated on summary screens or
+    not.  By default, long text fields on summary screens are cut to some
+    manageable size so that the screen remains tidy.  In some cases you may
+    want to display the entire text field, even if it occupies several lines.
+        <restrict value = "0">do not truncate long text fields on summary screens</restrict>
+        <restrict value = "1">truncate long text fields on summary screens</restrict>
+    </attr>
+
+    <attr name = "rows"  short = "Rows for textbox display">
+    For input textbox fields, defines the number of rows in the textbox.  
+    Only valid when type = "textbox".
+    </attr>
+
+    <attr name = "cols"  short = "Columns for textbox display">
+    For input textbox fields, defines the number of columns in the textbox.
+    Only valid when type = "textbox".
+    </attr>
+
+    <attr name = "select"  short = "Multivalue select style">
+    Defines the style for a multi-valued field.  This is a textual or numeric
+    field that has 'value' items defined for it, either in the DFL or in the
+    PFL.  See also the dynamic attribute.
+        <restrict value = "drop down" >values are shown in a drop-down select box</restrict>
+        <restrict value = "radio"     >values are shown as a horizontal list of options</restrict>
+        <restrict value = "radio down">values are shown as a vertical list of options</restrict>
+    </attr>
+
+    <attr name = "domain" short = "Data domain for multivalue fields">
+    If this attribute is set, the field will get its properties from the
+    the data domain specified.  This is useful for calculated fields.  The
+    field type, size, decimals, default value, required flag, label, and
+    selection values are inherited from the domain if not specified in the
+    field.
+    </attr>
+    
+    <attr name = "dynamic" short = "If 1, multivalue labels come from fields">
+    If this attribute is set, the labels shown for each value are taken from a
+    set of variables.  For example, when a 'value' item has the label "name1",
+    and the dynamic attribute is not specified, the text "name1" appears on
+    the screen beside the option.  If dynamic = "1", the program takes the
+    contents of the field called "name1" and shows that content on the screen.
+        <restrict value = "0">show the value text as-is</restrict>
+        <restrict value = "1">use the value text as a field name, and show the
+        content of that field</restrict>
+    </attr>
+
+    <attr name = "case"  short = "Case-conversion rule, if any">
+    For textual and textbox fields, this specifies whether the field is
+    converted to upper or lower case or not.
+        <restrict value = "none" >field value is left as-is</restrict>
+        <restrict value = "upper">field value is converted to upper case</restrict>
+        <restrict value = "lower">field value is converted to lower case</restrict>
+    </attr>
+
+    <attr name = "blank" short = "If 1, zero values shown as empty">
+    For numeric fields, this specifies whether the field is shown as blank
+    when it contains zero.
+        <restrict value = "0">zero values are shown as 0</restrict>
+        <restrict value = "1">zero values are shown as empty</restrict>
+    </attr>
+
+    <attr name = "nowrap" short = "If 1, field is not wrapped">
+    For text fields in summary screens, this specifies whether long values are
+    wrapped or not.  Do not use this for long text or the screen will start to
+    become unreadable.  It is best used for short phrases that you want to keep
+    on one line.
+        <restrict value = "0">long fields are wrapped</restrict>
+        <restrict value = "1">long fields are not wrapped</restrict>
+    </attr>
+
+    <attr name = "align" short = "Field alignment tag">
+    HTML paragraph alignment tag.
+        <restrict value = "left"  >text is left-aligned</restrict>
+        <restrict value = "middle">text is centered</restrict>
+        <restrict value = "right" >text is right-aligned</restrict>
+    </attr>
+
+    <attr name = "width" short = "Field width for summary screens">
+    In summary screens, you can control the width of columns.  By default, the
+    browser chooses a width that suits the field label and contents.
+    </attr>
+
+    <attr name = "condition" short = "Show field under this condition">
+    You can use this attribute to optionally show or hide fields.  Use this
+    to control whether input fields show or not, rather than placing &lt;if&gt;
+    blocks around input fields.  The condition is a boolean value in the
+    implementation language (e.g. VBScript).  If the condition is true, the
+    field is shown.  If false, the field is hidden. 
+    </attr>
+
+    <attr name = "prefix" short = "Show this text before field">
+    Specifies a text label that is shown before the field, especially useful
+    for layouts where you have several related field.  Use a group label for
+    the first field, and a prefix that identifies that specific field, then
+    place the remaining fields on the same line (using 'join'), and provide
+    a suitable label for each.
+    </attr>
+</class>
+
+<class name = "action" tag = "action" >
+  Outputs an image, hyperlink, or button action.  In layout blocks, the
+  action is shown on a line by itself unless you set the join attribute.
+  In form blocks, the action is shown as part of the surrounding HTML
+  text unless you set the before or after attributes.  In summary blocks
+  the action is shown in a column by itself.
+    <attr name = "name" required = "1" short = "Name of action">
+    The name of action, which should be unique on the page.
+    </attr>
+
+    <attr name = "text" short = "Displayed action prompt">
+    The displayed prompt, which defaults to the action name, formatted with
+    a leading capital letter.
+    </attr>
+
+    <attr name = "fields" default = "0" short = "If 1, enforces required fields">
+    By default, actions do not check that required fields are filled-in.  If
+    you want an action to check these, set the fields attribute to "1".  In
+    this case, each required field is validated by JavaScript code before the
+    page is returned to the server.  All actions that update the database and
+    expect data coming from the screen should have this attribute set to "1".
+        <restrict value = "0">check required fields</restrict>
+        <restrict value = "1">don't check required fields</restrict>
+    </attr>
+
+    <attr name = "label" short = "Label, for actions in layouts">
+    In layout mode, specifies the label for the action, if any.
+    </attr>
+
+    <attr name = "type" short = "Action type on screen">
+    Specifies whether the action is shown as a link, a button, or a clickable
+    image.  In input forms, the default is 'link'.  In output forms, the default
+    is 'button'.
+        <restrict value = "link"  >show as hyperlink</restrict>
+        <restrict value = "button">show as button</restrict>
+        <restrict value = "image" >show as image</restrict>
+    </attr>
+
+    <attr name = "image" short = "Image file, without extension">
+    This is the name of the image file.  Action images are always located in
+    a subdirectory called 'images', and must exist as two files, one called
+    xxxxl.gif and another xxxxh.gif, where 'xxxx' is the value of the image
+    tag.  These represent the 'low' and 'high' images, i.e. without and with
+    mouse rollover.
+    </attr>
+
+    <attr name = "style" default = "action" short = "HTML style for action text">
+    You can tweak the look and feel of actions by working with the HTML
+    stylesheet.  For example, you can define smaller and larger fonts for
+    different types of action.
+    </attr>
+
+    <attr name = "confirm" default = "" short = "End-user confirmation text, if wanted">
+    Normally, actions are sent back to the application without confirmation.
+    To add a confirmation step, set the confirm attribute to the message you
+    wish to display.  When the user clicks on the action, they get this message
+    and must then choose either 'Ok' or 'Cancel'.  if they click 'Cancel', the
+    browser continues without sending the page back to the application.
+    </attr>
+
+    <attr name = "hint" short = "Rollover hint text">
+    If specified, this text shows as a popup and on the browser status bar
+    when the mouse hovers over the action.  If not supplied, it defaults to
+    the action name.
+    </attr>
+
+    <attr name = "join" default = "0" short = "If 1, does not shown on new line">
+    In layout blocks, specifies whether the action is shown on the same line as
+    the previous field.  You can use this to show several items on the same
+    line.
+        <restrict value = "0">action is shown starting on a new line</restrict>
+        <restrict value = "1">action is shown on the same line as the previous item</restrict>
+    </attr>
+
+    <attr name = "url" short = "Show this URL in pop-up window">
+    Normally, actions are returned to the application in the cur_action
+    variable.  If you set the url attribute to the address of a web page
+    clicking on the action causes a secondary window to open up and load
+    the specified page.  The application does not get any action from the
+    browser - this is done locally at the browser side.
+    </attr>
+
+    <attr name = "align" short = "Paragraph alignment tag">
+    HTML paragraph alignment tag.
+        <restrict value = "left"  >action is left-aligned</restrict>
+        <restrict value = "middle">action is centered</restrict>
+        <restrict value = "right" >action is right-aligned</restrict>
+    </attr>
+
+    <attr name = "toolbar" short = "If 1, also shown on toolbar">
+    if 1, the action is also shown on toolbar.
+        <restrict value = "0">action is not automatically shown on toolbar</restrict>
+        <restrict value = "1">action is automatically shown on toolbar</restrict>
+    </attr>
+
+    <attr name = "active" default = "1" short = "If 0, action is disabled">
+    Specifies whether the action is enabled or disabled.  Normally we do not
+    show disabled actions, but it may suit your user-interface model to do so.
+        <restrict value = "0">the action is disabled and appears as plain text</restrict>
+        <restrict value = "1">the action is enabled and works normally</restrict>
+    </attr>
+
+    <attr name = "condition" short = "Shows under this condition">
+    This is a condition in the implementation language (e.g. VBScript).  If the
+    condition is true, the action is shown.  If false, the action is hidden.
+    This attribute lets you control the visibility of actions at runtime.
+    </attr>
+
+    <attr name = "shortcut" default = "" short = "Browser shortcut key">
+    If the browser supports it, this attribute specifies a single letter that
+    is used as a 'shortcut key'.  This currently only works with some versions
+    of MS Internet Explorer, which implements this using the Alt key (e.g.
+    Alt+B).
+    </attr>
+
+    <attr name = "separator" short = "If 0, action is not separated by a bar">
+    Specifies whether multiple actions on the same line are separated by
+    vertical bars or not.
+        <restrict value = "0">actions are not separated by vertical bars</restrict>
+        <restrict value = "1">actions are separated by bars</restrict>
+    </attr>
+</class>
+
+<class name = "lookup" tag = "lookup" >
+  A lookup block shows one or more descriptive fields that are taken from
+  the database by doing a lookup on a foreign key field.  Lookups are
+  defined in the OFL for the object being displayed.  On output, lookup
+  fields are translated and displayed.  On input, lookup fields are shown
+  with a select icon.  The user can click on this to select a new value.
+    <attr name = "table" short = "Lookup table, if not first for field">
+    Specifies the table on which the lookup is performed.  By default it
+    is the first child table for the field, as defined in the application's
+    OFL file, for the current object and view.
+    </attr>
+
+    <attr name = "select" short = "Select program, if not xxx_select">
+    Specifies the name of the program to chain to to perform the lookup.
+    By default this is the "xxxx_select" where 'xxxx' is the name of the
+    parent field.
+    </attr>
+
+    <attr name = "condition" short = "Shown under this condition">
+    This is a condition in the implementation language (e.g. VBScript).  If the
+    condition is true, the lookup action is possible.  If false, the action is
+    hidden.
+    </attr>
+</class>
+
+
+<!-- FUNCTION DEFINTIONS ------------------------------------------------>
+
+<function when = "parse" >
+
+function action_defaults ()
+    action.text  ?= "$(action.name:neat)"
+    action.image ?= "$(name)"
+    action.hint  ?= text
+    if mode ?= "input"
+        action.type ?= "button"
+    else
+        action.type ?= "link"
+    endif
+    if action.toolbar ?= 1 
+        if count (page.toolbar) \
+        &  count (page-> toolbar.action, count.name = action.name) = 0
+            copy action to page-> toolbar
+        endif
+    endif
+    if name &lt;&gt; "" & count (screen.handler, count.action ?= name) = 0
+        if count (page.handler, count.action ?= name) = 0
+            pfl_parse_error ("no handler for action '$(name:)'")
+        else
+            for page.handler where action ?= name
+                handler.fields = action.fields
+            endfor
+        endif
+    endif
+endfunction
+
+function expand_wildcards_if_any ()
+    if count (field) = 1
+       for field as wildcard where name = "*"
+          for ofl.object where name = object
+          for view       where name = view
+             for view-> table.field as viewfield
+                new field before wildcard
+                   field.name   = viewfield.name
+                   field.object = object
+                   field.view   = view
+                   #   Expand lookup tables if any exist in view
+                   if count (viewfield.table, type = "lookup")
+                      for viewfield.table where type = "lookup"
+                         new lookup to field
+                            for table.field as lookupfield
+                               if (lookupfield.auto?0) = 0
+                                  new field to lookup
+                                     field.name   = lookupfield.name
+                                     field.object = object
+                                     field.view   = view
+                                  endnew
+                               endif
+                            endfor
+                         endnew
+                      endfor
+                   endif
+                endnew
+             endfor
+          endfor
+          endfor
+       endfor
+    endif
+    for field where name = "*"
+        delete field
+    endfor
+endfunction
+
+function parse_top_level_field (style)
+    if defined (view)
+        #   Object and view can be set at field or page level
+        for ofl.object where name = object
+        for view       where name = view
+            for view-> table.field as viewfield where name = field.name
+                set_field_from_object (style)
+                #   If field has child tables, parse lookups and sublists
+                parse_field_subtables ("child",  "sublist", "summary")
+                parse_field_subtables ("lookup", "lookup",  style)
+            endfor
+        endfor
+        endfor
+    endif
+    if defined (field.view)
+        field.varname = "fld_$(object)_$(field.name)"
+    else
+        field.varname = "fld_$(field.name)"
+    endif
+    set_field_defaults (style)
+
+    #   Allow type and default to be put either in field or var
+    #   var value overrides field default, and field type overrides
+    #   var type.
+    for screen.var where name = field.varname
+        if defined (field.type)
+            var.type = field.type
+        else
+            field.type = var.type
+        endif
+        if defined (var.value)
+            field.default = var.value
+        else
+            var.value = field.default
+        endif
+        field.occurs ?= var.occurs?
+    endfor
+
+    if count (screen.var, count.name = field.varname) = 0
+        if !defined (field.view)
+            echo "Warning: undeclared var '$(field.varname)' in $(screen.name)"
+        endif
+        new var to screen
+            var.name  = field.varname
+            var.type  = field.type
+            var.value = field.default
+        endnew
+    endif
+    if count (page.field, count.name = field.name & count.object?"" = field.object?"")
+        pfl_parse_error ("'$(field.name)' duplicated in $(page.name)")
+    else
+        copy field to page
+    endif
+endfunction        
+
+function parse_field_subtables (subtable, subblock, style)
+    #   Go through field subtables in view
+    for viewfield.table as viewtable where type = subtable
+        #   and now in parallel, through field subblock on screen
+        parent = field.name
+        parent_label = field.label?
+        for field.$(subblock)
+            $(subblock).table     ?= viewtable.name
+            $(subblock).indicator ?= viewtable.indicator?
+            $(subblock).processed = 1
+            if $(subblock).table &lt;&gt; viewtable.name
+                last
+            endif
+            for $(subblock).field
+                #   Now find view field that matches our field
+                for viewtable.field as viewfield where name = field.name
+                    set_field_from_object (style)
+                endfor
+                field.varname = "fld_$(object)_$(parent)_$(field.name)"
+                #   Parent label overrides child label in lookups
+                field.label  ?= parent_label?
+                set_field_defaults (style)
+            endfor
+        endfor
+    endfor
+    for field.$(subblock) where !defined (processed)
+        pfl_parse_error ("'$(field.name)' has no $(subblock) defined in the $(view) view")
+    endfor
+endfunction
+
+function set_field_from_object (style)
+    #   Get presentation-level attributes for this field
+    for rule where name = "show" & (when = style | when = "all")
+        field.$(what) ?= value
+    endfor
+    field.object   ?= object
+    field.view     ?= view
+    field.type     ?= viewfield.type
+    field.size     ?= viewfield.size?
+    field.decs     ?= viewfield.decs?
+    field.required ?= viewfield.required?0
+    field.default  ?= viewfield.default?
+    field.hidden   ?= viewfield.hidden?0
+    field.         ?= viewfield.?
+    #   Get list of select values
+    if count (field.value) = 0
+        for value
+            copy value to field
+        endfor
+    endif
+endfunction
+
+function set_field_defaults (style)
+    #   Inherit field properties from domain if specified
+    if defined (field.domain)
+        if count (dfl.domain, count.name = field.domain) = 0
+            pfl_parse_error ("Domain '$(domain)' not found in DFL")
+        endif
+        for dfl.domain where name = field.domain
+            #   Get presentation-level attributes for this field
+            for rule where name = "show" & (when = style | when = "all")
+                field.$(what) ?= value
+            endfor
+            field.type     ?= domain.type?
+            field.size     ?= domain.size?
+            field.decs     ?= domain.decs?
+            field.default  ?= domain.default?
+            field.required ?= domain.required?
+            field.         ?= domain.?
+            #   Get list of select values
+            if count (field.value) = 0
+                for value
+                    copy value to field
+                endfor
+            endif
+        endfor
+    endif
+
+    field.type ?= "textual"
+    if type = "textual"
+        field.size     ?= 40
+        field.showsize ?= field.size
+        field.default  ?= ""
+        if (attachment?0 = 0) & (showsize > 60 | defined (rows) | defined (cols))
+            field.type = "textbox"
+            field.cols ?= 50
+            field.html ?= 1
+            if style = "summary"
+                field.rows ?= 1
+            else
+                field.rows ?= 2
+            endif
+        endif
+    elsif type = "textbox"
+        if style = "summary"
+            field.rows ?= 1
+        else
+            field.rows ?= 4
+        endif
+        field.cols     ?= 60
+        field.default  ?= ""
+        field.size     ?= rows * cols
+        field.html     ?= 1
+    elsif type = "numeric"
+        field.size     ?= 10
+        field.decs     ?= 0
+        field.showsize ?= field.size
+        field.default  ?= 0
+        if showsize > 15
+            showsize = 15
+        endif
+    else
+        field.default  ?= 0
+    endif
+    if !defined (field.label)
+        label = trim (field.?"")
+        if label = ""
+            field.label = field.name
+        endif
+        field.label = "$(substr (label,0,,1):neat)" + substr (label,1,,)
+    endif
+    if form.mode = "output"
+        field.attr ?= "plain"
+    else
+        field.attr ?= "input"
+    endif
+    field.join   ?= 0
+
+    if count (lookup)
+        if field.type = "textual"
+            field.hidden ?= 0
+        else
+            field.hidden = 1
+        endif
+    else
+        field.hidden ?= 0
+    endif
+    if field.attachment ?= 1
+        screen.has_attachments = 1
+    endif
+    if count (value)
+        field.select ?= "drop down"
+    endif
+    if count (value)
+        if count (screen.value_set, count.name = field.name) = 0
+            copy field to screen as value_set
+        endif
+    endif
+endfunction
+
+function parse_lookup_block ()
+    if !defined (page.view)
+        pfl_parse_error ("no view is defined for page '$(page.name)'")
+    endif        
+    if count (screen.lookup, count.name = field.name) = 0
+        new lookup to screen as screenlookup
+            screenlookup.name    = field.name
+            screenlookup.varname = field.varname
+            screenlookup.object  = lookup.table?
+            screenlookup.select  = lookup.select? "$(lookup.table?)_select"
+            if !defined (lookup.table)
+                pfl_parse_error ("'$(field.name)' cannot be used as lookup in $(view) view")
+            endif
+        endnew
+    endif
+    for screen.lookup as screenlookup where name = field.name
+        for lookup.field
+            if count (screenlookup.field, name = field.name) = 0
+                copy field to screenlookup
+            endif
+        endfor
+    endfor
+endfunction
+
+function assume_screen_view (p_object, p_view)
+    if !defined (p_object)
+        pfl_parse_error ("No object defined for view '$(p_view)'")
+    endif    
+    if count (screen.view, count.object = p_object & count.name = p_view) = 0
+        new view to screen
+            view.object = p_object
+            view.name   = p_view
+        endnew
+
+        #   Ensure all object fields are defined as variables
+        for ofl.object where name = p_object
+        for view       where name = p_view
+            for view-> table.field
+                varname = "fld_$(p_object)_$(field.name)"
+                if count (screen.var, count.name = varname) = 0
+                    new var to screen 
+                        var.name  = varname
+                        var.type  = field.type
+                        var.value = field.default
+                    endnew
+                endif
+                #   Expose all child table fields as variables
+                for table 
+                    parent = field.name
+                    for field
+                        varname = "fld_$(p_object)_$(parent)_$(field.name)"
+                        if count (screen.var, count.name = varname) = 0
+                            new var to screen 
+                                var.name   = varname
+                                var.type   = field.type
+                                var.value  = field.default
+                                var.occurs = table.occurs?
+                            endnew
+                        endif
+                    endfor
+                endfor
+            endfor
+        endfor
+        endfor
+    endif
+endfunction
+</function>
+
+<errorhandler when = "parse">
+function pfl_parse_error (p_message)
+    #   GSL has bug in parameter passing...
+    if !defined (p_message)
+        p_message = "(Unknown error)"
+    endif
+    if defined (page.name)
+        message = "$(screen.name) ($(page.name)): $(p_message:)"
+    else
+        message = "$(screen.name): $(p_message:)"
+    endif
+    error (message)
+endfunction
+</errorhandler>
+
+<errorhandler when = "code">
+function pfl_code_error (p_message)
+    #   GSL has bug in parameter passing...
+    if defined (page.name)
+        message = "$(screen.name) ($(page.name)): $(p_message:)"
+    else
+        message = "$(screen.name): $(p_message:)"
+    endif
+    error (message)
+endfunction
+</errorhandler>
+
+</xnf>
+

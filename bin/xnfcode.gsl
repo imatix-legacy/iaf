@@ -1,0 +1,73 @@
+#  'Code' engine for XNF
+#  Generated 2000/11/22, 14:19:09
+#
+
+function code_xnf (tag)
+    #    Process all entities using 'entity' scope name 
+    for . as entity
+        if    name () = "include"
+            code_include ()
+        elsif name () = "entity"
+            code_entity ()
+        elsif name () = "class"
+            code_class ()
+        elsif name () = "function"
+            code_function ()
+        elsif name () = "errorhandler"
+            code_errorhandler ()
+        endif
+    endfor
+endfunction
+
+function code_include (tag)
+endfunction
+
+function code_entity (tag)
+    code_entity_element ('entity')
+endfunction
+
+function code_class (tag)
+    code_entity_element ('class')
+endfunction
+
+function code_entity_element (tag)
+    #    Process all entities using 'entity' scope name 
+    for . as entity
+        if    name () = "allow"
+            code_allow ()
+        elsif name () = "body"
+            code_body ()
+        elsif name () = "rule"
+            code_rule ()
+        elsif name () = "attr"
+            code_attr ()
+        endif
+    endfor
+endfunction
+
+function code_body (tag)
+endfunction
+
+function code_allow (tag)
+endfunction
+
+function code_rule (tag)
+endfunction
+
+function code_attr (tag)
+    #    Process all entities using 'entity' scope name 
+    for . as entity
+        if    name () = "restrict"
+            code_restrict ()
+        endif
+    endfor
+endfunction
+
+function code_restrict (tag)
+endfunction
+
+function code_function (tag)
+endfunction
+
+function code_errorhandler (tag)
+endfunction

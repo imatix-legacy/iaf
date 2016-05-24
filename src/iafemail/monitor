@@ -1,0 +1,143 @@
+#! /usr/bin/perl
+#=============================================================================
+#
+#   monitor - monitor service
+#
+#   Written:     4/05/28  Pieter.Hintjens@imatix.com
+#   Revised:     4/05/28
+#
+#=============================================================================
+
+package main;
+$main::service_name = "usmonitor";
+$main::service_text = 'UltraSource Service Monitor/1.0';
+$main::service_desc = 'Monitors the usemailu service';
+
+require 'monitor.d';                    #   Include dialog interpreter
+
+
+##########################   INITIALISE THE PROGRAM   #########################
+
+sub initialise_the_program
+{
+    $the_next_event = $ok_event;
+    $target         = "usemailu.exe";
+    $logfile        = "";
+    $schedule       = 30;
+    $logfile_size   = 0;
+    load_config_file ();
+
+    log_msg ("Monitoring process=$target logfile=$logfile schedule=$schedule");
+    $timeout = $schedule;
+}
+
+sub load_config_file {
+    if (open (CONFIG, "usemailu.xml")) {
+        while (<CONFIG>) {
+            if (/trace_file\s*=\s*"([^"]+)"/) {
+                $logfile = $1;
+            }
+            if (/schedule\s*=\s*"([^"]+)"/) {
+                $schedule = $1 * 3;
+            }
+        }
+    }
+    else {
+        log_msg ("Can't open usemailu config file: $!");
+    }
+}
+
+sub log_msg {
+    ($_) = @_;
+
+    ($sec, $min, $hour, $day, $month, $year) = localtime;
+    $date = sprintf ("%02d/%02d/%02d", $year, $month + 1, $day);
+    $time = sprintf ("%2d:%02d:%02d", $hour, $min, $sec);
+
+    open  (LOG, ">>usmonitor.lst");
+    print  LOG "$date $time: $_\n";
+    close (LOG);
+}
+
+
+#########################   CHECK IF PROCESS RUNNING   ########################
+
+sub check_if_process_running
+{
+    $_ = `tlist`;
+    if (/$target/) {
+        $the_next_event = $ok_event;
+    }
+    else {
+        $the_next_event = $missing_event;
+    }
+}
+
+
+########################   RELOAD CONFIGURATION FILE   ########################
+
+sub reload_configuration_file
+{
+    load_config_file ();
+}
+
+
+##########################   CHECK LOGFILE PROGRESS   #########################
+
+sub check_logfile_progress
+{
+    if ($timeout > 0) {
+        $timeout--;                     #   Count down until ready to check
+        $the_next_event = $ignore_event;
+    }
+    else {
+        $timeout = $schedule;
+        $current_size = (stat ($logfile)) [7];
+        if ($current_size == $logfile_size) {
+            $the_next_event = $unchanged_event;
+        }
+        else {
+            $the_next_event = $growing_event;
+            $logfile_size = $current_size;
+        }
+    }
+}
+
+
+#############################   SLEEP FOR A WINK   ############################
+
+sub sleep_for_a_wink
+{
+    sleep (1);
+}
+
+
+###############################   KILL PROCESS   ##############################
+
+sub kill_process
+{
+    log_msg ("Process $target appears to be crashed - killing it");
+    system ("kill -f $target");
+    sleep  (1);
+    $_ = `tlist`;
+    if (/$target/) {
+        log_msg ("Process $target appears to be crashed - killing it");
+        system ("kill -f $target");
+    }
+}
+
+
+############################   GET EXTERNAL EVENT   ###########################
+
+sub get_external_event
+{
+}
+
+
+##########################   TERMINATE THE PROGRAM    #########################
+
+sub terminate_the_program
+{
+    $the_next_event = $terminate_event;
+}
+

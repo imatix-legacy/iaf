@@ -1,0 +1,48 @@
+<screen object = "module" style = "rolist" />
+
+<screen object = "module" style = "select" />
+
+<screen object = "module" style = "create" name = "module_create" >
+    <use object = "module" />
+    <invoke macro = "module_pass_data" />
+</screen>
+
+<screen object = "module" style = "browse" name = "module_browse" >
+    <use object = "module" />
+    <invoke macro = "module_pass_data" />
+    <page name = "detail">
+        <form>
+          <layout>
+              <action name = "roles" text = "Roles" label = "Module Roles" />
+          </layout>
+        </form>
+        <handler action = "roles">chain_to "modulerole_list"</handler>
+    </page>
+</screen>
+
+<macro name = "module_pass_data" >
+    <handler event = "on_global" >
+    Session ("module_id_adm")   = fld_module_id
+    Session ("module_name_adm") = fld_module_name
+    </handler>
+</macro>
+
+<macro name = "module_usertype" >
+<macro_attr name = "object" value = "module"            />
+<macro_attr name = "item"   value = "Access to Modules" />
+<macro_attr name = "query"  value = "primary"           />
+<use object = "module" />
+<var name = "fld_usertype_name" />
+<handler event = "on_init" >
+    fld_usertype_name   = Session ("usertype_name")
+    ' TODO
+    fld_module_id       = 2
+</handler>
+<match name = "moduleid" />
+<page name = "*"><form>
+<layout append = "0" >
+<field name = "usertype_name" label = "User Type" size = "50" attr = "plain" />
+</layout>
+</form></page>
+</macro>
+

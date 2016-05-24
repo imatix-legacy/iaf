@@ -1,0 +1,91 @@
+#   This file is used by the SCL workflow component to load and
+#   resolve workflow items.
+
+.template 0
+#   Resolve state class inheritence
+for state where defined (class)
+    if count (workflow.class, count.name = state.class) = 0
+        abort "Class '$(state.class)' is not defined in workflow"
+    endif
+    for workflow.class where name = state.class
+        for event 
+            if count (state.event, count.name = event.name) = 0
+                copy event to state
+            endif
+        endfor
+    endfor
+endfor
+
+#   Enumerate actions at workflow level and number them all
+for state
+    for event
+        for action
+            if count (workflow.action, count.name = action.name) = 0
+                copy action to workflow
+            endif
+            if defined (what)
+                for workflow.action as wfaction where name = action.name
+                    if count (what, name = action.what) = 0
+                        new what to wfaction
+                            what.name = action.what
+                        endnew
+                    endif 
+                endfor
+            endif
+            if defined (argument)
+                event.argument = argument
+            endif
+            for workflow.action as wfaction where name = action.name
+                event.actionlist = "$(event.actionlist?)" + "$(name:c) "
+            endfor
+        endfor
+    endfor
+endfor
+
+#  Invert events and roles to get list of methods per role in state
+for state
+    for event
+        if count (workflow.event, count.name = event.name) = 0
+            copy event to workflow
+        endif
+        for role
+            if count (state.role, count.name = role.name) = 0
+                new role to state as newrole
+                    newrole.name          = role.name
+                    newrole.methods       = ""
+                    newrole.methods_label = ""
+                endnew
+            endif
+            for state.role as staterole where name = role.name
+                if count (staterole.event, count.name = event.name) = 0 \
+                &  count (workflow.method, count.name = event.name) > 0
+                    new event to staterole as newevent
+                        newevent.name = event.name
+                    endnew
+                    staterole.methods += "$(event.name)" + " "
+                    for workflow.method where name = event.name
+                         staterole.methods_label += "$(method.label?method.name)" + "|"
+                    endfor
+                endif
+            endfor
+        endfor
+    endfor
+endfor
+
+for state
+    text = trim (state.)
+    char_nbr = 0
+    while char_nbr < length (text)
+        if substr (text, char_nbr,,1) = "\n"
+            if char_nbr > 0
+                text = substr (text, 0, char_nbr - 1) + " " + substr (text, char_nbr + 1)
+            else
+                text = " " + substr (text, char_nbr + 1)
+            endif
+        endif
+        char_nbr += 1
+    endwhile
+    state.text = text
+endfor
+endtemplate
+

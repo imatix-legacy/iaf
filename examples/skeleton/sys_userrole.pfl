@@ -1,0 +1,158 @@
+<screen name = "userrole_list" style = "rolist" object = "userrole" item = "User Role">
+    <var name = "fld_usertype_name" />
+    <match name = "usertypeid" />
+
+    <handler event = "on_init" replace = "1" >
+       fld_usertype_name        = Session ("usertype_name_adm")
+       fld_userrole_usertypeid  = Session ("usertype_id_adm")
+       <query name = "summary" control = "first">
+           <empty>
+              chain_to "userrole_subset"
+           </empty>
+       </query>
+    </handler>
+
+    <page name = "list">
+    <toolbar>
+        <action name = "edit"/>
+    </toolbar>
+    <form>
+    <hints>
+       <hint>This screen shows the different modules a user type has access to.</hint>
+       <hint>To change the choice of the different modules, chose 'Edit'.</hint>
+    </hints>
+    <layout append = "0" >
+    <field name = "usertype_name" label = "User type" size = "50" attr = "plain" />
+    </layout>
+    <summary>
+        <field name = "moduleid" attr = "click">
+            <lookup>
+                <field name = "name"  />
+            </lookup>
+       </field>
+       <field name = "moduleroleid" >
+            <lookup>
+               <field name = "shortname" />
+               <field name = "longname"  />
+            </lookup>
+       </field>
+    </summary>
+    </form>
+    <handler action = "edit">
+        chain_to "userrole_subset"
+    </handler>
+    <handler event = "on_select">
+        Session ("usertypeid") = fld_userrole_usertypeid
+        Session ("moduleid")   = fld_userrole_moduleid
+        chain_to "userrole_detail"
+    </handler>
+    </page>
+</screen>
+
+<screen name = "userrole_select" style = "select"
+    object = "userrole" 
+    item   = "Module"
+    query  = "summary">
+<var name = "fld_usertype_name" />
+<handler event = "on_init" >
+    fld_usertype_name        = Session ("usertype_name")
+    fld_userrole_usertypeid  = Session ("usertype_id")
+</handler>
+<match name = "usertypeid" />
+<page name = "list"><form>
+<layout append = "0" >
+<field name = "usertype_name" label = "Usertype" size = "50" attr = "plain" />
+</layout>
+    <summary>
+       <field name = "moduleid" attr = "click">
+            <lookup>
+                <field name = "name"  />
+            </lookup>
+       </field>
+       <field name = "moduleroleid" >
+            <lookup>
+               <field name = "shortname" />
+               <field name = "longname"  />
+            </lookup>
+       </field>
+    </summary>
+</form></page>
+</screen>
+
+<screen name = "userrole_detail" object = "userrole" item = "User Role" >
+<use object = "userrole" />
+<handler event = "on_init">
+    Session ("module_id_adm") = fld_userrole_moduleid
+    userrole_recv_key
+    <fetch view = "detail" />
+    <step>
+    if fld_userrole_moduleroleid = 0 then
+        cur_page = "modify"
+        Session ("module_id_adm")   = fld_userrole_moduleid
+        Session ("module_name_adm") = fld_userrole_moduleid_name
+        Session ("lookup_on")       = "moduleroleid"
+        chain_to "modulerole_select"
+    end if
+    </step>
+</handler>
+<handler event = "on_lookup">
+   select case cur_argval
+    case "moduleroleid"
+        Session ("module_id_adm")   = fld_userrole_moduleid
+        Session ("module_name_adm") = fld_userrole_moduleid_name
+   end select
+</handler>
+<page title = "Edit User Role Details" name = "modify" view = "detail" >
+  <form mode = "input">
+    <hints>
+    <hint>Click on Ok to save your changes, or on Cancel to discard them.</hint>
+    </hints>
+    <layout>
+    <field name = "moduleid"  attr = "plain">
+        <lookup>
+            <field name = "name" />
+        </lookup>
+    </field>
+    <field name = "usertypeid" attr = "plain">
+        <lookup >
+            <field name = "name" />
+        </lookup>
+    </field>
+    <field name = "moduleroleid" >
+        <lookup>
+            <field name = "shortname" />
+            <field name = "longname"  />
+        </lookup>
+    </field>
+    <action name = "update" toolbar = "1" text = "Ok" fields = "1" hint = "Save your changes now" />
+    <action name = "cancel" join = "1"                             hint = "Lose your changes"     />
+    </layout>
+</form>
+<handler action = "update">
+    <update>
+        <ok>return_to_parent</ok>
+    </update>
+</handler>
+<handler action = "cancel" >
+    return_to_parent
+</handler>
+</page>
+</screen>
+
+<screen
+    name      = "userrole_subset"
+    style     = "subset_simple"
+    object    = "userrole"
+    query     = "summary"
+    fromlabel = "Module"
+    fromobj   = "module"
+    fromquery = "summary"
+    fromview  = "summary"
+    fromfield = "id"
+    title     = "Select Modules for User Type"
+    saverule  = "
+        fld_userrole_usertypeid = Session (&quot;usertype_id_adm&quot;)
+                ">
+<match name = "usertypeid"  value = "Session (&quot;usertype_id_adm&quot;)"  />
+</screen>
+

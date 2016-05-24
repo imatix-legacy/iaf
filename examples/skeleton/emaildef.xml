@@ -1,0 +1,25 @@
+<data>
+
+<!-- System and user administration email contexts -->
+
+<emaildef
+    context = "user new password"
+    name    = "User requests a new password"
+    subject = "Welcome back to $(application)"
+    body    = "Your new password is: $(password).
+Please change your password by selecting 'Modify Personal Profile'
+as soon as you login to $(application)."
+    hidden  = "1" />
+
+<emaildef
+    context = "user deactivated"
+    name    = "User account is deactivated after login failures"
+    subject = "Your $(application) account has been disactivated"
+    body    = "An unknown person has tried repeatedly to access your $(application)
+'$(login)' account using erroneous passwords.  We have had to disable
+your $(application) account as a security measure.  Please contact your
+Manager to get your account opened again, and to receive a new password."
+    hidden  = "1" />
+
+</data>
+

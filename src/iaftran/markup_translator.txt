@@ -1,0 +1,143 @@
+#############################################################################
+# Markup Translator 1.0                                                     #
+#                                                                           #
+# Creation: 1999/11/08 Pascal Antonnaux <pascal@imatix.com>                 #
+# Revision: 1999/11/23 Pascal Antonnaux <pascal@imatix.com>                 #
+#                                                                           #
+# Copyright iMatix Corporation 1999                                         #
+#############################################################################
+
+Introduction
+------------
+
+Le but de ce programme est d'extraire les données textuelles d'un ensemble
+de fichiers (regrouper sous le terme d'application), afin de produire
+un dictionnaire de référence pour cette application.
+
+Ce dictionnaire est ensuite traduit dans differentes langues.
+
+Les fichiers sources sont ensuite modifiés afin de pouvoir les traduires.
+
+1.Extraction de données
+=======================
+
+Les fichiers de départ sont de type MARKUP (HTML, XML, ...). 
+
+Les tags autorisés, la syntaxe, etc sont défini dans un fichier de
+configuration.
+
+
+Le programme collecte les données textuelles, les recherche dans
+le dictionnaire actuelle.
+
+Si la donnée est nouvelle, elle est créée dans le dictionnaire avec un
+identificateur unique.
+
+A la fin du traitement du fichier, le dictionnaire est sauvegarder.
+
+1.1 Fichier de configuration de markup
+--------------------------------------
+Le fichier définissant le 'Markup Language' est au format XML.
+
+Ceci dans le but de pouvoir générer un tableau statique à compiler dans
+ un programme C.
+
+Chaque TAG devra contenir les informations suivante:
+
+    * Un 'End Of Tag' est-t-il requis (exemple : <B> </B> et <LI>)
+
+    * Est-ce que il s'agit d'un tag de script (afin de ne pas tenir compte 
+      des caractères '<' et '>' dans ces tags.
+
+    * La séquence de terminaison de tag (ex: "%>", "-->", ">")
+
+
+2.Dictionnaire
+==============
+Le dictionnaire est au format XML.
+
+chaque enregistrement comprend un identificateur unique, la valeur
+par defaut et un ensemble de traduction rérérencer par un code langue ISO 
+sur 2 caractères.
+
+Exemple:
+
+<dictionary>
+<dictionary>
+    <field id = "1">
+        <data lang = "en" value = "UltraSource - Logon" default = "1"/>
+        <data lang = "fr" value = "UltraSource - Logon"              />
+        <usage value = "Logon.asp"/>
+    </field>
+    <field id = "2">
+        <data lang = "en" value = "If you are a new user" default = "1"/>
+        <data lang = "fr" value = "Si vous etes un nouvelle utilisateur"/>
+        <usage value = "Logon.asp"/>
+    </field>
+    .
+    .
+    .
+</dictionary>
+
+3.Traduction
+============
+
+Le dictionnaire peut-être utilisé dans differents types de projets.
+La traduction de la page est liée au type d'application
+
+3.1 Fichier statique
+--------------------
+Le programme remplace simplement le texte initiale par la traduction.
+
+On pourra choisir entre la création d'un fichier de même nom dans un répertoire
+différent, ou l'ajout du code langue à l'extension du fichier initiale.
+
+
+3.2 iMatix Studio
+-----------------
+Le programme remplace la donnée par une référence à la donnée,
+par exemple %(id), ou id est l'identifiant de la valeur. 
+
+On pourra mettre la valeur initiale en commentaire afin de pouvoir
+lire le fichier transformer.
+
+Un fichier include (.h) est générer sur base du fichier dictionnaire.
+
+Un module en c permet de remplacer les réferences %(id) dans le fichier traduit
+par sa véritable valeur.
+
+3.3 Application ASP
+-------------------
+Les valeurs dans les pages seront remplacées par l'appel d'une routine ASP
+Exemple:
+         <% = tranlate_value (1, "FR") %> 
+      ou <% = tranlate_value (1, cur_user_language) %>
+
+Un fichier ASP sera générer sur base du dictionnaire, permettant le chargement
+en mémoire du dictionnaire et la recherche de valeur dans ce dictionnaire.
+
+Ce module devrait normalement être charger dans le fichier GLOBAL.ASA 
+lors du démarrage de l'application, afin de partager le dictionnaire entre
+toutes les sessions.
+
+4. Maintenance
+==============
+
+Développement d'un utilitaire permettant de 'nettoyer' le dictionnaire des
+valeurs qui ne sont plus utilisée.
+
+Permettre de générer un rapport sur le dictionnaire (fréquence d'un terme,
+référence des fichiers contenant un terme ...) afin de pouvoir mesurer
+l'impact d'un chagement de traduction d'une page sur les autres pages utilisant
+ce terme.
+
+5. Autres
+=========
+1) Dans le cadre du html, il faudrat étudier le cas des références vers des
+fichiers images affichant du texte.
+
+
+2) Il faudrait envisager un application internet permettant d'encoder
+les traductions dans le dictionnaire (sur base d'un fichier source) et
+d'effectuer une prévisualisation de la traduction de cette page dans
+un browser (un autre frame par exemple).

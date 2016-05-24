@@ -1,0 +1,61 @@
+<table name = "field" description = "Form Field Definition" >
+ Defines one field on a data capture form.
+    <field name = "id"          domain = "recordid" >Record id</field>
+    <field name = "formid"      domain = "id"       >Parent form</field>
+    <field name = "label"       domain = "shortname">Label shown to user</field>
+    <field name = "name"        domain = "shortname">Internal name</field>
+    <field name = "order"       domain = "int"      >Order on screen
+        <rule name = "show" when = "all" what = "blank" value = "1" />
+    </field>
+    <field name = "type"        domain = "fieldtype">Field type</field>
+    <field name = "showsize"    domain = "fieldsize">Displayed size</field>
+    <field name = "maxsize"     domain = "fieldsize">Maximum size</field>
+    <field name = "default"     domain = "longname" >Default value</field>
+    <field name = "mask"        domain = "longname" >Mask format validation</field>
+    <field name = "join"        domain = "boolean"  >Join to previous</field>
+    <field name = "break"       domain = "boolean"  >Blank line after
+        <rule name = "show" when = "layout" what = "join"  value = "1"   />
+    </field>
+    <field name = "rule"        domain = "boolean"  >Draw line after
+        <rule name = "show" when = "layout" what = "join"  value = "1"   />
+    </field>
+    <field name = "lockable"    domain = "boolean"  >Can be locked</field>
+    <field name = "cursor"      domain = "boolean"  >Place cursor
+        <rule name = "show" when = "layout" what = "join"  value = "1"   />
+    </field>
+    <field name = "required"    domain = "boolean"  >Require data
+        <rule name = "show" when = "layout" what = "join"  value = "1"   />
+    </field>
+    <field name = "uppercase"   domain = "boolean"  >Force uppercase</field>
+    <field name = "blankzero"   domain = "boolean"  >Show 0 as blank
+        <rule name = "show" when = "layout" what = "join"  value = "1"   />
+    </field>
+    <field                      domain = "audit"   />
+    <link type = "childof" table = "form" />
+    <index name = "byform">
+        <field name = "formid"      />
+        <field name = "order"       />
+        <field name = "id"          />
+    </index>
+    <index name = "byname">
+        <field name = "formid"      />
+        <field name = "name"        />
+    </index>
+</table>
+
+<domain name = "fieldsize"  type = "numeric" size = "4" >
+    <rule name = "show" when = "all" what = "blank" value = "1" />
+</domain>
+
+<domain name = "fieldtype" type = "numeric" size = "2" default = "1">
+    <value key = "1" label = "Text"       />
+    <value key = "2" label = "Textbox"    />
+    <value key = "3" label = "Date"       />
+    <value key = "4" label = "Time"       />
+    <value key = "5" label = "Number"     />
+    <value key = "6" label = "Select"     />
+    <value key = "7" label = "Radio"      />
+    <value key = "8" label = "Checkbox"   />
+    <value key = "9" label = "Label"      />
+    <rule name = "show" when = "all" what = "select" value = "drop down" />
+</domain>

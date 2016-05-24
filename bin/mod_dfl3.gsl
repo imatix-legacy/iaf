@@ -1,0 +1,295 @@
+#-----------------------------------------------------------------------
+#
+#   mod_dfl - DFL processing module
+#
+#   For GSL/3
+#
+#-----------------------------------------------------------------------
+
+#   Loads and validates a DFL file as a child of root, called "dfl".
+#   If fast option is specified, only loads file, does not denormalize
+
+function dfl_load (dflfile, fast)
+
+  if !file.exists (my.dflfile)
+      abort "$(my.dflfile) not found"
+  else
+      xml to root from my.dflfile 
+  endif
+
+  if (my.fast?0) = 0
+      echo "Loading and processing $(my.dflfile)..."
+  endif
+  for root.dfl
+
+    #   Include everything from <include> files - we'll shoot duplicates later
+    for [include]
+        xml to dfl from filename
+        for dfl.dfl
+            abort "$(filename) is not a valid include file - use <inherit>"
+        endfor
+    endfor
+
+    #   Inherit classes from <inherit> files
+    for inherit
+        xml from filename
+        if count (dfl) = 0
+            abort "$(filename) is not a valid - inherited files must contain dfl entity"
+        endif    
+        for dfl as inheritdb
+            for domain as inheritdom where count (dfl.domain, count.name = inheritdom.name, count) = 0
+                copy inheritdom to dfl
+            endfor
+        endfor
+        delete inherit-> dfl
+    endfor
+
+    #   Check whether cleanid rule is applied to dfl
+    dfl.cleanids = 0
+    for rule where name = "clean ids"
+        dfl.cleanids = 1
+    endfor
+
+    if count (dfl.table) = 0
+        abort "DFL contains no table definitions"
+    endif
+
+    if my.fast ?= 1
+        return
+    endif
+
+    #   Resolve group domains - one pass for now
+    #   Group fields are left in table, with 'group = 1'
+    #   todo: inherit rules on domain links
+    for table
+        if count (dfl.table, count.name = table.name, count) > 1
+            abort "Table '$(name)' is defined more than once"
+        endif
+        for field as tabfield where defined (domain)
+            for dfl.domain where name = tabfield.domain & type ?= "group"
+                for domain.field as grpfield
+                    grpfield.name ?= grpfield.domain
+                    new field to table before tabfield
+                        field.name     = (tabfield.name?"") + grpfield.name
+                        field.domain   = grpfield.domain?
+                        field.type     = grpfield.type?
+                        field.size     = grpfield.size?
+                        field.decs     = grpfield.decs?
+                        field.default  = grpfield.default?
+                        field.required = grpfield.required?
+                        field.         = grpfield.?
+                        for grpfield.rule
+                            copy rule to field
+                        endfor
+                    endnew
+                endfor
+                for link
+                    copy link to table
+                endfor
+                tabfield.group = 1
+           endfor
+       endfor
+    endfor
+
+    #   All fields inherit their basic properties from their domain
+    for table
+        for field where defined (domain)
+            if count (dfl.domain, count.name = field.domain, count) = 0
+                abort "In $(table.name): domain '$(field.domain)' not defined"
+            endif
+            for dfl.domain where name = field.domain
+                if type ?= "group"
+                    #   Rules apply to table
+                    for domain.rule 
+                        copy rule to table
+                    endfor
+                else
+                    field.name     ?= domain.name?
+                    field.type     ?= domain.type?
+                    field.size     ?= domain.size?
+                    field.decs     ?= domain.decs?
+                    field.default  ?= domain.default?
+                    field.required ?= domain.required?
+                    field.         ?= domain.?
+                    #   Rules apply to field
+                    for domain.rule
+                        copy rule to field
+                    endfor
+                    #   Values apply to field
+                    for domain.value
+                        copy value to field
+                    endfor
+                endif
+            endfor
+        endfor
+    endfor
+
+    #   Check that each table has a valid primary index, or an id field
+    #   if the database uses clean identifiers.
+    for table
+        if count (index, count.name = "primary", count) = 0
+            if cleanids = 0
+                abort "In $(table.name): no primary index defined"
+            else
+                if count (field, count.name ?= "id", count) > 1
+                    abort "In $(table.name): table contains more than 1 id field"
+                elsif count (field, count.name ?= "id", count) = 1
+                    xml '<index name="primary"><field name="id"/></index>'
+                else
+                    abort "In $(table.name): no primary index or id field defined"
+                endif
+            endif
+        endif
+    endfor  
+
+    #   For each childof and multiplex link, check that an index is defined
+    #   in the child table, consisting of parent primary index plus child
+    #   primary index.  We create the index if necessary.
+    #   In parent table, create a 'contains' link referring to the child
+    #   table and index name.
+    #   For each reference link, fill-in the link fields if none are defined.
+    #
+    for table
+        for link 
+            if count (dfl.table, count.name = link.table, count) = 0
+                abort "In $(table.name): unknown table '$(link.table)' used in link"
+            endif
+            if count (link.field) = 0
+                if cleanids = 0
+                    abort "In $(table.name): no fields defined for link to '$(link.table)'"
+                endif
+                new field to link
+                    field.name = link.table + "id"
+                    if count (table.field, count.name ?= field.name, count) = 0
+                        abort "In $(table.name): field '$(field.name)' expected"
+                    endif
+                endnew
+            else
+                #   Check that link fields exist in source table
+                for link.field
+                    if count (table.field, count.name ?= field.name, count) = 0
+                        abort "In $(table.name): link made from non-existing '$(field.name)'"
+                    endif
+                endfor
+            endif
+
+            if link.type = "childof" | link.type = "multiplex"
+                #   If an index exists with necessary fields, store its name,
+                #   else create a new index using link fields.
+                for table.index
+                    link.matches = 1
+                    for link.field as linkfield
+                        if item () > count (index.field)
+                            matches = 0
+                        else
+                            for index.field as indexfield where item () = item (linkfield)
+                                if linkfield.name <> indexfield.name
+                                    matches = 0
+                                endif
+                            endfor
+                        endif
+                        if matches = 0
+                            last
+                        endif
+                    endfor
+                    if matches
+                        link.index = index.name
+                        last
+                    endif
+                endfor
+                if !matches
+                    new index to table
+                        index.name = "alt"
+                        link.index = index.name
+                        for link.field as linkfield
+                            index.name += "_" + linkfield.name
+                            new field to index
+                                field.name = linkfield.name
+                            endnew
+                        endfor
+                    endnew
+                endif
+            endif
+        endfor link
+    endfor table
+
+    #   Define all realnames, field null attributes, maximum attributes 
+    #   and field index attributes
+    for table
+        table.realname    ?= (prefix?"") + table.name
+        table.description ?= table.name
+    
+        for field where ! defined (group)
+            field.realname ?= (prefix?"") + field.name
+            if !defined (field.type)
+                echo "No field type for: $(field.name) in $(table.name)"
+                abort "Inconsistency in XML tree!"
+            endif
+            if type = "textual"
+                field.default ?= ""
+            else
+                field.default ?= "0"
+            endif
+            field.calculated = 0
+        endfor
+
+        for index
+            if index.name = "primary"
+                index.realname = "primary_index"
+            else
+                index.realname = index.name
+            endif
+            for field as indexfield
+                for table.field as tablefield where name = indexfield.name & ! defined (group)
+                    if index.name = "primary"
+                        tablefield.required = 1
+                    endif
+                    indexfield.realname = tablefield.realname
+                    indexfield.type     = tablefield.type?
+                    indexfield.size     = tablefield.size?
+                    indexfield.decs     = tablefield.decs?
+                    indexfield.null     = tablefield.null?
+                    indexfield.default  = tablefield.default?
+                    indexfield.required = tablefield.required?
+                    if count (tablefield.index, count.name = index.name, count) = 0
+                        new index to tablefield as fieldindex
+                            fieldindex.name = index.name
+                        endnew
+                    else
+                        abort "In $(table.name): '$(tablefield.name)' is duplicated in $(index.name) index"
+                    endif
+                endfor
+                if ! defined (realname)
+                    abort "In $(table.name): index field '$(indexfield.name)' not found"
+                endif
+            endfor
+        endfor
+
+        for link
+            for field as linkfield
+                for table.field as tablefield where name = linkfield.name & ! defined (group)
+                    linkfield.realname = tablefield.realname
+                endfor
+            endfor
+        endfor
+    endfor
+
+    #   Resolve target and target_realname's for link fields
+    for table
+        for link
+            for field as linkfield
+                if ! defined (target)
+                    for dfl.table where name = link.table
+                        for index where name = "primary"
+                            linkfield.target          = index-> field.name
+                            linkfield.target_realname = index-> field.realname
+                        endfor
+                    endfor
+                endif
+            endfor
+        endfor
+    endfor
+
+  endfor    # dfl
+endfunction
+

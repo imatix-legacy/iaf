@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<config 
+    description = "iafStep Daemon configuration">
+    <main
+        run             = "1"
+        schedule        = "10"
+        service_name    = "iafstep"
+        service_text    = "iafStep Daemon"
+        debug           = "1"
+        trace_file      = "iafstep.log"
+        resend          = "1"
+    />      
+
+    <email>
+        <smtp
+            server   = "wspascal"
+        />
+        <pop3
+            server   = "wspascal"
+            user     = "usdx"
+            password = "usdx"
+        />
+        <!-- Alert is used to send system error report -->
+        <alert
+            to       = "usdxalert@manpowerinc.com"
+            sender   = "usdx@wspascal"
+        />
+    </email>
+
+    <directory
+            to_send      = "d:\clients\manpower\us20\out"
+            when_receive = "in"
+    />
+    <sender
+        name         = "usdx"
+        private_key  = "usdx_priv.cert"
+    />
+
+    <recipient name     = "usdx">
+        <transport type = "email">usdx@wspascal</transport>
+        <key>usdx_pub.cert</key>
+    </recipient>
+
+    <recipient name     = "digisheet">
+        <transport type = "email">digisheet@wspascal</transport>
+        <key>digisheet_pub.cert</key>
+    </recipient>
+</config>
+

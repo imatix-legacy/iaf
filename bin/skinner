@@ -1,0 +1,223 @@
+#! /usr/bin/perl
+#
+#   Skinner
+#
+#   This Perl tool does nasty things to a generated SPF page.
+#   SPF stands for Skinnable Program File.  It's an ASP page
+#   that needs to be merged with a skin file.
+#
+#   Skinner is a iAF post-processing tool.  This text is the
+#   current documentation for Skinner.
+#
+#   Firstly, skinning is enabled by setting the screen 'skin'
+#   option.  You can do this in individual screens or you can
+#   do it in the defaults.pfl file if your application uses
+#   that.
+#
+#   Secondly, the skinner.def file provides Skinner with a
+#   bunch of start-up information.  You should look at this
+#   file and try to understand it.
+#
+#   Thirdly, a 'skin' is an HTML page designed using any web
+#   design tool, or by hand, which includes special comments
+#   that Skinner understands.  These comments look like this:
+#
+#      <!--<form>-->
+#       random HTML goes here
+#      <!--</form>-->
+#
+#   The 'random' HTML is shown when designing the skin, but is
+#   thrown away by Skinner.  Skinner inserts the block called
+#   'form' in place of the comment.  The blocks that Skinner
+#   works with are arbitrary and can come either from the iAF
+#   page or from the skinner.def file.  The developer and the
+#   skin designer must simply agree on the name of the block.
+#
+#   When a screen is 'skinned', iAF generates blocks named:
+#   title (the page title), form (the data form), hints (the
+#   hints block), and toolbar (the page toolbar).  All other
+#   blocks must come from the skinner.def file.
+#   
+#   When a screen is 'skinned', iAF does not generate an ASP
+#   file directly.  It generates a 'SPF' (skinnable program
+#   file).  Skinner takes this, merges it with the skin HTML,
+#   and produces an ASP file as a result.
+#
+#   If you want to understand how this works, look at a SPF
+#   file and look for tags of the form [skin...].  These are
+#   control instructions to Skinner.  The possibilities are:
+#
+#    [skin start b]    starts a block called 'b'
+#    [skin end b]      ends a block called 'b'
+#    [skin page]       Insert the HTML page here
+#    [skin apply "f" pattern...]
+#                      apply specified skin to matching files
+#    [skin filter block pattern]
+#                      only include block if file matches
+#                      max. 1 pattern per block
+#
+#   Before doing anything else, Skinner reads skinner.def and
+#   executes any tags it finds there.  Then it goes off and
+#   processes all SPF files that it has been told about.
+#
+#   In gross terms, Skinner works like this.  iAF ASP programs
+#   always start with executable code, with the HTML page body
+#   at the end.  Skinner starts by copying the ASP code in the
+#   SPF file to its output.  Any [skin] tags that it finds it
+#   parses and processes.  This includes start and end tags,
+#   which can be nested to any degree.  When it finds the page
+#   tag, it inserts the HTML skin, taking care to insert all
+#   blocks that the HTML skin has asked for.  The result is a
+#   nice skinned ASP program.
+#
+
+#   Constants
+$skinner_def = "skinner.def";
+
+#   Process skinner.def file if present
+$block_level = 0;           #   Skin block indentation level
+$skin_count  = 0;           #   Number of skin patterns defined
+$pipe_output = 0;           #   Do we copy input to output?
+($sec, $min, $hour, $day, $month, $year) = localtime;
+$year += 1900;              
+
+process_file ($skinner_def);
+for (@ARGV) {
+    if (/\.spf$/) {
+        $pipe_output = 1;
+        $file_content = "";
+        open (OUTPUT, ">$`.asp") || die "Can't write to $`.asp: $!";
+        print "Generating $`.asp...\n";
+        process_file ($_);
+        close (OUTPUT);
+    }
+    else {
+        print "Skinner expects an SPF file as input\n";
+    }
+}
+
+
+#-----------------------------   Process File   ------------------------------
+
+sub process_file {
+    ($filename) = (@_);
+    if (-f $filename) {
+        open (INPUT, $filename) || die "Can't read $filename: $!";
+        $line_nbr = 0;
+        while (<INPUT>) {
+            process_line ();
+        }
+    }
+}
+
+sub process_line {
+    $line_nbr++;
+    if (/\[skin\sstart\s(\w+)\s*\]/) {
+        $block_stack {$block_level} = $block_name;
+        $block_text  {$block_name}  = $cur_block;
+        $block_level++;
+        $block_name = $1;
+        $cur_block = "";
+    }
+    elsif (/\[skin\send\s(\w+)\s*\]/) {
+        if ($1 ne $block_name) {
+            print "$filename $line_nbr: End/start mismatch\n";
+            die;
+        }
+        $block_text {$block_name} = $cur_block;
+        $block_level--;
+        $block_name = $block_stack {$block_level};
+        $cur_block  = $block_text  {$block_name};
+    }
+    elsif (/\[skin\sapply\s\"([^"]+)\"\s+\"([^"]+)\"\s*]/) {
+        if (! -f $1) {
+            print "$filename does not exist\n";
+            die;
+        }
+        $skin_filename {$skin_count} = $1;
+        $skin_pattern  {$skin_count} = $2;
+        $skin_count++;
+    }
+    elsif (/\[skin\sfilter\s(\w+)\s+\"([^"]+)\"\s*]/) {
+        $filter {$1} = $2;
+    }
+    elsif (/\[skin\spage\s*]/) {
+        #   Find skin for current file
+        for ($skin = 0; $skin < $skin_count; $skin++) {
+            if ($filename =~ $skin_pattern {$skin}) {
+                process_skin ($skin_filename {$skin});
+                last;
+            }
+        }
+    }
+    elsif (/\[skin.*\]/) {
+        print "$filename $line_nbr: unrecognised tag: $_";
+    }
+    elsif ($block_level > 0) {
+        #   Add line to block
+        #   Process meta functions
+        #   $year()  - insert current year
+        #   $space() - insert spacing into text
+        while (/\$year\(\)/) {
+            $_ = $`.$year.$';
+        }
+        while (/\$space\(([^)]*)\)/) {
+            $text   = $1;
+            $before = $`;
+            $after  = $';
+            $text   =~ s/(.)/$1&nbsp;/g;
+            $_ = $before.$text.$after;
+        }
+        $cur_block .= $_;
+    }
+    elsif ($pipe_output) {
+        print OUTPUT $_;
+        $file_content .= $_;
+    }
+}
+
+sub process_skin {
+    local ($filename) = (@_);
+    local ($block_name);
+    
+    if (-f $filename) {
+        open (SKIN, $filename) || die "Can't read $filename: $!";  
+        while (<SKIN>) {
+            if (/\s*<!--<(\/?)(\w+)>-->\s*/) {
+                $block_name = $2;
+                $block_text = $block_text {$block_name};
+                $before     = $`;
+                $after      = $';
+
+                if (defined ($block_text)) {
+                    if (!$1) {
+                        #   Start of block comment
+                        print OUTPUT "$before\n" if $before;
+                        print OUTPUT "<!--<$block_name>-->\n";
+
+                        if (!defined ($filter {$block_name})
+                        |  $file_content =~ $filter {$block_name}) {
+                            print OUTPUT $block_text;
+                            $file_content .= $block_text;
+                        }
+                        $pipe_output = 0;
+                    }
+                    else {
+                        #   End of block comment
+                        print OUTPUT "<!--</$block_name>-->\n";
+                        print OUTPUT $after;
+                        $pipe_output = 1;
+                    }
+                }
+                else {
+                    print "$filename $line_nbr: no such block: '$block_name'\n";
+                }
+            }
+            elsif ($pipe_output) {
+                print OUTPUT $_;
+                $file_content .= $_;
+            }
+        }
+    }
+}
+

@@ -1,0 +1,52 @@
+<object name = "user">
+    <view name = "create" >
+       <field name = "id"         />
+       <field name = "surname"    />
+       <field name = "salute"     />
+       <field name = "forename"   />
+       <field name = "initial"    />
+       <field name = "login"      />
+       <field name = "usertypeid" >
+          <table name = "usertype" >
+            <field name = "name" />
+          </table>
+       </field>
+       <field name = "password"   />
+       <field name = "language"    >
+          <table name = "language" >
+            <field name = "name" />
+          </table>
+       </field>
+       <field name = "datefmt"    />
+       <field name = "moneyfmt"   />
+       <field name = "email"      />
+       <field name = "address1"   />
+       <field name = "address2"   />
+       <field name = "address3"   />
+       <field name = "telephone"  />
+       <field name = "fax"        />
+       <field name = "status"     />
+       <field name = "moduleid"   />
+       <field name = "showhints"  />
+       <field name = "lastlogin"  />
+       <field name = "timeslogin" />
+       <field name = "failures"   />
+    </view>
+
+    <view name = "profile" >
+       <field name = "id"         />
+       <field name = "moduleid"   />
+       <field name = "showhints"  />
+     </view>
+    
+    <query name = "bylogin"     view = "summary" index = "bylogin"    />
+    <query name = "byname"      view = "summary" index = "byname"     />
+    <query name = "byusertype"  view = "summary" index = "byusertype" />
+    
+    <require>
+        <field name = "login"    />
+        <field name = "surname"  />
+        <field name = "forename" />
+    </require>
+</object>
+

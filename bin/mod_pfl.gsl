@@ -1,0 +1,15 @@
+------------------------------------------------------------------------
+-
+-   mod_pfl - PFL processing module
+-
+-   Written: 1999/12/24  Pieter Hintjens <ph@imatix.com>
+-   Revised: 2000/02/21  Pieter Hintjens <ph@imatix.com>
+-
+------------------------------------------------------------------------
+
+if ! defined (mod_pfl_included)
+    mod_pfl_included = 1
+    include "mod_ofl.gsl"
+    include "pflload.gsl"
+    include "pflasp.gsl"
+endif included

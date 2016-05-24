@@ -1,0 +1,319 @@
+----------------------------------------------------------------------------
+-
+-  Name:       dfldoc.gsl
+-  Title:      Library for DFL documentation.
+-
+-  Written:    2000/01/04  Pascal Antonnaux <pascal@imatix.com>
+-  Revised:    2000/02/15  Pieter Hintjens
+-
+----------------------------------------------------------------------------
+
+include "mod_html.gsl"
+include "mod_doc.gsl"
+
+function generate_doc 
+
+for root.dfl
+   echo "Generating $(dfl.name)$(FILE_EXTENSION:)..."
+   output "$(dfl.name)$(FILE_EXTENSION:)"
+   START_DOCUMENT (dfl.description, dfl.author, "", "")
+
+for table
+    SET_TITLE ("H2", "$(Name)" + " - " + "$(description:neat)")
+    table_text = trim ("$(table.?:)")
+    if defined (table_text) & table_text <> ""
+        BEGIN_PAR ()
+>$(table_text:)
+        END_PAR ()
+    endif
+
+    for link where type = "childof" | type = "multiplex"
+        BEGIN_PAR ()
+        >Table is a child of the $(link.table) table.
+        END_PAR ()
+    endfor
+
+    SET_TITLE ("H3", "Fields in Table")
+
+BEGIN_TABLE ("10")
+DEFINE_COLUMN ("40", "LRTBS")
+DEFINE_COLUMN ("60", "LRTBS")
+DEFINE_COLUMN ("80", "LRTBS")
+DEFINE_COLUMN ("100", "LRTBS")
+DEFINE_COLUMN ("160", "LRTBS")
+BEGIN_ROW ()
+CELL_BOLD ("Name")
+CELL_BOLD ("Domain")
+CELL_BOLD ("Type")
+CELL_BOLD ("Size")
+CELL_BOLD ("Description")
+END_ROW ()
+START_COLUMN_DEFINITION ("10")
+DEFINE_COLUMN ("40", "LRTB")
+DEFINE_COLUMN ("60", "LRTB")
+DEFINE_COLUMN ("80", "LRTB")
+DEFINE_COLUMN ("100", "LRTB")
+DEFINE_COLUMN ("160", "LRTB")
+    for field where ! defined (group)
+BEGIN_ROW ()
+CELL_BOLD  (name)
+CELL_PLAIN (domain?)
+CELL_PLAIN (type?)
+CELL_PLAIN (size?)
+CELL_PLAIN (field.?)
+END_ROW ()
+endfor
+END_TABLE ()
+
+   if count (table.link) > 0
+      SET_TITLE ("H3", "Links from Table")
+      BEGIN_TABLE ("10")
+      DEFINE_COLUMN ("40",  "LRTBS")
+      DEFINE_COLUMN ("60",  "LRTBS")
+      DEFINE_COLUMN ("100", "LRTBS")
+      DEFINE_COLUMN ("160", "LRTBS")
+      BEGIN_ROW ()
+      CELL_BOLD ("Target table")
+      CELL_BOLD ("Link type")
+      CELL_BOLD ("Index used")
+      CELL_BOLD ("Fields")
+      END_ROW ()
+      for link
+       for field
+         if count (link.field) = 1
+            START_COLUMN_DEFINITION ("10")
+            DEFINE_COLUMN ("40", "LRTB")
+            DEFINE_COLUMN ("60", "LRTB")
+            DEFINE_COLUMN ("100", "LRTB")
+            DEFINE_COLUMN ("160", "LRTB")       
+         elsif index (field) = 1
+            START_COLUMN_DEFINITION ("10")
+            DEFINE_COLUMN ("40", "LRT")
+            DEFINE_COLUMN ("60", "LRT")
+            DEFINE_COLUMN ("100", "LRT")
+            DEFINE_COLUMN ("160", "LRT")       
+         elsif index (field) = count (link.field)
+            START_COLUMN_DEFINITION ("10")
+            DEFINE_COLUMN ("40", "LRB")
+            DEFINE_COLUMN ("60", "LRB")
+            DEFINE_COLUMN ("100", "LRB")
+            DEFINE_COLUMN ("160", "LRB")       
+         else
+            START_COLUMN_DEFINITION ("10")
+            DEFINE_COLUMN ("40", "LR")
+            DEFINE_COLUMN ("60", "LR")
+            DEFINE_COLUMN ("100", "LR")
+            DEFINE_COLUMN ("160", "LR")       
+         endif
+          BEGIN_ROW ()
+          
+         if index (field) = 1
+            CELL_BOLD (link.table?)
+            CELL_BOLD (link.type?)
+            CELL_BOLD (link.index?)
+         else
+            CELL_BOLD ("")
+            CELL_BOLD ("")
+            CELL_BOLD ("")
+         endif
+         CELL_BOLD (field.name?)
+         END_ROW ()
+       endfor
+     endfor
+      END_TABLE  ()
+   endif
+   if count (table.index) > 0
+      SET_TITLE ("H3", "Table Indexes")
+      BEGIN_TABLE ("10")
+      DEFINE_COLUMN ("60", "LRTBS")
+      DEFINE_COLUMN ("160", "LRTBS")
+      BEGIN_ROW ()
+      CELL_BOLD ("Name")
+      CELL_BOLD ("Field")
+      END_ROW ()
+      START_COLUMN_DEFINITION ("10")
+     for index
+       for field
+         if count (index.field) = 1
+            START_COLUMN_DEFINITION ("10")
+            DEFINE_COLUMN ("60", "LRTB")
+            DEFINE_COLUMN ("160", "LRTB")       
+         elsif index (field) = 1
+            START_COLUMN_DEFINITION ("10")
+            DEFINE_COLUMN ("60", "LRT")
+            DEFINE_COLUMN ("160", "LRT")       
+         elsif index (field) = count (index.field)
+            START_COLUMN_DEFINITION ("10")
+            DEFINE_COLUMN ("60", "LRB")
+            DEFINE_COLUMN ("160", "LRB")       
+         else
+            START_COLUMN_DEFINITION ("10")
+            DEFINE_COLUMN ("60", "LR")
+            DEFINE_COLUMN ("160", "LR")       
+         endif
+          BEGIN_ROW ()
+           if index (field) = 1
+               CELL_BOLD (index.name?)
+            else
+               CELL_BOLD ("")
+           endif
+            CELL_BOLD (field.name?)
+          END_ROW ()
+       endfor
+     endfor
+      END_TABLE  ()
+   endif
+   if count (table.contain) > 0
+      SET_TITLE ("H3", "Child Tables")
+      BEGIN_TABLE ("10")
+      DEFINE_COLUMN ("60", "LRTBS")
+      DEFINE_COLUMN ("160", "LRTBS")
+      BEGIN_ROW ()
+      BEGIN_CELL ()    
+      BEGIN_BOLD ()
+>Table
+      END_BOLD ()
+      END_CELL ()
+      BEGIN_CELL ()
+      BEGIN_BOLD ()
+>Index
+      END_BOLD ()
+      END_CELL ()
+      END_ROW ()
+      START_COLUMN_DEFINITION ("10")
+     for contain
+         if count (table.contain) = 1
+            START_COLUMN_DEFINITION ("10")
+            DEFINE_COLUMN ("60", "LRTB")
+            DEFINE_COLUMN ("160", "LRTB")       
+         elsif index (contain) = 1
+            START_COLUMN_DEFINITION ("10")
+            DEFINE_COLUMN ("60", "LRT")
+            DEFINE_COLUMN ("160", "LRT")       
+         elsif index (contain) = count (table.contain)
+            START_COLUMN_DEFINITION ("10")
+            DEFINE_COLUMN ("60", "LRB")
+            DEFINE_COLUMN ("160", "LRB")       
+         else
+            START_COLUMN_DEFINITION ("10")
+            DEFINE_COLUMN ("60", "LR")
+            DEFINE_COLUMN ("160", "LR")       
+         endif
+          BEGIN_ROW ()
+          BEGIN_CELL ()    
+          BEGIN_BOLD ()
+>$(table?:)
+          END_BOLD ()
+          END_CELL ()
+          BEGIN_CELL ()
+>$(index?:)
+          END_CELL ()
+          END_ROW ()
+     endfor
+      END_TABLE ()
+   endif
+endfor
+
+SET_TITLE ("H2", "Field Domains")
+BEGIN_PAR ()
+>These are the domains defined and used in the database definition.
+> For each domain we specify its size and type, and list of values
+> when this is defined.  We cross-reference the domain to the tables
+> that use it.
+END_PAR  ()
+
+for domain where type <> "group"
+    domain_tables = ""
+    domain_comma  = ""
+    for dfl.table
+        for field where domain ?= domain.name
+            domain_tables += domain_comma + table.name
+            domain_comma  = ", "
+            last
+        endfor
+    endfor
+    if domain_tables = ""
+        domain_tables = "Not used in any database tables."
+    else
+        domain_tables = "Used in these database tables: " + domain_tables + "."
+    endif
+
+    SET_TITLE ("H3", "The $(Name) Domain")
+    BEGIN_PAR ()
+    >$(domain_tables:)
+    END_PAR ()
+
+    BEGIN_TABLE ("10")
+    DEFINE_COLUMN ("40", "LRTBS")
+    DEFINE_COLUMN ("80", "LRTBS")
+    if defined (decs)
+        DEFINE_COLUMN ("110", "LRTBS")
+    endif
+    DEFINE_COLUMN ("160", "LRTBS")
+    BEGIN_ROW ()
+    CELL_ITALIC ("Data type")
+    CELL_ITALIC ("Size, in bytes")
+    if defined (decs)
+        CELL_ITALIC ("Decimals")
+    endif
+    CELL_ITALIC ("Default value")
+    END_ROW ()
+
+    START_COLUMN_DEFINITION ("10")
+    DEFINE_COLUMN ("40", "LRTB")
+    DEFINE_COLUMN ("80", "LRTB")
+    if defined (decs)
+        DEFINE_COLUMN ("110", "LRTB")
+    endif
+    DEFINE_COLUMN ("160", "LRTB")
+
+    BEGIN_ROW ()
+    CELL_BOLD (type)
+    CELL_BOLD (size?)
+    if defined (decs)
+        CELL_BOLD (decimals)
+    endif
+    if defined (default)
+        CELL_BOLD (default)
+    elsif type = "textual"
+        CELL_BOLD ("empty")
+    elsif type = "numeric"
+        CELL_BOLD ("zero")
+    elsif type = "boolean"
+        CELL_BOLD ("false")
+    else
+        CELL_BOLD ("-")
+    endif
+    END_ROW ()
+    END_TABLE  ()
+
+    if count (value) > 0
+        BEGIN_PAR ()
+        >The domain specifies this value set:
+        END_PAR ()
+        
+        BEGIN_TABLE ("10")
+        DEFINE_COLUMN ("40", "LRTBS")
+        DEFINE_COLUMN ("160", "LRTBS")
+        BEGIN_ROW ()
+        CELL_ITALIC ("Internal code:")
+        CELL_ITALIC ("Display text:")
+        END_ROW ()
+
+        for value
+            START_COLUMN_DEFINITION ("10")
+            DEFINE_COLUMN ("40", "LRTB")
+            DEFINE_COLUMN ("160", "LRTB")
+            BEGIN_ROW ()
+            CELL_BOLD (key)
+            CELL_BOLD (label)
+            END_ROW ()
+        endfor
+        END_TABLE  ()
+    endif
+endfor
+
+END_DOCUMENT ()
+endfor
+
+endfunction

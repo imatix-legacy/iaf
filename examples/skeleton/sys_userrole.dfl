@@ -1,0 +1,26 @@
+<table name = "userrole" description = "User role in module">
+    <field name = "usertypeid"   domain = "id"       >User Type</field>
+    <field name = "moduleid"     domain = "id"       >Module</field>
+    <field name = "moduleroleid" domain = "id"       >Module Role</field>
+    <field                       domain = "audit"   />
+    
+    <link type = "multiplex" table = "usertype"     />
+    <link type = "reference" table = "modulerole"   />
+    <link type = "multiplex" table = "module"       />
+    
+    <index name = "primary" >
+        <field name = "usertypeid"   />
+        <field name = "moduleid"     /> 
+    </index>
+    <index name = "bymodule">
+        <field name = "moduleid"     />
+    </index>
+    <index name = "byrole">
+        <field name = "moduleroleid" />
+        <field name = "moduleid"     />
+        <field name = "usertypeid"   />
+    </index>
+</table>
+
+
+

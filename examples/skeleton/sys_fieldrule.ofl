@@ -1,0 +1,46 @@
+<object name = "fieldrule" >
+    <view name = "detail">
+        <field name = "id"/>
+        <field name = "formid"/>
+        <field name = "sourceid">
+            <table name = "field">
+                <field name = "name">
+                    <rule name = "show" when = "all" what = "label" value = "Source field" />
+                </field>
+            </table>
+        </field>
+        <field name = "targetid">
+            <table name = "field">
+                <field name = "name">
+                    <rule name = "show" when = "all" what = "label" value = "target field" />
+                </field>
+            </table>
+        </field>
+        <field name = "rule"/>
+        <field name = "sourceparam"/>
+        <field name = "targetparam"/>
+    </view>
+
+    <view name = "summary">
+        <field name = "id"/>
+        <field name = "formid"/>
+        <field name = "sourceid">
+            <table name = "field">
+                <field name = "name">
+                    <rule name = "show" when = "all" what = "label" value = "Source field" />
+                </field>
+            </table>
+        </field>
+        <field name = "targetid">
+            <table name = "field">
+                <field name = "name">
+                    <rule name = "show" when = "all" what = "label" value = "target field" />
+                </field>
+            </table>
+        </field>
+        <field name = "rule"/>
+    </view>
+
+    <query name = "bytarget" index = "bytarget" view = "detail"  />
+    <query name = "bysource" index = "bysource" view = "detail"  />
+</object>

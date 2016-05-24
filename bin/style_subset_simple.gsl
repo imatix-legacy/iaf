@@ -1,0 +1,292 @@
+/*  SUBSET SIMPLE
+ *
+ *  This style implements a 'subset' list screen that lets the user
+ *  select a subset of records from some other set.  The subset is
+ *  always stored in an associative table with one fixed key field
+ *  and one variable key field.
+ *
+ *  object        - associative table we're filling in
+ *  query         - query on primary associative table
+ *  field         - key field in primary associative table
+ *  fromobj       - multiplexed object
+ *  fromquery     - query on multiplex object
+ *  fromview      - view used for parent object query (by default, detail)
+ *  fromfield     - field in parent object used in association
+ *  fromdisplay   - field from fromobj to show (by default, name)
+ *  fromlabel     - label for multiplexed object name
+ *  title         - page title, 'Select xxx for xxx'
+ *  saverule      - ASP commands to execute before saving subset in database
+ *  on_empty      - if not empty, do this code if parent list is empty
+ *  before_create - if not empty, call specified subroutine before each create
+ *  before_delete - if not empty, call specified subroutine before each delete
+ *
+ *  Note: does not work for associative tables with primary ID fields.
+ */
+function style_subset_simple ()
+    screen.view  ?= "detail"
+    screen.query ?= "summary"
+    screen.limit ?= "20"
+    xml '
+<style>
+<use object = "$(fromobj)" />
+<use object = "$(object)"  />
+<var name = "fld_toggle"  occurs = "$(limit)" />
+<var name = "fld_$(field?"$(fromobj)id")" occurs = "$(limit)" />
+<var name = "toggle_max"  type = "numeric" value = "$(limit)" />  
+<handler event = "on_global">
+Private Const TOGGLE_ON      = 1
+Private Const TOGGLE_ON_NEW  = 2
+Private Const TOGGLE_OFF     = 3
+Private Const TOGGLE_OFF_NEW = 4
+</handler>
+
+<handler event = "on_global">
+pxml.value = Session ("$(screen.name)_$(fromobj)_oal")
+
+sub show_query_item (item_nbr)
+    if Session ("toggles").exists (fld_$(fromobj)_$(fromfield)) then
+        toggle = Session ("toggles").item (fld_$(fromobj)_$(fromfield))
+    else
+        toggle = TOGGLE_OFF
+    end if
+    if toggle = TOGGLE_ON or toggle = TOGGLE_ON_NEW then
+        fld_toggle (item_nbr) = 1
+    else
+        fld_toggle (item_nbr) = 0
+    end if
+    fld_$(field?"$(fromobj)id") (item_nbr) = fld_$(fromobj)_$(fromfield)
+end sub
+</handler>
+
+<handler event = "on_init">
+    Set Session ("toggles") = CreateObject ("Scripting.Dictionary")
+    for index = 1 to toggle_max
+        fld_toggle (index) = 0
+        fld_$(field?"$(fromobj)id") (index) = 0
+    next
+    <query object = "$(object)" name = "$(query)" control = "first" limit = "1000" >
+      <each>
+        Session ("toggles").item (fld_$(object)_$(field?"$(fromobj)id")) = TOGGLE_ON
+      </each>
+    </query>
+    <query object = "$(fromobj)" name = "$(fromquery)" control = "first" >
+      <empty>
+        $(on_empty?:)
+      </empty>
+      <each>
+        show_query_item item_nbr
+      </each>
+    </query>
+</handler>
+
+<page title = "$(title:)" name = "list" view = "summary">
+<toolbar>
+  <action name = "first"    text = "|<" hint = "Go to the start of the list" />
+  <action name = "previous" text = "<<" hint = "Go backwards in the list"    />
+  <action name = "next"     text = ">>" hint = "Go forwards in the list"     />
+  <action name = "last"     text = ">|" hint = "Go to the end of the list"   />
+  <action name = "all"      hint = "Select all entries"   />
+  <action name = "none"     hint = "Clear all selections" />
+</toolbar>
+
+<form mode = "input">
+  <hints>
+  <hint>This list shows the $(fromobj) items already selected.</hint>
+  <hint>Scroll through this list and check all those you want.</hint>
+  <hint>Click \'Done\' to update the list, or \'Cancel\' to leave it unchanged.</hint>
+  </hints>
+  <summary>
+    <field name = "toggle" type = "boolean" attr = "input" label = "Select" />
+    <field name = "$(fromdisplay?"name")"   attr = "plain" label = "$(fromlabel:)" />
+  </summary>
+  <action name = "next" text = "More..." hint = "Show next page"
+          condition = "query_count = query_limit" />
+  <action name = "done"   toolbar = "1" />
+  <action name = "cancel" toolbar = "1" />
+</form>
+
+<handler action = "first">
+    for index = 1 to toggle_max
+        fld_toggle (index) = 0
+        fld_$(field?"$(fromobj)id") (index) = 0
+    next
+    <query object = "$(fromobj)" name = "$(fromquery)" control = "first" >
+      <each>
+        show_query_item item_nbr
+      </each>
+    </query>
+</handler>
+
+<handler action = "last">
+    for index = 1 to toggle_max
+        fld_toggle (index) = 0
+        fld_$(field?"$(fromobj)id") (index)  = 0
+    next
+    <query object = "$(fromobj)" name = "$(fromquery)" control = "last" >
+      <each>
+        show_query_item item_nbr
+      </each>
+    </query>
+</handler>
+
+<handler action = "next">
+    for index = 1 to toggle_max
+        fld_toggle (index) = 0
+        fld_$(field?"$(fromobj)id") (index)  = 0
+    next
+    <query object = "$(fromobj)" name = "$(fromquery)" control = "gt" >
+      <empty>
+        cur_message = "This is the end of the list.  Click |&lt; to scroll back."
+        <query object = "$(fromobj)" name = "$(fromquery)" control = "last" />
+      </empty>
+      <each>
+        show_query_item item_nbr
+      </each>
+    </query>
+</handler>
+
+<handler action = "previous">
+    for index = 1 to toggle_max
+        fld_toggle (index) = 0
+        fld_$(field?"$(fromobj)id") (index) = 0
+    next
+    <query object = "$(fromobj)" name = "$(fromquery)" control = "lt" >
+      <empty>
+        <query object = "$(fromobj)" name = "$(fromquery)" control = "first" />
+      </empty>
+      <each>
+        show_query_item item_nbr
+      </each>
+    </query>
+</handler>
+
+<handler action = "all">
+    <query object = "$(fromobj)" name = "$(fromquery)" control = "first" limit = "1000" >
+      <each>
+        thisid = fld_$(fromobj)_$(fromfield)
+        if Session ("toggles").exists (thisid) then
+            toggle = Session ("toggles").item (thisid)
+            if toggle = TOGGLE_OFF then
+                toggle = TOGGLE_ON_NEW
+            elseif toggle = TOGGLE_OFF_NEW then
+                toggle = TOGGLE_ON
+            end if
+        else
+            toggle = TOGGLE_ON_NEW
+        end if
+        Session ("toggles").item (thisid) = toggle
+      </each>
+    </query>
+    <step>
+    list_do_first
+    cur_message = "Click \'Done\' to finish adding all entries to list"
+    </step>
+</handler>
+
+<handler action = "none">
+    dim keys
+    keys = Session ("toggles").keys
+    for index = 0 to Session ("toggles").count - 1
+        thisid = keys (index)
+        if Session ("toggles").item (thisid) = TOGGLE_ON then
+            Session ("toggles").item (thisid) = TOGGLE_OFF_NEW
+        else
+            Session ("toggles").item (thisid) = TOGGLE_OFF
+        end if
+    next
+    list_do_first
+    cur_message = "Click \'Done\' to finish removing all entries from list"
+</handler>
+
+<handler event = "on_getdata">
+    for index = 1 to toggle_max
+        if Session ("toggles").exists (fld_$(field?"$(fromobj)id") (index)) then
+            toggle = Session ("toggles").item (fld_$(field?"$(fromobj)id") (index)) 
+        else
+            toggle = TOGGLE_OFF
+        end if
+        if fld_toggle (index) then
+            if toggle = TOGGLE_OFF_NEW then
+                Session ("toggles").item (fld_$(field?"$(fromobj)id") (index)) = TOGGLE_ON
+            elseif toggle = TOGGLE_OFF then
+                Session ("toggles").item (fld_$(field?"$(fromobj)id") (index)) = TOGGLE_ON_NEW
+            end if
+        else
+            if toggle = TOGGLE_ON_NEW then
+                Session ("toggles").item (fld_$(field?"$(fromobj)id") (index)) = TOGGLE_OFF
+            elseif toggle = TOGGLE_ON then
+                Session ("toggles").item (fld_$(field?"$(fromobj)id") (index)) = TOGGLE_OFF_NEW
+            end if
+        end if
+    next
+</handler>
+
+<handler action = "done">
+    dim keys
+    <query object = "$(fromobj)" name = "$(fromquery)" control = "first" limit = "1000"/>
+    <step>
+    keys = Session ("toggles").keys
+    line_nbr = 0
+    pxml.item_root
+    pxml.item_first_child
+    $(fromobj)_$(fromview?"detail")_get_item
+
+    for index = 0 to UBound (keys)
+        fld_$(object)_$(field?"$(fromobj)id") = keys (index)
+        toggle = Session ("toggles").item (fld_$(object)_$(field?"$(fromobj)id"))
+        loopback = 0
+        do 
+            $(fromobj)_$(fromview?"detail")_get_item
+            pxml.item_next
+            if pxml.valid = false then
+                pxml.item_root
+                pxml.item_first_child
+                if loopback = 0 then
+                	loopback = 1
+                else
+                	exit do
+                end if
+            end if
+        loop until fld_$(fromobj)_$(fromfield) = fld_$(object)_$(field?"$(fromobj)id")
+        $(saverule:)
+        if toggle = TOGGLE_ON_NEW then
+            </step>
+            <save>
+            $(before_create?:)
+            <create object = "$(object)" />
+            </save>
+            <step>
+        elseif toggle = TOGGLE_OFF_NEW then
+            </step>
+            <save>
+            $(before_delete?:)
+            <delete object = "$(object)" />
+            </save>
+            <step>
+        end if
+    next
+    return_to_parent
+    </step>
+</handler>
+<handler action = "cancel">
+    return_to_parent
+</handler>
+</page>
+<handler event = "on_filter">
+    for index = 1 to toggle_max
+        fld_toggle (index) = 0
+        fld_$(field?"$(fromobj)id") (index) = 0
+    next
+    <query object = "$(fromobj)" name = "$(fromquery)" control = "first" >
+      <each>
+        show_query_item item_nbr
+      </each>
+    </query>
+</handler>
+<handler event = "on_exit">
+    Set Session ("toggles") = Nothing
+</handler>
+</style>
+'
+endfunction
+

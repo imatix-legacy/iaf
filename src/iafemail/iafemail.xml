@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<config description = "dotBEER Email Daemon configuration">
+    <main
+        run          = "1"
+        schedule     = "30"
+        service_name = "iafemail"
+        service_text = "Normal dotBEER Email Daemon"
+        debug        = "1"
+        trace_file   = "iafemail.log"
+    />
+    <email
+        sender = "user@wspascal"
+        server = "wspascal"
+        cc     = ""
+        bcc    = ""
+    />
+    <database
+        dsn      = "starling"
+        user     = "sa"
+        password = ""
+    />
+</config>

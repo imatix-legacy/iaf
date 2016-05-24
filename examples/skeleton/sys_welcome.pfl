@@ -1,0 +1,119 @@
+<screen name = "sys_welcome" style = "menu"
+    sidebar_left  = "sidebarleft_lite.gif" 
+    sidebar_right = "sidebarright_lite.gif" >
+
+<invoke macro = "welcome_module_handling" />
+
+<handler event = "on_init">
+    Session ("statusbar_text") = ""
+    cur_hideback = 1
+</handler>
+
+<page name = "welcome" title = "General Menu">
+<form>
+    <banner text = "Welcome to the Administration Module" />
+    <hints>
+    <hint>Welcome to the Administration Module.</hint>
+    <hint>If you reached this screen by accident, please contact your
+    System Manager.  All accesses are logged.</hint>
+    <hint>Use the administration functions to create new users, define
+    module access rights, and do other system administration functions.</hint>
+    </hints>
+    <choice text = "Manage Users">
+        chain_to "user_list_byname"
+    </choice>
+    <choice text = "Define a New User">
+        chain_to "usertype_select"
+    </choice>
+    <choice text = "Manage User Types">
+        chain_to "usertype_list"
+    </choice>
+    <choice text = "System Administration" condition = "cur_role = &amp;quot;SYSADMIN&amp;quot;" >
+        chain_to "sys_admin"
+    </choice>
+    <line />
+    <choice text = "Edit Personal Profile">
+        chain_to "user_profile"
+    </choice>
+    <choice text = "Work in Another Module" condition = "cur_switch_module" >
+        chain_to "userrole_select"
+    </choice>
+</form>
+</page>
+<handler event = "on_return">
+    if cur_called = "usertype_select" and Session ("select_made") = 1 then
+        Session ("usertype_id_adm")   = Session ("id")
+        Session ("usertype_name_adm") = Session ("name")
+        chain_to "user_create"
+    end if
+</handler>
+</screen>
+
+<macro name = "welcome_module_handling">
+
+<handler event = "on_init">
+    fld_user_id = cur_userid
+    <fetch object = "user" view = "profile" />
+</handler>
+
+<use object = "user"       />
+<use object = "module"     />
+<use object = "modulerole" />
+
+<handler event = "on_return" >
+    Session ("statusbar_text") = "  "
+    if Session ("select_made") = 1 then
+        select case cur_called
+            case "userrole_select"
+                Session ("module_id") = Session ("moduleid")
+        end select
+    end if
+
+    '   Save showhints or module in user profile if changed
+    if Session ("showhints") &lt;&gt; fld_user_showhints  _
+    or Session ("module_id") &lt;&gt; fld_user_moduleid then
+        fld_user_id = cur_userid
+        <fetch object = "user" view = "profile">
+          <ok>
+            fld_user_showhints = Session ("showhints")
+            fld_user_moduleid  = Session ("module_id")
+            <update object = "user" view = "profile" />
+          </ok>
+        </fetch>
+        <step>
+    end if
+    
+    switch_to_module_if_changed    
+    </step>
+</handler>
+
+<handler event = "on_global">
+sub switch_to_module_if_changed
+    if cur_called = "userrole_select" then
+       if Session ("select_made") = 1 then
+          Session ("module_id") = Session ("moduleid")
+          fld_module_id         = Session ("moduleid")
+          <fetch object = "module">
+            <ok>
+              fld_modulerole_id = Session ("moduleroleid")
+              <fetch object = "modulerole">
+                 <ok>
+                    cur_role                 = fld_modulerole_shortname
+                    Session ("cur_rolename") = fld_modulerole_longname
+                 </ok>
+              </fetch>
+              Session ("homepage")        = fld_module_homepage
+              Session ("module_homepage") = fld_module_homepage
+              Session ("module_name")     = fld_module_name
+              chain_to Session ("module_homepage")
+            </ok>
+          </fetch>
+          <step>
+       end if   
+    end if
+end sub
+</step>
+</handler>
+
+</macro>
+

@@ -1,0 +1,35 @@
+----- committed
+
+2002/01/21
+    pflasp.gsl - Stop treating 0 value in fields as special
+    
+2001/12/30
+    pflasp.gsl - Summary texts now vertically aligned at top, like fields
+    pflasp.gsl - Now generates lookup tables for enum domains
+    
+2001/12/15
+    pflasp.gsl - Enter on input forms caused data to be lost - fixed
+    pflasp.gsl - Added new event on_enter for Enter on input forms
+    
+2001/12/10
+    pflasp.gsl - generated illegal code in certain summary screens
+    
+2001/12/02
+    iafmake - better recognition of screen names
+    oflobj.gsl - subselect error handling made more robust
+    
+2001/12/01
+    pflasp.gsl - import statement did not generate correct code
+    
+2001/11/29
+    pfl.xnf, pflasp.gsl - form banner can now contain text attribute for text banners
+    pfl.xnf, pflasp.gsl - screen can have sidebar_left and sidebar_right definitions
+
+2001/09/05
+    oflobj.gsl - if subselect returns null fields, convert to 0 or ""
+
+2001/09/03
+    pflasp.gsl - on_lookup handler could not do a 'chain_to' - fixed
+
+2001/09/02
+    pflstyle.gsl - changed hints for list screens

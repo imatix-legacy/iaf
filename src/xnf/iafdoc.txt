@@ -1,0 +1,28 @@
+gdl
+    title     = iAF Languages
+    subtitle  = DFL, OFL, and PFL
+    product   = iMatix iAF
+    author    = iMatix Corporation &lt;tools@imatix.com&gt;
+    date      = 2003/01/10
+    copyright = Copyright (c) 2002-2003 iMatix Corporation
+    version   = 1.0
+end gdl
+
+iAF Languages
+*************
+
+The DFL Language
+================
+
+[See dfl.txt]
+
+The OFL Language
+================
+
+[See ofl.txt]
+
+The PFL Language
+================
+
+[See pfl.txt]
+

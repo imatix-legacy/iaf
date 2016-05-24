@@ -1,0 +1,827 @@
+#
+#   pflfield.gsl - Generate ASP fields
+#
+
+#--------------------------------   OUTPUT   -------------------------------
+
+function show_field_output
+    if count (value)
+        show_select_output ()
+    elsif type = "date"
+        show_date_output ()
+    elsif type = "time"
+        show_time_output ()
+    elsif type = "textual"
+        show_textual_output ()
+    elsif type = "textbox"
+        show_textbox_output ()
+    elsif type = "numeric"
+        show_numeric_output ()
+    elsif type = "boolean"
+        show_boolean_output ()
+    elsif type = "timestamp"
+        show_timestamp_output ()
+    else
+        echo "Unknown field type '$(type?)' for '$(name)'"
+    endif
+endfunction
+
+function show_select_output
+    if count (value) > 0
+        if defined (color)
+            ><font color="$(color)">
+        endif
+        format_output_field ("<%=lookup_$(name) ($(varname))%>")
+        if defined (color)
+            ></font>
+        endif
+    else
+        abort "No values specified for field $(name) in $(object)"
+    endif
+endfunction
+
+.macro format_output_field (value)
+.if    attr ?= "plain" | attr ?= "input"
+<b>$(value:)&nbsp;</b>
+.elsif attr ?= "hilite"
+<table cellpadding=0 cellspacing=0><tr><td class=hilite>
+<b>$(value:)&nbsp;</b></td></tr></table>
+.elsif attr ?= "title"
+<table cellpadding=0 cellspacing=0><tr><td class=title>
+<b>$(value:)&nbsp;</b></td></tr></table>
+.elsif attr ?= "click"
+.#  We need to massage text fields containing <table> HTML to be clickable
+.   if type = "textual"
+<%  if left ($(varname), 6) = "<table" then
+        response.write "<table onClick=""formaction('CLICK',0,'$(entity.name)')"" "
+        response.write mid ($(varname), 7)
+    else
+        open_link "CLICK", "$(name:)", 0, "", "", "Click to select", "action"
+        response.write "<b>" & $(varname) & "</b></a>"
+    end if
+%>
+.   else
+<% open_link "CLICK", "$(name:)", 0, "", "", "Click to select", "action" %><b>$(value:)</b></a>
+.   endif
+.else
+.   echo "Unknown field attribute: $(attr)"
+.endif
+.endmacro
+
+function show_date_output
+    format_output_field ("<%=showdate ($(varname))%>")
+endfunction
+
+function show_time_output
+    format_output_field ("<%=showtime ($(varname), FALSE)%>")
+endfunction
+
+function show_textual_output
+    if password ?= 1
+        format_output_field ("(Password)")
+    elsif email ?= 1
+        format_output_field ('<A HREF="mailto:<%=$(varname)%>"><%=$(varname)%></A>')
+    elsif attachment ?= 1
+        ><% Set file_xml = Server.CreateObject ("scl.xmlstore")
+        >   file_xml.value = $(varname)
+        >   create_link "DOWNLOAD", file_xml.attr ("real", ""), 0, "", file_xml.attr ("name", ""), "Click to download", "action" 
+        >   Set file_xml = Nothing
+        >%>
+    elsif html ?= 1
+        format_output_field ("<%=pstring.HTMLEncode ($(varname))%>")
+    else
+        format_output_field ("<%=$(varname)%>")
+    endif
+endfunction
+
+function show_textbox_output
+    format_output_field ("<%=pstring.replace (pstring.HTMLEncode ($(varname)), chr(13), \"<br>\")%>")
+endfunction
+
+function show_numeric_output
+    if money ?= 1
+        if blank ?= 1
+            ><%
+            >if $(varname) = 0 then
+            >    output_value = ""
+            >else
+            >    output_value = showmoney ($(varname))
+            >end if %>
+            format_output_field ("<%=output_value%>")
+        else
+            format_output_field ("<%=showmoney ($(varname))%>")
+        endif
+    elsif blank ?= 1
+        ><%
+        >if $(varname) = 0 then
+        >    output_value = ""
+        >else
+        >    output_value = $(varname)
+        >end if %>
+        format_output_field ("<%=output_value%>")
+    else
+        format_output_field ("<%=$(varname)%>")
+    endif
+endfunction
+
+function show_boolean_output
+    ><% if cstr ($(varname)) = "1" then
+    >    bool_value = "$(true?"Yes":)"
+    >else
+    >    bool_value = "$(false?"No":)"
+    >end if %>
+    format_output_field ("<%=bool_value%>")
+endfunction
+
+function show_timestamp_output
+    format_output_field ('<%=showts($(varname))%>')
+endfunction
+
+
+#--------------------------------   INPUT   --------------------------------
+
+function show_field_input
+    ><%
+    if count (value)
+        show_select_input ()
+    elsif type = "date"
+        show_date_input ()
+    elsif type = "time"
+        show_time_input ()
+    elsif type = "textual"
+        show_textual_input ()
+    elsif type = "textbox"
+        show_textbox_input ()
+    elsif type = "numeric"
+        show_numeric_input ()
+    elsif type = "boolean"
+        show_boolean_input ()
+    elsif type = "timestamp"
+        show_timestamp_input ()
+    else
+        echo "Unknown field type '$(type)' for '$(name)'"
+    endif
+    >%>
+endfunction
+
+function show_select_input
+    >item_nbr = 1
+    >open_select "$(select)", "$(name)"
+    for value
+        if defined (condition)
+        >   if $(condition:) then
+        endif
+        if dynamic ?= 1
+            >if $(label:) <> "" then
+            >    build_select $(varname), "$(key:)", $(label:), item_nbr
+            >end if
+        else
+            if defined (color)
+                >response.write "<font color=""$(color)"">"
+            endif
+            >build_select $(varname), "$(key:)", "$(label:)", item_nbr
+            if defined (color)
+                >response.write "</font>"
+            endif
+        endif
+        if defined (condition)
+        >   end if
+        endif
+    endfor
+    >close_select
+endfunction
+
+function show_date_input
+    >build_date $(varname), "$(name)", $(startyear?0), $(endyear?0)
+    if screen.datesplit = 1
+    >if cur_cursor = "" then cur_cursor = "$(name)_dd"
+    else
+    >if cur_cursor = "" then cur_cursor = "$(name)"
+    endif
+endfunction
+
+function show_time_input
+    >build_time $(varname), "$(name)", $(starthour?0), $(endhour?23), $(interval?15)
+    >if cur_cursor = "" then cur_cursor = "$(name)_hh"
+endfunction
+
+function show_textual_input
+    if name = "default"
+        attrs = 'size=$(showsize) name=""$(name)""'
+    else
+        attrs = 'size=$(showsize) name=""$(name)"" onFocus=""this.form.$(name).select();""'
+    endif
+    if required ?= 1
+        attrs += ' class=force'
+    endif
+    if password ?= 1
+        >response.write "<input $(attrs) maxlength=$(size) type=password>"
+    elsif html ?= 1
+        >response.write "<input $(attrs) maxlength=$(size) value=""" & pstring.HTMLEncode ($(varname)) & """>"
+    elsif attachment ?= 1
+        >response.write "<input name=""$(name)"" type=file>"
+    else
+        >response.write "<input $(attrs) maxlength=$(size) value=""" & $(varname) & """>"
+    endif
+    >if cur_cursor = "" then cur_cursor = "$(name)"
+endfunction
+
+function show_textbox_input
+    attrs = 'rows=$(rows) cols=$(cols) wrap=virtual maxlength=$(size) name=""$(name)""'
+    if required ?= 1
+        attrs += ' class=force'
+    endif
+    >response.write "<textarea $(attrs)>" & pstring.HTMLEncode ($(varname)) & "</textarea>"
+    >if cur_cursor = "" then cur_cursor = "$(name)"
+endfunction
+
+function show_numeric_input
+    attrs = 'size=$(showsize) name=""$(name)"" onFocus=""this.form.$(name).select();""'
+    if required ?= 1
+        attrs += ' class=force'
+    endif
+    if money ?= 1
+        if blank ?= 1
+            >if $(varname) = 0 then
+            >    response.write "<input $(attrs) maxlength=20 value="""">"
+            >else
+            >    response.write "<input $(attrs) maxlength=20 value=""" & showmoney ($(varname)) & """>"
+            >end if
+        else
+            >response.write "<input $(attrs) maxlength=20 value=""" & showmoney ($(varname)) & """>"
+        endif
+    elsif blank ?= 1
+        >if $(varname) = 0 then
+        >    response.write "<input $(attrs) maxlength=$(size) value="""">"
+        >else
+        >    response.write "<input $(attrs) maxlength=$(size) value=""" & $(varname) & """>"
+        >end if
+    else
+        >response.write "<input $(attrs) maxlength=$(size) value=""" & $(varname) & """>"
+    endif
+    >if cur_cursor = "" then cur_cursor = "$(name)"
+endfunction
+
+function show_boolean_input
+    >if cstr ($(varname)) = "1" then
+    >    response.write "<input class=check type=checkbox name=""$(name)"" checked>"
+    >else
+    >    response.write "<input class=check type=checkbox name=""$(name)"">"
+    >end if
+    >if cur_cursor = "" then cur_cursor = "$(name)"
+endfunction
+
+function show_timestamp_input
+    echo "Timestamps cannot be shown as input fields!"
+endfunction
+
+#--------------------------------   CHECK   --------------------------------
+
+function field_is_mandatory
+    if label <> ""
+        field.prompt_name = label
+    else
+        field.prompt_name = name
+    endif
+    if count (value)
+        check_select_field ()
+    elsif type = "date"
+        check_date_field ()
+    elsif type = "time"
+        check_time_field ()
+    elsif type = "textual"
+        check_textual_field ()
+    elsif type = "textbox"
+        check_textbox_field ()
+    elsif type = "numeric"
+        check_numeric_field ()
+    elsif type = "boolean"
+        check_boolean_field ()
+    elsif type = "timestamp"
+        check_timestamp_field ()
+    else
+        echo "Unknown field type '$(type)' for '$(name)'"
+    endif
+endfunction
+
+.macro check_select_field
+    if (form.$(name) && !selfield_is_supplied (form.$(name), "$(prompt_name:)"))
+        return (false)
+.   include_selfield_is_supplied = 1
+.endmacro
+
+macro check_date_field
+.   if screen.datesplit = 1
+    if (form.$(name)_mm && !selfield_is_supplied (form.$(name)_mm, "$(prompt_name:) month"))
+        return (false)
+    if (form.$(name)_dd && !selfield_is_supplied (form.$(name)_dd, "$(prompt_name:) day"))
+        return (false);
+    if (form.$(name)_yyy && !selfield_is_supplied (form.$(name)_yy, "$(prompt_name:) year"))
+        return (false);
+.       include_selfield_is_supplied = 1
+.   else
+    if (form.$(name) && !nbrfield_is_supplied (form.$(name), "$(prompt_name:)"))
+        return (false);
+.       include_nbrfield_is_supplied = 1
+.   endif
+.endmacro
+
+macro check_time_field
+    if (form.$(name)_hh && !selfield_is_supplied (form.$(name)_hh, "$(prompt_name:) hours"))
+        return (false);
+.   include_selfield_is_supplied = 1
+.endmacro
+
+macro check_textual_field
+    if (form.$(name) && !txtfield_is_supplied (form.$(name), "$(prompt_name:)"))
+        return (false);
+.   include_txtfield_is_supplied = 1
+.endmacro
+
+macro check_textbox_field
+    if (form.$(name) && !txtfield_is_supplied (form.$(name), "$(prompt_name:)"))
+        return (false);
+.   include_txtfield_is_supplied = 1
+.endmacro
+
+macro check_numeric_field
+    if (form.$(name) && !nbrfield_is_supplied (form.$(name), "$(prompt_name:)"))
+        return (false);
+.   include_nbrfield_is_supplied = 1
+.endmacro
+
+.macro check_boolean_field
+.endmacro
+
+.macro check_timestamp_field
+.endmacro
+
+.macro field_is_email
+.   if label <> ""
+.       field.prompt_name = label
+.   else
+.       field.prompt_name = name
+.   endif
+    if (form.$(name) && !txtfield_is_email_addr (form.$(name), "$(prompt_name:)"))
+        return (false);
+.   include_txtfield_is_email_addr = 1
+.endmacro
+
+.macro field_is_positive
+.   if label <> ""
+.       field.prompt_name = label
+.   else
+.       field.prompt_name = name
+.   endif
+    if (form.$(name) && !nbrfield_is_positive (form.$(name), "$(prompt_name:)"))
+        return (false);
+.   include_nbrfield_is_positive = 1
+.endmacro
+
+
+#-------------------------   JAVASCRIPT ROUTINES   -------------------------
+
+function reset_field_routines
+    include_selfield_is_supplied   = 0
+    include_nbrfield_is_supplied   = 0
+    include_nbrfield_is_positive   = 0
+    include_txtfield_is_supplied   = 0
+    include_txtfield_is_email_addr = 0
+endfunction
+
+.macro include_field_routines
+.if include_txtfield_is_supplied ?= 1
+
+//  Returns true if the specified field is not empty.
+//
+function txtfield_is_supplied (field, name)
+{
+    if (field.value == "") {
+        alert ("Please enter " + name);
+        field.className = "error";
+        field.focus ();
+        return (false);
+    }
+    else {
+        field.className = "force";
+        return (true);
+    }
+}
+.endif
+.if include_nbrfield_is_supplied ?= 1
+
+//  Returns true if the specified field is not empty or zero
+//
+function nbrfield_is_supplied (field, name)
+{
+    if (field.value == "" || field.value == 0) {
+        alert ("Please enter " + name);
+        field.className = "error";
+        field.focus ();
+        return (false);
+    }
+    else {
+        field.className = "force";
+        return (true);
+    }
+}
+.endif
+.if include_nbrfield_is_positive ?= 1
+
+//  Returns true if the field is a zero or positive number; pops-up an
+//  error message if not.
+//
+function nbrfield_is_positive (field, name)
+{
+    if (field.value < 0) {
+        alert ("Values less than zero are not allowed for " + name);
+        field.className = "error";
+        field.focus ();
+        return (false);
+    }
+    else {
+        field.className = "force";
+        return (true);
+    }
+}
+.endif
+.if include_selfield_is_supplied ?= 1
+
+//  Returns true if the specified field is selected and not 0. 
+//
+function selfield_is_supplied (field, name)
+{
+    if (field.selectedIndex <= 0) {
+        alert ("Please enter " + name);
+        field.className = "error";
+        field.focus ();
+        return (false);
+    }
+    else {
+        field.className = "force";
+        return (true);
+    }
+}
+.endif
+.if include_txtfield_is_email_addr ?= 1
+
+//  Returns true if the field is a valid e-mail address; pops-up an error
+//  message if not.  Empty fields are valid by definition.
+//
+function txtfield_is_email_addr (field, name)
+{
+    var index;                   //  Scan through e-mail address
+    var nbr_aposts = 0;          //  Count number of apostrophes
+    var nbr_atsign = 0;          //  Count number of at signs
+
+    for (index = 0; index < field.value.length; index++) {
+        if (field.value.charAt (index) == "@")
+            nbr_atsign++;
+    }
+    if (field.value != "" && nbr_atsign != 1) {
+        alert (name + " must be of the form 'user@hostname.domain'");
+        field.className = "error";
+        field.focus ();
+        return (false);
+    }
+    else {
+        field.className = "force";
+        return (true);
+    }
+}
+.endif
+.endmacro
+
+#--------------------------------   LIST   --------------------------------
+
+function show_field_list (field)
+    if count (value)
+        show_select_list ()
+    elsif type = "date"
+        show_date_list ()
+    elsif type = "time"
+        show_time_list ()
+    elsif type = "textual"
+        show_textual_list ()
+    elsif type = "textbox"
+        show_textbox_list ()
+    elsif type = "numeric"
+        show_numeric_list ()
+    elsif type = "boolean"
+        show_boolean_list ()
+    elsif type = "timestamp"
+        show_timestamp_list ()
+    else
+        echo "Unknown field type '$(type)' for '$(name)'"
+    endif
+endfunction
+
+function show_select_list
+    format_list_field ("lookup_$(name) ($(varname))")
+endfunction
+
+function show_date_list
+    format_list_field ("showdate_compact ($(varname))")
+endfunction
+
+function show_time_list
+    format_list_field ("showtime ($(varname), FALSE)")
+endfunction
+
+function show_textual_list
+    if password ?= 1
+        format_list_field ('"(Password)"')
+    elsif email ?= 1
+        format_list_field ('"<A HREF=""mailto:" & $(varname) & """>" & $(varname) & "</A>"')
+    elsif html ?= 1
+        format_list_field ("pstring.HTMLEncode ($(varname))")
+    elsif attachment ?= 1
+        >%>        
+        show_textual_output ()
+        ><%
+    else
+        #  We need to massage text fields containing <table> HTML to be clickable
+        >if left ($(varname), 6) = "<table" then
+        >    response.write "<table onClick=""formaction('SELECT',0,'" & index & ":$(entity.name)')"" "
+        >    response.write mid ($(varname), 7)
+        >else
+        >    response.write $(varname)
+        >end if
+    endif
+endfunction
+
+function show_textbox_list
+    if html ?= 0
+        if (truncate?1) = 1
+            format_list_field ("pstring.replace (choptext ($(varname), 250), chr(13), \"<br>\")")
+        else
+            format_list_field ("pstring.replace ($(varname), chr(13), \"<br>\")")
+        endif
+    else
+        if (truncate?1) = 1
+            format_list_field ("pstring.replace (pstring.HTMLEncode (choptext ($(varname), 250)), chr(13), \"<br>\")")
+        else
+            format_list_field ("pstring.replace (pstring.HTMLEncode ($(varname)), chr(13), \"<br>\")")
+        endif
+    endif
+endfunction
+
+function show_numeric_list
+    if money ?= 1
+        if blank ?= 1
+            >if $(varname) = 0 then
+            >    output_value = ""
+            >else
+            >    output_value = showmoney ($(varname))
+            >end if
+            format_list_field ("output_value")
+        else
+            format_list_field ("showmoney ($(varname))")
+        endif
+    elsif blank ?= 1
+        >output_value = $(varname)
+        >if output_value = 0 then output_value = ""
+        format_list_field ("output_value")
+    else
+        format_list_field ("$(varname)")
+    endif
+endfunction
+
+function show_boolean_list
+    >if cstr ($(varname)) = "1" then
+    >    bool_value = "$(true?"Yes":)"
+    >else
+    >    bool_value = "$(false?"No":)"
+    >end if
+    format_list_field ("bool_value")
+endfunction
+
+function show_timestamp_list ()
+    >    response.write showts ($(varname))
+endfunction
+
+function format_list_field (value)
+    >    response.write $(value:)
+endfunction
+
+#-----------------------------   GRID INPUT   ------------------------------
+
+function show_field_grid_input
+    if count (value)
+        show_select_grid_input ()
+    elsif type = "date"
+        show_date_grid_input ()
+    elsif type = "time"
+        show_time_grid_input ()
+    elsif type = "textual"
+        show_textual_grid_input ()
+    elsif type = "textbox"
+        show_textbox_grid_input ()
+    elsif type = "numeric"
+        show_numeric_grid_input ()
+    elsif type = "boolean"
+        show_boolean_grid_input ()
+    elsif type = "timestamp"
+        show_timestamp_grid_input ()
+    else
+        echo "Unknown field type '$(type)' for '$(name)'"
+    endif
+endfunction
+
+function show_select_grid_input
+    >item_nbr = 1
+    >open_select "$(select)", "$(name)" & index
+    for value
+        if defined (condition)
+        >   if $(condition:) then
+        endif
+        if dynamic ?= 1
+            >if $(label:) <> "" then
+            >    build_select $(varname) (index), "$(key:)", $(label:), item_nbr
+            >end if
+        else
+            >build_select $(varname) (index), "$(key:)", "$(label:)", item_nbr
+        endif
+        if defined (condition)
+        >   end if
+        endif
+    endfor
+    >close_select
+endfunction
+
+function show_date_grid_input
+    >build_date $(varname) (index), "$(name)" & index, $(startyear?0), $(endyear?0)
+    if screen.datesplit = 1
+    >if cur_cursor = "" then cur_cursor = "$(name)" & index & "_dd"
+    else
+    >if cur_cursor = "" then cur_cursor = "$(name)" & index
+    endif
+endfunction
+
+function show_time_grid_input
+    >build_time $(varname) (index), "$(name)" & index, $(starthour?0), $(endhour?23), $(interval?15)
+    >if cur_cursor = "" then cur_cursor = "$(name)" & index & "_hh"
+endfunction
+
+function show_textual_grid_input
+    attrs = 'size=$(showsize) name=""$(name)" & index & """ onFocus=""this.form.$(name)" & index & ".select();""'
+    if required ?= 1
+        attrs += ' class=force'
+    endif
+    if password ?= 1
+        >response.write "<input $(attrs) maxlength=$(size) type=password>"
+    elsif html ?= 1
+        >response.write "<input $(attrs) maxlength=$(size) value=""" & pstring.HTMLEncode ($(varname) (index)) & """>"
+    elsif attachment ?= 1
+        >response.write "<input name=""$(name)"" type=file>"
+    else
+        >response.write "<input $(attrs) maxlength=$(size) value=""" & $(varname) (index) & """>"
+    endif
+    >if cur_cursor = "" then cur_cursor = "$(name)" & index
+endfunction
+
+function show_textbox_grid_input
+    attrs = 'rows=$(rows) cols=$(cols) wrap=virtual maxlength=$(size) name=""$(name)" & index & """'
+    if required ?= 1
+        attrs += ' class=force'
+    endif
+    >response.write "<textarea $(attrs)>" & pstring.HTMLEncode ($(varname)(index)) & "</textarea>"
+    >if cur_cursor = "" then cur_cursor = "$(name)" & index
+endfunction
+
+function show_numeric_grid_input
+    attrs = 'size=$(showsize) name=""$(name)" & index & """ onFocus=""this.form.$(name)" & index & ".select();""'
+    if required ?= 1
+        attrs += ' class=force'
+    endif
+    if money ?= 1
+        if blank ?= 1
+            >if $(varname) (index) = 0 then
+            >    response.write "<input $(attrs) maxlength=20 value="""">"
+            >else
+            >    response.write "<input $(attrs) maxlength=20 value=""" & showmoney ($(varname) (index)) & """>"
+            >end if
+        else
+            >response.write "<input $(attrs) maxlength=20 value=""" & showmoney ($(varname) (index)) & """>"
+        endif
+    elsif blank ?= 1
+        >if $(varname) (index) = 0 then
+        >    response.write "<input $(attrs) maxlength=$(size) value="""">"
+        >else
+        >    response.write "<input $(attrs) maxlength=$(size) value=""" & $(varname) (index) & """>"
+        >end if
+    else
+        >response.write "<input $(attrs) maxlength=$(size) value=""" & $(varname) (index) & """>"
+    endif
+    >if cur_cursor = "" then cur_cursor = "$(name)" & index
+endfunction
+
+function show_boolean_grid_input
+    >if cstr ($(varname) (index)) = "1" then
+    >    response.write "<input class=check type=checkbox name=""$(name)" & index & """ checked>"
+    >else
+    >    response.write "<input class=check type=checkbox name=""$(name)" & index & """>"
+    >end if
+    >if cur_cursor = "" then cur_cursor = "$(name)" & index
+endfunction
+
+function show_timestamp_grid_input
+    echo "Timestamps cannot be shown as input fields!"
+endfunction
+
+#-----------------------------   GRID OUTPUT ------------------------------
+
+function show_field_grid_output (field)
+    if count (value)
+        show_select_grid_output ()
+    elsif type = "date"
+        show_date_grid_output ()
+    elsif type = "time"
+        show_time_grid_output ()
+    elsif type = "textual"
+        show_textual_grid_output ()
+    elsif type = "textbox"
+        show_textbox_grid_output ()
+    elsif type = "numeric"
+        show_numeric_grid_output ()
+    elsif type = "boolean"
+        show_boolean_grid_output ()
+    elsif type = "timestamp"
+        show_timestamp_grid_output ()
+    else
+        echo "Unknown field type '$(type)' for '$(name)'"
+    endif
+endfunction
+
+function show_select_grid_output
+    format_grid_output_field ("lookup_$(name) ($(varname) (index))")
+endfunction
+
+function show_date_grid_output
+    format_grid_output_field ("showdate_compact ($(varname) (index))")
+endfunction
+
+function show_time_grid_output
+    format_grid_output_field ("showtime ($(varname) (index), FALSE)")
+endfunction
+
+function show_textual_grid_output
+    if password ?= 1
+        format_grid_output_field ('"(Password)"')
+    elsif email ?= 1
+        format_grid_output_field ('"<A HREF=""mailto:" & $(varname) (index) & """>" & $(varname) (index) & "</A>"')
+    elsif attachment ?= 1
+        format_grid_output_field ('"<A HREF=""" & $(varname) (index) & """>" & $(varname) (index) & "</A>"')
+    elsif html ?= 1
+        format_grid_output_field ("pstring.HTMLEncode ($(varname) (index))")
+    else
+        format_grid_output_field ("$(varname) (index)")
+    endif
+endfunction
+
+function show_textbox_grid_output
+    if (truncate?1) = 1
+        format_grid_output_field ("pstring.replace (pstring.HTMLEncode (choptext (textbox_value, 250)), chr(13), \"<br>\")")
+    else
+        format_grid_output_field ("pstring.replace (pstring.HTMLEncode (textbox_value), chr(13), \"<br>\")")
+    endif
+endfunction
+
+function show_numeric_grid_output
+    if money ?= 1
+        if blank ?= 1
+            >if $(varname) = 0 then
+            >    output_value = ""
+            >else
+            >    output_value = showmoney ($(varname) (index))
+            >end if
+            format_grid_output_field ("output_value")
+        else
+            format_grid_output_field ("showmoney ($(varname) (index))")
+        endif
+    elsif blank ?= 1
+        >output_value = $(varname) (index)
+        >if output_value = 0 then output_value = ""
+        format_grid_output_field ("output_value")
+    else
+        format_grid_output_field ("$(varname) (index)")
+    endif
+endfunction
+
+function show_boolean_grid_output
+    >if cstr ($(varname) (index)) = "1" then
+    >    bool_value = "$(true?"Yes":)"
+    >else
+    >    bool_value = "$(false?"No":)"
+    >end if
+    format_grid_output_field ("bool_value")
+endfunction
+
+function show_timestamp_grid_output ()
+    >    response.write showts ($(varname) (index))
+endfunction
+
+function format_grid_output_field (value)
+    >    response.write $(value:)
+endfunction
+

@@ -1,0 +1,21 @@
+<?xml?>
+<!-- Copy this file and give it a site-specific name,
+     edit the values and run 'gslgen myfile.xml'
+     -->
+     
+<global script = "global.gsl"
+    
+    database          = "skeleton"
+    dsn               = "skeleton"
+    uid               = "sa"
+    password          = ""
+    connectiontimeout = "60"
+    commandtimeout    = "60"
+    sessiontimeout    = "60"
+    cursorlocation    = "3"
+    docdir            = "upload"
+    dbprefix          = "db"
+    debug             = "1"
+    mailserver        = ""
+    rootkey           = "E510CB9D78B2DF805C335A860B7E3E0C91B07C97"
+/>

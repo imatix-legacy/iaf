@@ -1,0 +1,17 @@
+------------------------------------------------------------------------
+-
+-   mod_dfl - DFL processing module
+-
+-   Written: 1999/12/24  Pieter Hintjens <ph@imatix.com>
+-   Revised: 2000/09/30  Pieter Hintjens <ph@imatix.com>
+-
+------------------------------------------------------------------------
+
+if ! defined (mod_dfl_included)
+    mod_dfl_included = 1
+    include "dflload.gsl"
+    include "dflsql.gsl"
+    include "dfldoc.gsl"
+    include "dflhtml.gsl"
+endif
+

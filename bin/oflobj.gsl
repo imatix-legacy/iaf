@@ -1,0 +1,2603 @@
+#############################################################################
+#   oflobj.gsl - Generate OFL object handlers from OFL file
+#                in ASP, Com component in VB or Component in
+#                VB and MS SQLServer Stored Procedure
+#
+#   use 'platform' variable for object implementation
+#   authorized value for 'platform' is:
+#       'asp'  : implement object in ASP Visual Basic Script
+#       'vbc'  : Microsoft Transaction Server Component in VB
+#       'vbsp' : idem with database stored procedure
+#
+#    use 'mts' variable for Microsoft Transaction Server support
+#
+#    use 'unicode=1" variable for unicode version
+#
+#############################################################################
+include "dflsql.gsl"
+include "oflobjt.gsl"
+include "oflobjs.gsl"
+
+#############################################################################
+    function generate_objects
+#
+#   Generates object handlers for the ofl (Visual Basic COM).
+#
+#############################################################################
+if !defined (platform)
+    platform = "asp"
+endif
+if platform <> "asp"
+    unique_id = "32FA94A500"
+    obj_id    = 1
+endif
+
+if unicode ?= 1
+    sp_type_varchar   = "adVarWChar"
+    sp_type_lvarchar  = "adLongVarWChar"
+    type_sql_varchar  = "NVARCHAR"
+    type_sql_lvarchar = "NTEXT"
+else
+    sp_type_varchar   = "adVarChar"
+    sp_type_lvarchar  = "adLongVarChar"
+    type_sql_varchar  = "VARCHAR"
+    type_sql_lvarchar = "TEXT"
+endif
+
+for root.dfl
+for root.ofl
+  if platform = "vbsp"
+      set_sql_target ("mssql")
+  else
+      set_sql_target ("odbc")
+  endif
+  for object where build
+#for object where name = "usergroup"
+    # Sort field to place memo field at end 
+    for view
+        sort_view_field ()
+    endfor
+
+    object.handler ?= root_table
+    echo "Generating code for $(handler)..."
+    if platform <> "asp"
+        generate_vb_project_file ()
+        output "$(handler).cls"
+    else
+        output "$(handler).asp"
+    endif
+    do_handler_header   ()
+    do_handler_inherit  ()
+    do_handler_create   ()
+    do_handler_update   ()
+    do_handler_delete   ()
+    do_handler_fetch    ()
+    do_handler_query    ()
+    do_handler_footer   ()
+    close
+    if platform <> "asp"
+        output "$(handler).asp"
+        do_handler_asp      ()
+        close
+    endif
+  endfor object
+endfor ofl
+endfor dfl
+
+if platform = "vbsp"
+  generate_stored_procedures ()
+endif
+endfunction
+
+function sort_view_field 
+    for table
+        for field
+            if !defined (size)
+                field.size = 30
+            endif
+         endfor
+         sort table.field by size 
+         for field
+             sort_view_field ()
+         endfor
+    endfor
+endfunction
+
+.macro header_func (use_date)
+.  if platform <> "asp"
+.    if defined (use_date)
+    Dim objdate    As SCL_DATELib.date
+.    endif
+.      if platform = "vbsp"
+    Dim Cmd          As ADODB.Command
+    Dim Cmd_lookup   As ADODB.Command
+    Dim Cmd1         As ADODB.Command
+    Dim Cmd2         As ADODB.Command
+.if unicode ?= 1
+    Dim string_value As String
+    Dim string_size  As Long
+.endif
+.      else
+    Dim APDB       As ADODB.Connection
+.      endif
+    Dim oa_userid  As Long
+    Dim Rs         As ADODB.Recordset
+    Dim Rs_lookup  As ADODB.Recordset
+    Dim Rs1        As ADODB.Recordset
+    Dim Rs2        As ADODB.Recordset
+.      if mts ?= 1
+    Dim context    As ObjectContext
+
+    Set context = GetObjectContext ()
+.      endif
+.      if defined (use_date)
+.         if mts ?= 1
+    Set objdate = context.CreateInstance ("scl.date")
+.         else
+    Set objdate = new SCL_DATELib.date
+.         endif
+.      endif
+'   Open Database Connection
+.      if platform = "vbsp"
+.          if mts ?= 1
+    Set Cmd = context.CreateInstance("ADODB.Command")
+.          else
+    Set Cmd = new ADODB.Command
+.          endif
+    Cmd.ActiveConnection = connect_string
+    Cmd.CommandType      = adCmdStoredProc
+    Cmd.CommandTimeout   = 60
+.      else
+.          if mts ?= 1
+    Set APDB = context.CreateInstance("ADODB.Connection")
+.          else
+    Set APDB = new ADODB.Connection
+.          endif
+    APDB.Open connect_string
+.      endif
+.  endif
+.endmacro
+
+.macro footer_func (use_date)
+.  if platform <> "asp"
+.    if defined (use_date)
+    Set objdate = Nothing
+.    endif
+.    if platform = "vbsp"
+    Set Cmd     = Nothing
+.    else
+    APDB.close
+	Set APDB    = Nothing
+.    endif
+.   if mts ?= 1
+    Set context = Nothing
+.   endif
+.  endif
+.endmacro
+#############################################################################
+.macro do_handler_header ()
+.############################################################################
+.    if platform = "asp"
+<%
+'
+'   $(handler).asp - handler for $(name) object
+'
+'   Application: $(ofl.name)
+'   Generated:   $(date) $(time)
+'   Script by:   iMatix Corporation <pieter.hintjens@imatix.com>
+'
+'   The oa_do_$(name) function implements the object access layer for the
+'   $(name) object.  This function accepts one argument - an OAL (object
+'   access language) string, and returns an OAL string as reply.  Returns
+'   "" if there was an internal error, such as a lack of available memory.
+
+oa_trace  = 0           '   Do we trace SQL accesses?
+
+'   ADO recordset constant declaration
+'---- CursorTypeEnum Values ----
+ adOpenForwardOnly     = 0
+ adOpenKeyset          = 1
+ adOpenDynamic         = 2
+ adOpenStatic          = 3
+'---- LockTypeEnum Values -----
+ adLockReadOnly        = 1
+ adLockPessimistic     = 2
+ adLockOptimistic      = 3
+ adLockBatchOptimistic = 4
+'---- CommandTypeEnum Values ----
+ adCmdUnknown          = &H0008
+ adCmdText             = &H0001
+ adCmdTable            = &H0002
+ adCmdStoredProc       = &H0004
+
+function oa_do_$(name) (OALstring)
+    '   Create an XML object for the OAL string
+    set xml     = Server.CreateObject ("scl.xmlstore")
+    set objdate = Server.CreateObject ("scl.date")
+'    xml.set_trace ("c:\\xmlstore.log")
+    xml.alloc (OALstring)
+    if xml.valid then
+        oa_trace  = CInt (xml.attr ("trace", 0))
+        select case xml.attr ("do")
+            case "create"
+                oa_do_$(name) = oa_create_$(name)   (xml, objdate)
+            case "fetch"
+                oa_do_$(name) = oa_fetch_$(name)    (xml, objdate)
+            case "update"
+                oa_do_$(name) = oa_update_$(name)   (xml, objdate)
+            case "delete"
+                oa_do_$(name) = oa_delete_$(name)   (xml, objdate)
+            case "query"
+                oa_do_$(name) = oa_query_$(name)    (xml, objdate)
+            case else
+                oa_do_$(name) = "<oal done=""error"" cause=""oa""/>"
+        end select
+        xml.free
+    else
+        oa_do_$(name) = "<oal done=""error"" cause=""oa""/>"
+    end if
+    Set xml     = Nothing
+    Set objdate = Nothing
+End Function
+.    else
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1  'True
+.if mts ?= 1
+  MTSTransactionMode  = 3  'UsesTransaction
+.endif
+END
+Attribute VB_Name = "$(name:)"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = True
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = True
+Attribute VB_Ext_KEY = "RVB_UniqueId" ,"$(UNIQUE_ID)$(OBJ_ID%02d)"
+Attribute VB_Ext_KEY = "Top_Level" ,"Yes"
+. obj_id += 1
+'
+.        if platform = "vbsp"
+'   $(handler).cls - VB COM handler for $(name) object using Stored Procedure
+.        else
+'   $(handler).cls - VB COM handler for $(name) object
+.        endif
+'
+'   Application: $(ofl.name)
+'   Generated:   $(date) $(time)
+'   Script by:   iMatix Corporation <pascal@imatix.com>
+'
+'   The oa_do_$(name) function implements the object access layer for the
+'   $(name) object.  This function accepts one argument - an OAL (object
+'   access language) string, and returns an OAL string as reply.  Returns
+'   "" if there was an internal error, such as a lack of available memory.
+Option Base 0
+Option Explicit
+.if mts ?= 1
+Implements ObjectControl
+.endif
+
+Private oa_error   As Boolean
+Private oa_trace   As Integer           '   Do we trace SQL accesses?
+
+.if mts ?= 1
+Private Function ObjectControl_CanBePooled () As Boolean
+    ObjectControl_CanBePooled = True
+End Function
+
+Private Sub ObjectControl_Deactivate ()
+End Sub
+
+Private Sub ObjectControl_Activate ()
+End Sub
+
+Private Sub Class_Initialize ()
+End Sub
+
+Private Sub Class_Terminate ()
+End Sub
+.endif
+
+Public Function oa_do (OALstring As String, connect_string As String ) As String
+    Dim xml      As SCL_XMLSTORELib.xmlstore
+.   if mts ?= 1
+    Dim context  As ObjectContext
+    Set context = GetObjectContext ()
+.   endif
+
+    On Error Goto oa_do_error
+    If IsEmpty (connect_string) Then
+        oa_do = "<oal done=""error"" cause=""oa"" message=""Missing Connection string""/>"
+.   if mts ?= 1
+        context.SetAbort
+.   endif
+        Exit Function
+    End If
+    oa_error = FALSE
+.if mts ?= 1
+    If not IsObject (context) Then
+        Set context = GetObjectContext ()
+    End If
+.endif
+.  if mts ?= 1
+    Set xml     = context.CreateInstance ("scl.xmlstore")
+.  else
+    Set xml     = new SCL_XMLSTORELib.xmlstore
+.  endif
+    '   Create an XML object for the OAL string
+'    xml.set_trace ("c:\\xmlstore.log")
+    xml.alloc (OALstring)
+    If xml.valid Then
+        oa_trace  = CInt (xml.attr ("trace", 0))
+        select case xml.attr ("do")
+            case "create"
+                oa_do = oa_create_$(name)   (xml, connect_string)
+            case "fetch"
+                oa_do = oa_fetch_$(name)    (xml, connect_string)
+            case "update"
+                oa_do = oa_update_$(name)   (xml, connect_string)
+            case "delete"
+                oa_do = oa_delete_$(name)   (xml, connect_string)
+            case "query"
+                oa_do = oa_query_$(name)    (xml, connect_string)
+            case else
+                oa_do = "<oal done=""error"" cause=""oa""/>"
+                oa_error = TRUE
+        end select
+    else
+        oa_do    = "<oal done=""error"" cause=""oa""/>"
+        xml.free
+.       if mts ?= 1
+        context.SetAbort
+.       endif
+        Set xml     = Nothing
+.    if mts ?= 1
+        Set context = Nothing
+.    endif
+
+        Exit Function
+    end if
+.   if mts ?= 1
+    If oa_error = FALSE Then
+        context.SetComplete
+    Else
+        context.SetAbort
+    End If
+.   endif
+    xml.free
+    Set xml     = Nothing
+.    if mts ?= 1
+    Set context = Nothing
+.    endif
+
+    exit function
+oa_do_error:
+    If Err.Number <> 0 Then
+      oa_do    = "<oal done=""error"" cause=""Error # " & Str(Err.Number) & " was generated by " _
+                  & Err.Source & ": " & Err.Description & """/>
+      Set xml     = Nothing
+.    if mts ?= 1
+      Set context = Nothing
+.    endif
+    End If
+End Function
+.endif
+
+.##############################
+.### Function to get memo value
+.##############################
+.    have_memo = 0
+.    for view where have_memo = 0
+.      check_if_memo_field ()
+.    endfor
+.    if have_memo = 1
+.        if platform = "asp"
+Private Function get_memo (rs, field_name)
+.        else
+Private Function get_memo (rs As ADODB.RecordSet, field_name As String) As String
+    Dim memo_size  As Long
+    Dim block_size As Long
+    Dim read_size  As Long
+.        endif
+    get_memo  = ""
+    memo_size = rs (field_name).ActualSize
+.        if unicode ?= 1
+    memo_size = memo_size / 2
+.        endif
+    If memo_size > 0 Then
+        block_size = 4096
+        read_size  = 0
+        do while read_size < memo_size
+            get_memo  = get_memo  & rs (field_name).GetChunk (block_size)
+            read_size = read_size + block_size
+        Loop
+        get_memo = RTrim (get_memo)
+    End If
+End Function
+.    endif
+.endmacro
+
+function check_if_memo_field
+    for table
+        if count (field, type = "textual" & size >= dfl.longtext_limit)
+            have_memo = 1
+            last
+        else
+            for field where have_memo = 0
+                check_if_memo_field ()
+            endfor
+        endif
+    endfor
+endfunction
+
+#############################################################################
+function do_handler_footer ()
+#############################################################################
+    if platform = "asp"
+>%>
+    endif
+endfunction
+
+#############################################################################
+.  macro do_handler_inherit
+.#
+.# Generate function to get parent field value
+.#
+.# Only for ASP of VB without stored procedure
+.#############################################################################
+.if platform <> "vbsp"
+.  for inherit
+.    function_param = ""
+.    for link
+.      comma = ""
+.      for field
+.        function_param = comma + field.realname
+.        if platform <> "asp"
+.          function_param += " As Variant"
+.        endif
+.        comma = ", "
+.      endfor
+.    endfor
+.    inherit_select = ""
+.    comma = ""
+.    for field
+.      inherit_select += comma + realname
+.      comma = ", "
+.    endfor
+'********************************   INHERIT   *********************************
+'** Inherit from table $(inherit.table)
+'**
+'******************************************************************************
+
+.    if platform = "asp"
+Private function $(object.name)_inherit_from_$(inherit.table) (Rs_inherit, $(function_param))
+.    else
+Private function $(object.name)_inherit_from_$(inherit.table) (Rs_inherit As ADODB.RecordSet, $(function_param), APDB  As ADODB.Connection) As ADODB.RecordSet
+Dim sql        As String
+.    endif
+    sql = "SELECT $(inherit_select) FROM $(inherit.table_realname) WHERE " & _
+.   for link
+.     comma = ""
+.     for field
+.       if type = "textual"
+          "$(comma)$(target_realname) = '" & $(realname) & "'" & _
+.       else
+          "$(comma)$(target_realname) = " & $(realname) & _
+.       endif
+.       comma = "AND "
+.     endfor
+.   endfor
+          "" 
+    on error resume next
+    If oa_trace = 1 Then
+.    if platform = "asp"
+        Response.Write "<hr>" & sql
+.    else
+        Trace "$(handler)", sql
+.    endif
+    End If
+    Set Rs_inherit = APDB.Execute (sql)
+'    inherit_from_$(inherit.table) = Rs_inherit
+End Function
+.  endfor
+.endif
+.endmacro
+
+#############################################################################
+/*****************************************************************************
+    Create a new object.  The data provided must match the 'create' view.
+    Data that is provided in the OAL data is stored in the database.
+    Fields that are missing are stored with default values if they are
+    defined as 'required' in the OFL, otherwise they are stored with null
+    values.  Any insert rules override the provided or default values.
+    Creates principal record and any child records provided.
+*/
+.macro do_handler_create   ()
+
+'********************************   CREATE   *********************************
+'   Input:
+'           <oal do    = "create"
+'                user  = "userid"
+'              [ id    = "newid" ]
+'                objectdata />
+'   Output:
+'           <oal done = "ok">
+'               <object_name>primary key value </object_name></oal>
+'           <oal done    = "error"
+'                cause   = "db"|"ua"|"id"
+'                message = "error message" />
+
+.fctname = "oa_create_$(object.name)"
+.if count (view, name = "create") = 0
+.   abort "No create view exists for $(object.name)"
+.endif
+.for view where name = "create"
+.   for table
+.       generate_create_object ()
+.   endfor
+.endfor
+.endmacro
+
+.-  This macro creates a table and all child tables.
+
+.macro generate_create_object ()
+.## ADD all field needed by insert rule into the view
+.  for dfl.table as dbtable where dbtable.name = table.name
+.    for dbtable.field as dbfield where count (rule, when = "insert")
+.      if count (table.field, name = dbfield.name) = 0
+.        copy dbfield to table
+.          for table.field as dfield where name = dbfield.name
+.              dfield.add4create = 1
+.              dfield.calculated = 0
+.              dfield.size       = dbfield.size?30
+.          endfor
+.      endif
+.    endfor
+.  endfor
+.  if table.type = "root"
+.    fctname = "oa_create_$(object.name)"
+.  else
+'   Create $(TABLE.NAME) record for $(object.name) field $(table.target)
+
+.    fctname = "oa_create_$(object.name)_$(view.name)_$(table.name)_$(table.target)"
+.  endif
+.  if platform = "asp"
+.    if table.type = "root"
+Private Function $(fctname) (xml, objdate)
+.    else
+Private Function $(fctname) (xml, parentkey, objdate)
+.    endif
+.  else
+.    if table.type = "root"
+Private Function $(fctname) (xml As SCL_XMLSTORELib.xmlstore, connect_string As String) As String
+.    else
+Private Function $(fctname) (xml As SCL_XMLSTORELib.xmlstore, connect_string As String, parentkey As String) As String
+.    endif
+    Dim parent_value     As String
+.    for field where count (rule, when = "insert" & name = "timestamp")
+    Dim revised          As String
+.     last
+.    endfor
+.    if platform = "vbsp"
+    Dim Param            As ADODB.Parameter
+.    else
+    Dim retries          As Integer
+    Dim sql              As String
+.      for field
+    Dim $(realname)      As Variant
+.      endfor
+.     if view.have_inherit ?= 1
+    Dim Rs_inherit       As ADODB.RecordSet
+.     endif
+.    endif
+.  endif
+.  header_func (1)
+
+   oa_userid = xml.attr ("user",  0)
+.  timestamp_$(object.name)_field = ""
+    xml.push_position
+.  if table.type = "root"
+    xml.item_set_current ("$(table.name)")
+    If xml.valid = false Then
+        $(fctname) = "<oal done=""error"" cause=""nd"" message=""Root item not found""/>"
+        oa_error = TRUE
+        exit function               '   No data supplied
+    End If
+.  endif
+.  assign_recordid = ""
+.#### ONLY FOR STORED PROCEDURE ######
+.  if platform = "vbsp"
+.    set_field_target_type ()
+.    if table.type <> "root"
+.      if mts ?= 1
+    Set Cmd = context.CreateInstance("ADODB.Command")
+.      else
+    Set Cmd = new ADODB.Command
+.      endif
+    Cmd.ActiveConnection = connect_string
+    Cmd.CommandType      = adCmdStoredProc
+    Cmd.CommandTimeout   = 60
+.    endif
+.    if mts ?= 1
+    Set Param = context.CreateInstance("ADODB.Parameter")
+.    else
+    Set Param = New ADODB.Parameter
+.    endif
+.    for field where calculated ?= 0
+.      if count (rule, when = "insert" & name = "recordid")
+.         assign_recordid = field.realname
+.         recordid_name   = field.name
+.         last
+.      endif
+.    endfor
+
+'    Set up Return parameter.
+    Set Param = Cmd.CreateParameter ("return", adInteger, adParamReturnValue)
+    Cmd.Parameters.Append Param
+.    recordid = ""
+.    for field where calculated ?= 0
+.      if count (rule, when = "insert") > 0
+.        for rule where when = "insert"
+.          if rule.name = "userid"
+.            create_stored_proc_param ("oa_userid" , "IN", "")
+.          elsif name = "recordid"
+.            create_stored_proc_param ("\"\"", "INOUT", "")
+.            recordid = field.name
+.          elsif name = "timestamp"
+           revised = objdate.timestamp
+.            create_stored_proc_param ("revised", "IN", "")
+.            timestamp_$(object.name)_field      = field.name
+.          endif
+.        endfor
+.      elsif realname ?= table.target
+.        create_stored_proc_param ("parentkey", "IN", "")
+.      else
+.           if field.dbrequired ?= 1
+.               if field.type = "textual"
+.                   create_stored_proc_param ("xml.item (\"$(field.name:)\", \"$(default)\")", "IN", "")
+.               else
+.                   create_stored_proc_param ("xml.item (\"$(field.name:)\", $(default))", "IN", "")
+.               endif
+.#           elsif unicode ?= 1
+.#               create_stored_proc_param ("xml.item (\"$(field.name:)\", \"\")", "IN", "")
+.           else
+.               create_stored_proc_param ("xml.item (\"$(field.name:)\")", "IN", "")
+.           endif
+.      endif
+.      comma = ","
+.    endfor
+.    if table.type = "root"
+    Cmd.CommandText = "$(object.name)_create"
+.    else
+    Cmd.CommandText = "$(object.name)_create_$(view.name)_$(table.name)_$(table.target)"
+.    endif
+    On Error Resume Next
+    Cmd.Execute
+    If err.number = 0 Then
+.    if recordid <> ""
+        $(fctname) = "<oal done=""ok""><$(table.name)" & _
+.      if timestamp_$(object.name)_field <> ""
+                     " revised = """ & revised & """"  & _
+.      endif
+                     "><$(recordid)>" & Cmd.Parameters ("$(recordid)") & "</$(recordid)>" & _
+                     "</$(table.name)>"
+'       Set value of id for child object
+        xml.item ("$(recordid)") = Cmd.Parameters ("$(recordid)")
+.    else
+        xml.item_set_current ("$(table.name)")
+        $(fctname) = "<oal done=""ok""><$(table.name)" & _
+.      if timestamp_$(object.name)_field <> ""
+                     " revised = """ & revised & """>"
+.      else
+                     ">"
+.      endif
+.      for field where count (index, name = "primary")
+       If not IsNull (xml.item ("$(name:)")) Then
+        $(fctname) = $(fctname) & "<$(name)>" & xml.item ("$(name:)") & "</$(name)>"
+       End If
+.      endfor
+        $(fctname) = $(fctname) & "</$(table.name)>"
+.    endif
+'   If Error in create
+    Else
+.     if assign_recordid = ""
+'     Check in record exist with usvalid = 0
+.       if table.type = "root"
+        Cmd.CommandText = "$(object.name)_create_valid"
+.       else
+        Cmd.CommandText = "$(object.name)_create_$(view.name)_$(table.name)_$(table.target)_valid"
+.       endif
+        On Error Resume Next
+        Cmd.Execute
+        If cmd(0) = 0 Then
+            $(fctname) = "<oal done=""error"" cause=""db"" message=""Record already exist""/>"
+            oa_error = TRUE
+.       footer_func (1)
+            Exit Function               '   No data supplied
+        Else
+            xml.item_set_current ("$(table.name)")
+            $(fctname) = "<oal done=""ok""><$(table.name)" & _
+.          if timestamp_$(object.name)_field <> ""
+                         " revised = """ & revised & """>"
+.          else
+                         ">"
+.          endif
+.          for field where count (index, name = "primary")
+           If not IsNull (xml.item ("$(name:)")) Then
+               $(fctname) = $(fctname) & "<$(name)>" & xml.item ("$(name:)") & "</$(name)>"
+           End If
+.          endfor
+           $(fctname) = $(fctname) & "</$(table.name)>"
+        End If
+.     else
+        $(fctname) = "<oal done=""error"" cause=""db"" message=""" & Err.Description & """/>"
+        oa_error = TRUE
+.       footer_func (1)
+        Exit Function
+.     endif
+    End If
+.#### END OF STORED PROCEDURE ########
+.  else
+.    for field where calculated ?= 0
+.      if count (rule, when = "insert")
+.        for rule where when = "insert"
+.          if    name = "timestamp"
+    $(realname)         = objdate.timestamp
+.            timestamp_$(object.name)_field      = field.realname
+.          elsif name = "userid"
+    $(realname)         = oa_userid
+.          elsif name = "set" & field.type = "textual"
+    $(realname)         = "$(value)"
+.          elsif name = "set"
+    $(realname)         = $(value)
+.          elsif name = "recordid"
+.            assign_recordid = field.realname
+.            recordid_name   = field.name
+.          else
+.            abort "$(script): unknown rule '$(name)' for '$(field.name)'"
+.          endif
+.        endfor
+.      elsif realname ?= table.target
+    $(realname)         = parentkey
+.      else
+.          if type = "textual"
+    $(realname)         = xml.item_child_value ("$(field.name)",  "$(default:)")
+.          elsif type = "timestamp"
+    $(realname)         = xml.item_child_value ("$(field.name)",  0)
+.          else
+.            if defined (default)
+    $(realname)         = xml.item_child_value ("$(field.name)",  $(default:))
+.            else
+    $(realname)         = xml.item_child_value ("$(field.name)")
+.            endif
+.          endif
+.      endif
+.    endfor
+.   ############# WITHOUT AUTOMATIC ID ####################################
+.    if assign_recordid = ""
+.      for field where count (index, name = "primary")
+    if $(realname) = "" then
+        $(fctname) = "<oal done=""error"" cause=""id""/>"
+        oa_error = TRUE
+.       footer_func (1)
+        exit function               '   No id value supplied
+    end if
+.      endfor
+.   if view.have_inherit ?= 1
+.     for view.inherit where inherit.have_type_link
+.       get_inherit_field ()
+.     endfor
+.   endif
+
+    sql =       "INSERT INTO $(table.realname) ( "
+.      sql_fields ("    ")
+    sql = sql + ") VALUES ( "
+.      sql_values ("    ")
+    sql = sql + ")"
+    on error resume next
+    If oa_trace = 1 Then
+.      if platform = "asp"
+        Response.Write sql
+.      else
+        Trace "$(handler)", sql
+.      endif
+    End If
+    Set Rs = APDB.Execute (sql)
+    If Err.number = 0 Then
+        $(fctname) = "<oal done=""ok""><$(table.name)" & _
+.      if timestamp_$(object.name)_field <> ""
+                     " revised = """ & $(timestamp_$(object.name)_field) & """>"
+.      else
+                     ">"
+.      endif
+.      for field where count (index, name = "primary")
+       If not IsNull ($(realname)) Then
+        $(fctname) = $(fctname) & "<$(name)>" & $(realname) & "</$(name)>"
+       End If
+.      endfor
+        $(fctname) = $(fctname) & "</$(table.name)>"
+
+.############## WITH AUTOMATIC ID ###########################
+.    else
+
+    retries = 0
+    do
+        Set Rs = APDB.Execute ("SELECT max($(assign_recordid)) FROM $(table.realname) as maxid")
+        if IsNull (Rs (0)) then
+            $(assign_recordid) = 1
+        else
+            $(assign_recordid) = Clng(Rs (0)) + 1
+        end if
+        Rs.Close
+'       Set value of id for child object
+        xml.item ("$(recordid_name)") = $(assign_recordid)
+
+.   if view.have_inherit ?= 1
+.     for view.inherit where inherit.have_type_link
+.       get_inherit_field ()
+.     endfor
+.   endif
+
+        sql =       "INSERT INTO $(table.realname) ( "
+.      sql_fields ("        ")
+        sql = sql + ") VALUES ( "
+.      sql_values ("        ")
+        sql = sql + ")"
+        If oa_trace = 1 Then
+.      if platform = "asp"
+            Response.Write sql
+.      else
+            Trace "$(handler)", sql
+.      endif
+        End If
+        on error resume next
+        APDB.Execute (sql)
+        retries = retries + 1
+    loop until err.number = 0 or retries = 5
+
+    if err.number = 0 then
+    $(fctname) = "<oal done=""ok""><$(table.name)" & _
+.      if timestamp_$(object.name)_field <> ""
+                  " revised =""" & $(timestamp_$(object.name)_field) & """" & _
+.      endif
+                 "><$(recordid_name)>" & _
+                  $(assign_recordid) & "</$(recordid_name)>" & _
+                  "</$(table.name)>"
+.    endif
+    Else
+.# Check if is duplicate error
+.     if assign_recordid = "" & platform <> "vbsp"
+            Err.Clear
+            sql = "SELECT * from $(table.realname:) WHERE " & _
+.     comma = "     "
+.     for field where count (index, name = "primary")
+.       if type = "textual" | type = "timestamp"
+                  "$(comma)$(field.realname) = "  & astr ($(field.realname)) & _
+.       else
+                  "$(comma)$(field.realname) = "  &       $(field.realname)  & _
+.       endif
+.       comma = " AND "
+.     endfor
+.     for field where name = "active"
+                  " AND $(realname) = 0" & _
+.     endfor
+                  ""
+            If oa_trace = 1 Then
+.     if platform = "asp"
+                Response.Write sql
+.     else
+                Trace "$(handler)", sql
+.     endif
+            End If
+.     if platform = "asp"
+            Set Rs = Server.CreateObject ("ADODB.Recordset")
+.     else
+.       if mts ?= 1
+            Set Rs = context.CreateInstance ("ADODB.Recordset")
+.       else
+            Set Rs = new ADODB.Recordset
+.       endif
+.     endif
+            Rs.Open sql, APDB, adOpenKeyset, adLockPessimistic, adCmdText
+            If Err.Number = 0 Then
+              If Rs.EOF OR Rs.BOF Then
+                $(fctname) = "<oal done=""error"" cause=""id"" message=""Record already exist""/>"
+                oa_error = TRUE
+.               footer_func (1)
+                Exit Function
+              Else
+.     for field where count (index, name = "primary") = 0 & calculated = 0
+                Rs ("$(realname)")   = $(realname)
+.     endfor
+                Rs.Update
+                $(fctname) = "<oal done=""ok""><$(table.name)" & _
+.     if timestamp_$(object.name)_field <> ""
+                             " revised =""" & $(timestamp_$(object.name)_field) & """>" & _
+.     else
+                             ">" & _
+.     endif
+.     for field where count (index, name = "primary")
+                             "<$(name)>" & $(realname) & "</$(name)>" & _
+.     endfor
+                             "</$(table.name)>"
+              End If
+            Else
+                $(fctname) = "<oal done=""error"" cause=""db"" message=""" & Err.Description & """/>"
+                oa_error = TRUE
+.               footer_func (1)
+                Exit Function
+            End If
+            Rs.Close
+.    else
+        $(fctname) = "<oal done=""error"" cause=""db"" message=""" & Err.Description & """/>"
+        oa_error = TRUE
+.       footer_func (1)
+        Exit Function
+.    endif
+    End If
+.  endif
+.   for field where calculated ?= 0
+.       if count (table, type = "child")
+    xml.push_position
+    xml.item_first_child
+    xml.item_set_current ("$(field.name)")
+    parent_value = xml.item
+    xml.item_first_child
+    Do While (xml.valid)
+.           for table where type = "child"
+        If xml.item_name = "$(table.name)" Then
+.               if platform = "asp"
+            $(fctname) = $(fctname) + oa_create_$(object.name)_$(view.name)_$(table.name)_$(table.target) (xml, parent_value, objdate)
+.               else
+            $(fctname) = $(fctname) + oa_create_$(object.name)_$(view.name)_$(table.name)_$(table.target) (xml, connect_string, parent_value)
+.               endif
+        End If
+.           endfor
+        xml.item_next
+    Loop
+    xml.pop_position
+.       endif
+.   endfor
+    $(fctname) = $(fctname) & "</oal>"
+    xml.pop_position
+.   footer_func (1)
+End Function
+
+.for field where calculated ?= 0
+.   for table where type = "child"
+.       generate_create_object ()
+.   endfor
+.endfor
+.for table.field as tmpfield where defined (add4create)
+.  delete tmpfield
+.endfor
+.endmacro
+
+.macro format_date_time    (value)
+        revised = $(value)
+        revised_str = Year (revised) & "-" & Month (revised) & "-" & Day (revised) & _
+                      " " & Hour (revised) & ":" & Minute (revised) & ":" & _
+                      Second (revised)
+.endmacro
+
+.macro do_handler_fetch    ()
+
+'********************************   FETCH   **********************************
+'   Input:
+'           <oal do   = "fetch"
+'                user = "userid"
+'                view = "viewname" >
+'            Object data...
+
+'   Output:
+'           <oal done    = "ok"
+'                id      = "objectid"
+'                revised = "timestamp"
+'                write   = "1"|"0"
+'                delete  = "1"|"0"
+'                view    = "viewname" >
+'                object data
+'           </oal>
+'           <oal done    = "error"
+'                cause   = "nf"|"nv"|"db"|"ua"|"wf"
+'                message = "error message" />
+.    if platform = "asp"
+Private Function oa_fetch_$(object.name) (xml, objdate)
+.    else
+Private Function oa_fetch_$(object.name) (xml As SCL_XMLSTORELib.xmlstore, connect_string As String) As String
+.    endif
+    Select Case xml.attr ("view")
+.   for view where read = 1
+        Case "$(name)"
+.     if defined (sameas)
+.       fcntname = "oa_fetch_$(object.name)_$(view.sameas)"
+.     else
+.       fcntname = "oa_fetch_$(object.name)_$(view.name)"
+.     endif
+.     if platform = "asp"
+            oa_fetch_$(object.name) = $(fcntname) (xml, objdate)
+.     else
+            oa_fetch_$(object.name) = $(fcntname) (xml, connect_string)
+.     endif
+.   endfor
+        Case Else
+            oa_fetch_$(object.name) = "<oal done=""error"" cause=""nv""/>"
+    End Select
+End Function
+
+.for view where read = 1
+.  if defined (sameas)
+.    for object.view as objview where objview.name = view.sameas
+.      objview.fetch_view = 1
+.    endfor
+.  else
+.      view.fetch_view = 1
+.  endif
+.endfor
+
+.   for view where defined (fetch_view)
+.## ADD all fields needed by update rule into the view
+.    if platform = "asp"
+Private Function oa_fetch_$(object.name)_$(view.name) (xml, objdate)
+.    else
+Private Function oa_fetch_$(object.name)_$(view.name) (xml As SCL_XMLSTORELib.xmlstore, connect_string As String) as String
+    Dim sql    As String
+.        if platform = "vbsp"
+    Dim Param  As ADODB.Parameter
+.        endif
+.    endif
+.        header_func ()
+.       for table
+.#        Add timestamp in fetch view for OAL revised value
+.         for dfl.table as dbtable where dbtable.name = table.name
+.           for dbtable.field as dbfield where count (rule, when = "update" & name = "timestamp")
+.             if count (table.field, name = dbfield.name) = 0
+.               copy dbfield to table
+.               for table.field as dfield where name = dbfield.name
+.                 dfield.add4fetch  = 1
+.                 dfield.calculated = 0
+.                 dfield.size       = dbfield.size?30
+.               endfor
+.             endif
+.           endfor
+.#
+.#          search the active field
+.#
+.           for dbtable.rule where name = "soft delete"
+.             for dbtable.field as dbfield where name = rule.what
+.                 table.have_active = dbfield.realname
+.             endfor
+.           endfor
+.         endfor
+    xml.item_set_current ("$(table.name)")
+    ' Verify index key value
+.   for field where count (index, name = "primary")
+.       if type = "textual"
+    If xml.item ("$(name)", "") = "" Then
+.       else
+    If Clng (xml.item ("$(name)", 0)) = 0 Then
+.       endif
+        oa_fetch_$(object.name)_$(view.name) = "<oal done=""error"" cause=""nf""" & _
+		     " message=""Missing key value for $(name)""/>"
+        oa_error = TRUE
+.       footer_func ()
+        exit function
+    End If
+.   endfor
+.#### ONLY FOR STORED PROCEDURE ######
+.   if platform = "vbsp"
+.   if mts ?= 1
+    Set Param = context.CreateInstance("ADODB.Parameter")
+.   else
+    Set Param = New ADODB.Parameter
+.   endif
+.    for field where count (index , name = "primary")
+.#        if  unicode ?= 1
+.#            create_stored_proc_param ("xml.item (\"$(field.name:)\", \"\")", "IN", "")
+.#        else
+.            create_stored_proc_param ("xml.item (\"$(field.name:)\")", "IN", "")
+.#        endif
+.    endfor
+    Cmd.CommandText = "$(object.name)_fetch_$(view.name)"
+    On Error Resume Next
+    Set Rs = Cmd.Execute
+.#### END OF STORED PROCEDURE ########
+.   else
+    sql = "SELECT $(select) FROM $(realname)" _
+.       sql_where_clause ("    ")
+
+.   execute_sql ("oa_fetch_$(object.name)_$(view.name)")
+.   endif
+    if Rs.Eof then
+        oa_fetch_$(object.name)_$(view.name) = "<oal done=""error"" cause=""nf""/>"
+        Rs.Close
+        Set Rs = Nothing
+.       footer_func ()
+        exit function
+    end if
+
+    xml.value             = "<oal done=""ok"" />"
+.   for field where count (index, name = "primary")
+    xml.attr ("$(name)")  = Rs ("$(realname:)")
+.   endfor
+    xml.attr ("write")    = "$(view.write)"
+    xml.attr ("delete")   = "$(view.delete)"
+    xml.attr ("view")     = "$(view.name)"
+
+    xml.item_new   "$(table.name)"
+    xml.item_first_child
+.   for field where calculated ?= 0 by size
+.       if count (rule, when = "update" & name = "timestamp")
+.           for rule where when = "update" & name = "timestamp"
+    ' Save revised time stamp
+    If Not IsNull (Rs ("$(field.realname)")) Then
+        xml.attr ("revised") = Rs ("$(field.realname)")
+    End If
+.           endfor
+.       endif
+.       if field.type =  "textual"
+.           if field.size ?<= dfl.longtext_limit
+    if not isnull (Rs ("$(field.realname)"))  then xml.item_new "$(field.name)",  RTrim (Rs ("$(field.realname)"))
+.           else
+    xml.item_new "$(field.name)",  get_memo (Rs, "$(field.realname)")
+.           endif
+.       else
+    if not isnull (Rs ("$(field.realname)"))  then xml.item_new "$(field.name)",  Rs ("$(field.realname)")
+.       endif
+.-  Process object link
+.       link_level = ""
+.       oa_fetch_view_links (0)
+.#
+.#    Remove added field in view
+.#
+.   endfor
+
+    oa_fetch_$(object.name)_$(view.name) = xml.value
+    Rs.Close
+    Set Rs = Nothing
+
+.     for table.field as tmpfield where defined (add4fetch)
+.       delete tmpfield
+.     endfor
+.     footer_func ()
+end function
+.   endfor
+.endfor
+.endmacro
+
+.----------------------------------------------------------------------------
+.- Recursive macro to resolve object link (lookup and child)
+.----------------------------------------------------------------------------
+.macro oa_fetch_view_links (is_query)
+.for table
+.-------------------------
+.-   Process lookup link
+.------------------------
+.    if type = "lookup"
+    If not ISNull (Rs$(link_level) ("$(field.realname)")) Then
+        xml.push_position
+.#### ONLY FOR STORED PROCEDURE ######
+.        if platform = "vbsp"
+.    if table.type <> "root"
+.if mts ?= 1
+        Set Cmd_lookup = context.CreateInstance("ADODB.Command")
+.else
+        Set Cmd_lookup = new ADODB.Command
+.endif
+        Cmd_lookup.ActiveConnection = connect_string
+        Cmd_lookup.CommandType      = adCmdStoredProc
+        Cmd_lookup.CommandTimeout   = 60
+.    endif
+.   create_stored_proc_param ("CStr (Rs$(link_level) (\"$(field.realname)\"))", "IN", "_lookup")
+.   if is_query ?= 1
+        Cmd_lookup.CommandText = "$(object.name)_query_$(view.name)_$(field.realname)_$(table.name)"
+.   else
+        Cmd_lookup.CommandText = "$(object.name)_fetch_$(view.name)_$(field.realname)_$(table.name)"
+.   endif
+        Set Rs_lookup = Cmd_lookup.Execute
+.#### END OF STORED PROCEDURE ########
+.   else
+        ' Fetch value from lookup table $(realname)
+        sql = "SELECT $(select) FROM $(realname) WHERE "  & _
+.        if field.type = "textual"
+              "$(target) = "  & astr (Rs$(link_level) ("$(field.realname)"))
+.            else
+              "$(target) = "  &       Rs$(link_level) ("$(field.realname)")
+.            endif
+        If oa_trace = 1 Then
+.    if platform = "asp"
+            Response.Write sql
+.    else
+            Trace "$(handler)", sql
+.    endif
+        End if
+        Set Rs_lookup = APDB.Execute (sql)
+.   endif
+        If Err.Number <> 0 Then
+            xml.item_last_child
+            xml.item_new "error",     Err.Description
+            xml.item_parent
+        ElseIf not Rs_lookup.EOF Then
+            xml.item_last_child
+.        for field where calculated ?= 0 by size
+.            if field.type =  "textual"
+.                if field.size ?<= dfl.longtext_limit
+                if not isnull (Rs_lookup ("$(field.realname)"))  then xml.item_new "$(field.name)",  RTrim (Rs_lookup ("$(field.realname)"))
+.                else
+            xml.item_new "$(field.name)",  get_memo (Rs_lookup, "$(field.realname)")
+.                endif
+.            else
+                if not isnull (Rs_lookup ("$(field.realname)"))  then xml.item_new "$(field.name)",  Rs_lookup ("$(field.realname)")
+.            endif
+.        endfor
+            xml.item_parent
+        End If
+        Rs_lookup.Close
+        Set Rs_lookup = Nothing
+        xml.pop_position
+    End If
+.-------------------------
+.-   Process Child link
+.------------------------
+.    elsif type = "child"
+.#### ONLY FOR STORED PROCEDURE ######
+.        if platform = "vbsp"
+.    old_link_level = link_level
+.    link_level += 1
+    If not ISNull (Rs$(old_link_level) ("$(field.realname)")) Then
+    xml.push_position
+.if mts ?= 1
+    Set Cmd$(link_level) = context.CreateInstance("ADODB.Command")
+.else
+    Set Cmd$(link_level) = new ADODB.Command
+.endif
+    Cmd$(link_level).ActiveConnection  = connect_string
+    Cmd$(link_level).CommandType       = adCmdStoredProc
+    Cmd$(link_level).CommandTimeout    = 60
+.   create_stored_proc_param ("CStr (Rs$(old_link_level) (\"$(field.realname)\"))", "IN", "$(link_level)")
+.   if is_query ?= 1
+    Cmd$(link_level).CommandText = "$(object.name)_query_$(view.name)_$(field.realname)_$(table.name)"
+.   else
+    Cmd$(link_level).CommandText = "$(object.name)_fetch_$(view.name)_$(field.realname)_$(table.name)"
+.   endif
+    On Error Resume Next
+    Set Rs$(link_level) = Cmd$(link_level).Execute
+.#### END OF STORED PROCEDURE ########
+.   else
+    If not ISNull (Rs$(link_level) ("$(field.realname)")) Then
+        xml.push_position
+        ' Fetch values from child table $(realname)
+        sql = "SELECT $(select) FROM $(realname) WHERE " & _
+.        if field.type = "textual"
+                  "$(table.target) = "  &  astr (Rs$(link_level) ("$(field.realname)"))
+.        else
+                  "$(table.target) = "  &        Rs$(link_level) ("$(field.realname)")
+.        endif
+.        for ofl.object as objobject where name = table.name
+.          if soft_delete = 1
+.            for rule where name = "soft delete"
+.              for dfl.table as dfltable where name = objobject.name
+.                for field where name = rule.what
+        sql = sql & " AND $(field.realname) = 1"
+.                endfor
+.              endfor
+.            endfor
+.          endif
+.        endfor
+        If oa_trace = 1 Then
+.    if platform = "asp"
+            Response.Write sql
+.    else
+            Trace "$(handler)", sql
+.    endif
+        End if
+.    link_level += 1
+        On Error Resume Next
+        Set Rs$(link_level) = APDB.Execute (sql)
+.    endif
+        If Err.Number <> 0 Then
+            xml.item_last_child
+            xml.item_new "error",     Err.Description
+            xml.item_parent
+        ElseIf not Rs$(link_level).EOF Then
+            xml.item_last_child
+            Do While (not Rs$(link_level).EOF AND Err.Number = 0)
+                xml.item_new      "$(table.name)"
+                xml.item_last_child
+.        for field where calculated ?= 0 by size
+.           if count (rule, when = "update" & name = "timestamp")
+.               for rule where when = "update" & name = "timestamp"
+                ' Save revised time stamp
+                xml.push_position
+                xml.item_parent
+                If Not IsNull (Rs ("$(field.realname)")) Then
+                    xml.attr ("revised") = Rs ("$(field.realname)")
+                End If
+                xml.pop_position
+.               endfor
+.           endif
+.            if field.type =  "textual"
+.                if field.size ?<= dfl.longtext_limit
+            if not isnull (Rs$(link_level) ("$(field.realname)"))  then xml.item_new "$(field.name)",  RTrim (Rs$(link_level) ("$(field.realname)"))
+.                else
+            xml.item_new "$(field.name)",  get_memo (Rs$(link_level), "$(field.realname)")
+.                endif
+.            else
+                if not isnull (Rs$(link_level) ("$(field.realname)"))  then xml.item_new "$(field.name)",  Rs$(link_level) ("$(field.realname)")
+.            endif
+.        endfor
+.-
+.-  define a variable to check if recordset is open in this link level
+.           tmp = "rs_open_$(link_level)"
+.           $(tmp) = 1
+.    endif
+.---------------------
+.-   Process sub link
+.---------------------
+.    oa_fetch_view_links (is_query)
+.-
+.-   If record set for child link is open, add code to move to next record
+.    if defined (rs_open_$(link_level))
+                Rs$(link_level).MoveNext
+                xml.item_parent
+            Loop
+        End If
+        Rs$(link_level).Close
+        Set Rs$(link_level) = Nothing
+        xml.pop_position
+    End If
+.-       Reset open recordset flag
+.        tmp = "rs_open_$(link_level)"
+.        $(tmp) = 0
+.        if link_level <> ""
+.            link_level -= 1
+.            if link_level = 0
+.                link_level = ""
+.            endif
+.        endif
+.    endif
+.endfor
+.endmacro
+
+#############################################################################
+.macro do_handler_update   ()
+.#############################################################################
+
+'********************************   UPDATE   *********************************
+'   Input:
+'           <oal do      = "update"
+'                id      = "objectid"
+'                revised = "timestamp"
+'                user    = "userid"
+'                view    = "viewname">
+'                object data
+'           </oal>
+'   Output:
+'           <oal done = "ok" />
+'           <oal done    = "error"
+'                cause   = "nf"|"nv"|"db"|"ua"|"wf"|"ro"|"ac"
+'                message = "error message" />
+
+.if platform = "asp"
+Private Function oa_update_$(name) (xml, objdate)
+.else
+Private Function oa_update_$(name) (xml As SCL_XMLSTORELib.xmlstore, connect_string As String) As String
+.endif
+    select case xml.attr ("view")
+.   for view where write = "1"
+        case "$(name)"
+.     if defined (sameas)
+.       fcntname = "oa_update_$(object.name)_$(sameas)"
+.     else
+.       fcntname = "oa_update_$(object.name)_$(view.name)"
+.     endif
+.     if platform = "asp"
+            oa_update_$(object.name) = $(fcntname) (xml, objdate)
+.     else
+            oa_update_$(object.name) = $(fcntname) (xml, connect_string)
+.     endif
+.   endfor
+        case else
+            oa_update_$(object.name) = "<oal done=""error"" cause=""nv""/>"
+            oa_error = TRUE
+    end select
+.if count (view, write = "1") = 0
+.   abort "No Update view exists for $(object.name)"
+.endif
+End Function
+.  if platform <> "vbsp"
+.      propagate_function ()
+.  endif
+.   for view where write = 1
+.     if defined (sameas)
+.       for object.view as objview where objview.name = view.sameas
+.         objview.update_view = 1
+.       endfor
+.     else
+.       view.update_view = 1
+.  endif
+.endfor
+
+.   for view where defined (update_view)
+.       for table
+.           generate_update_object ()
+.       endfor
+.   endfor
+.endmacro
+
+.-  This macro Update a table and all child tables.
+
+.macro generate_update_object ()
+.## ADD all fields needed by update rule into the view
+.  for dfl.table as dbtable where dbtable.name = table.name
+.    for dbtable.field as dbfield where count (rule, when = "update")
+.      if count (table.field, name = dbfield.name) = 0
+.        copy dbfield to table
+.        for table.field as dfield where name = dbfield.name
+.            dfield.add4update = 1
+.            dfield.calculated = 0
+.            dfield.size       = dbfield.size?30
+.        endfor
+.      endif
+.    endfor
+.  endfor
+.if table.type = "root"
+.fctname = "oa_update_$(object.name)_$(view.name)"
+.else
+'   Update $(TABLE.NAME) record for $(object.name) view $(view.name) field $(table.target)
+
+.fctname = "oa_update_$(object.name)_$(view.name)_$(table.name)_$(table.target)"
+.endif
+
+.if platform = "asp"
+.    if table.type = "root"
+Private Function $(fctname) (xml, objdate)
+.    else
+Private Function $(fctname) (xml, parentkey, objdate)
+.    endif
+.else
+.    if table.type = "root"
+Private Function $(fctname) (xml As SCL_XMLSTORELib.xmlstore, connect_string As String) As String
+.    else
+Private Function $(fctname) (xml As SCL_XMLSTORELib.xmlstore, connect_string As String, parentkey As String) As String
+.    endif
+    Dim parent_value    As String
+    Dim timestamp_value As String
+    Dim sql             As String
+.        if platform = "vbsp"
+    Dim Param           As ADODB.Parameter
+    Dim new_tm          As String
+.        endif
+.        header_func (1)
+    If oa_trace = 1 Then
+       Trace "$(handler)", "$(fctname)"
+    End If
+.endif
+    oa_userid = xml.attr ("user",  0)
+    xml.push_position
+.   if table.type = "root"
+    xml.item_set_current ("$(table.name)")
+.   endif
+.   timestamp_field = ""
+.   for field where count (rule, when = "update" & name = "timestamp")
+    timestamp_value  = xml.attr ("revised", "")
+.       timestamp_field      = field.realname
+.       timestamp_field_name = field.name
+.   endfor
+
+.#### ONLY FOR STORED PROCEDURE ######
+.   if platform = "vbsp"
+.       set_field_target_type ()
+.    if table.type <> "root"
+.if mts ?= 1
+     Set Cmd = context.CreateInstance("ADODB.Command")
+.else
+     Set Cmd = new ADODB.Command
+.endif
+     Cmd.ActiveConnection = connect_string
+     Cmd.CommandType      = adCmdStoredProc
+     Cmd.CommandTimeout   = 60
+.    endif
+.   if mts ?= 1
+    Set Param = context.CreateInstance("ADODB.Parameter")
+.   else
+    Set Param = New ADODB.Parameter
+.   endif
+'    Set up Return parameter.
+    Set Param = Cmd.CreateParameter ("return", adInteger, adParamReturnValue)
+    Cmd.Parameters.Append Param
+
+.    for field where calculated ?= 0
+.        if count (rule, when = "update")
+.            for rule where when = "update"
+.               if    name = "userid"
+.                   create_stored_proc_param ("oa_userid", "IN", "")
+.               elsif name = "timestamp"
+.                   create_stored_proc_param ("timestamp_value", "INOUT", "")
+    new_tm = objdate.TimeStamp
+    Set Param = Cmd.CreateParameter ("$(field.name:)_new",  $(sp_type_varchar:), adParamInputOutput, 30, new_tm)
+    Cmd.Parameters.Append Param
+.               endif
+.           endfor
+.       else
+.#           if field.dbrequired ?= 1
+.#               if field.type = "textual"
+.#                   create_stored_proc_param ("xml.item (\"$(field.name:)\", \"$(default)\")", "IN", "")
+.#               else
+.#                   create_stored_proc_param ("xml.item (\"$(field.name:)\", $(default))", "IN", "")
+.#               endif
+.##           elsif unicode ?= 1
+.##               create_stored_proc_param ("xml.item (\"$(field.name:)\", \"\")", "IN", "")
+.#           else             
+.               create_stored_proc_param ("xml.item (\"$(field.name:)\")", "IN", "")
+.#           endif
+.       endif
+.   endfor
+.    if table.type = "root"
+     Cmd.CommandText = "$(object.name)_update_$(view.name)"
+.    else
+     Cmd.CommandText = "$(object.name)_update_$(view.name)_$(table.name)_$(table.target)"
+.    endif
+     On Error Resume Next
+     Cmd.Execute
+     IF Err.Number = 0 Then
+'        Check return code : 1 = update ok, 0 = timestamp error, -1 not found
+         Select Case Cmd (0)
+             Case 1
+                 If oa_trace = 1 Then
+                     Trace "$(handler)", "Update ok"
+                 End If
+.        if timestamp_field <> ""
+                 $(fctname) = "<oal done=""ok""><$(table.name) revised=""" & _
+                              Cmd.Parameters ("$(timestamp_field_name)") & """></$(table.name)>"
+.        else
+                 $(fctname) = "<oal done=""ok"" ><$(table.name)></$(table.name)>"
+.        endif
+.        child_update ()
+             Case 0
+                 If oa_trace = 1 Then
+                     Trace "$(handler)", "time stamp"
+                 End If
+.        if timestamp_field <> ""
+                 $(fctname)          =  "<oal done=""error"" message=""Invalid timestamp value: "  & _
+                                        "Record modified in database $(table.name) at " & _
+                                        Cmd.Parameters ("$(timestamp_field_name)")  & "(" & timestamp_value & ")" & """/>"
+.        else
+                 $(fctname)          =  "<oal done=""error"" message=""Invalid timestamp value""/>"
+.        endif
+                 xml.pop_position
+                 oa_error = TRUE
+            Case -1
+                If oa_trace = 1 Then
+                    Trace "$(handler)", "not found"
+                End If
+.        if table.type = "root"
+               $(fctname) = "<oal done=""error"" cause=""nf"" message=""" & Err.description & """/>"
+               oa_error = TRUE
+               xml.pop_position
+.        else
+               xml.pop_position
+               $(fctname)  = oa_create_$(object.name)_$(view.name)_$(table.name)_$(table.target) (xml, connect_string, parentkey)
+.        endif
+.              footer_func ()
+               Exit Function
+         End Select
+     Else
+        $(fctname) = "<oal done=""error"" cause=""db"" message=""" & Err.description & """/>"
+        oa_error = TRUE
+        xml.pop_position
+.       footer_func (1)
+        Exit Function
+     End If
+.#### END OF STORED PROCEDURE ########
+.   else
+    'Select current value of record and lock the record for update
+.   make_table_select ()
+    sql = "SELECT $(table.select:) FROM $(realname:)"  & _
+.   delim = " WHERE "
+.       for field where count (index, name = "primary") > 0
+.           if field.type = "textual"
+          "$(delim:)$(field.realname) = " & astr (xml.item_child_value ("$(field.name)", "$(default:)")) & _
+.           else
+          "$(delim:)$(field.realname) = " & xml.item_child_value ("$(field.name)", $(default:)) & _
+.           endif
+.           delim = " AND    "
+.       endfor
+          " "
+.       if platform = "asp"
+    Set Rs = Server.CreateObject ("ADODB.Recordset")
+.       else
+.   if mts ?= 1
+    Set Rs = context.CreateInstance ("ADODB.Recordset")
+.   else
+    Set Rs = new ADODB.Recordset
+.   endif
+.       endif
+    Rs.Open sql, APDB, adOpenKeyset, adLockPessimistic, adCmdText
+    If Rs.EOF Then
+.       if table.type = "root"
+        xml.pop_position
+        $(fctname) = "<oal done=""error"" cause=""db"" message=""" & err.description & """/>"
+        oa_error = TRUE
+.       elsif table.type = "child"
+        xml.pop_position
+.         if platform = "asp"
+        $(fctname)  = oa_create_$(object.name)_$(view.name)_$(table.name)_$(table.target) (xml, parentkey, objdate)
+.         else
+        $(fctname)  = oa_create_$(object.name)_$(view.name)_$(table.name)_$(table.target) (xml, connect_string, parentkey)
+.         endif
+.       endif
+        Exit Function
+    End If
+
+.-      Check timestamp
+.       if timestamp_field <> ""
+    'Check if record is not revised by other user during modification
+     If IsNull (Rs ("$(timestamp_field)")) OR _
+          CDbl (Rs ("$(timestamp_field)")) = CDbl (timestamp_value) Then
+'     IF TRUE Then
+.       endif
+.       if object.have_inherit_update ?= 1
+.           if platform ?= "vbc" | platform = "vbsp"
+        propagate_data Rs, xml, connect_string
+.           else
+        propagate_data Rs, xml
+.           endif
+.       endif
+        'Set new value of fields and update table
+.       for field where count (index, name = "primary") = 0 & calculated = 0
+.           if count (rule, when = "update")
+.               for rule where when = "update"
+.                   if    name = "timestamp"
+        Rs ("$(realname)")         =  objdate.timestamp
+.                   elsif name = "userid"
+        Rs ("$(realname)")         =  oa_userid
+.                   endif
+.               endfor
+.           else
+.             if field.dbrequired ?= 1
+.               if field.type = "textual"
+         Rs ("$(realname)")     =  xml.item_child_value ("$(field.name)", "$(default)")
+.               else
+         Rs ("$(realname)")     =  xml.item_child_value ("$(field.name)", $(default))
+.               endif
+.             else
+         Rs ("$(realname)")     =  xml.item_child_value ("$(field.name)")
+.             endif
+.           endif
+.       endfor
+        Rs.Update
+.        if timestamp_field <> ""
+        $(fctname)                =  "<oal done=""ok""><$(table.name) revised=""" & _
+                                     Rs ("$(timestamp_field)") & """></$(table.name)>"
+.        else
+        $(fctname)                =  "<oal done=""ok"" ><$(table.name)></$(table.name)>"
+.        endif
+        Rs.Close
+.       child_update ()
+.       if timestamp_field <> ""
+    Else
+        $(fctname)                =  "<oal done=""error"" message=""Invalid timestamp value: "  & _
+                                     "Record modified in database at " & _
+                                      Rs ("$(timestamp_field)")  & "(" & timestamp_value & ")" & """/>"
+        Rs.Close
+    End If
+.       endif
+.   endif
+    xml.pop_position
+.   footer_func (1)
+End Function
+
+.for field where calculated ?= 0
+.   for table where type = "child"
+.-       generate_update_object ()
+.       if view.name <> "create"
+.           generate_create_object ()
+.       endif
+.   endfor
+.endfor
+.for table.field as tmpfield where defined (add4update)
+.  delete tmpfield
+.endfor
+.endmacro
+
+function child_update ()
+    if platform <> "vbsp"
+        delete_child_record ()
+    endif
+    for field where calculated ?= 0
+        if count (table, type = "child")
+>        xml.push_position
+>        xml.item_first_child
+>        xml.item_set_current ("$(field.name)")
+>        parent_value = xml.item
+>        xml.item_first_child
+>        Do While (xml.valid)
+            for table where type = "child"
+>            If xml.item_name = "$(table.name)" Then
+                if platform = "asp"
+>                $(fctname) = $(fctname) + oa_create_$(object.name)_$(view.name)_$(table.name)_$(table.target) (xml, parent_value, objdate)
+                else
+>                $(fctname) = $(fctname) + oa_create_$(object.name)_$(view.name)_$(table.name)_$(table.target) (xml, connect_string, parent_value)
+                endif
+>            End If
+           endfor
+>            xml.item_next
+>        Loop
+        endif
+    endfor
+>        xml.pop_position
+>        $(fctname) = $(fctname) + "</oal>"
+endfunction
+
+function delete_child_record
+    have_child = 0
+    for field where calculated ?= 0
+      if count (table, type = "child")
+        have_child = 1
+        last
+      endif
+    endfor
+    if have_child
+    for field where calculated ?= 0
+      for table
+.#### ONLY FOR STORED PROCEDURE ######
+.       if platform = "vbsp"
+>                    DELETE FROM $(table.realname:) WHERE $(table.target) = @$(field.realname)
+.#### END OF STORED PROCEDURE ########
+.       else
+          if field.type = "textual"
+>    sql  = "DELETE FROM $(table.realname:) WHERE $(table.target) = " & astr (xml.item ("$(field.name)", ""))
+          else
+>    sql  = "DELETE FROM $(table.realname:) WHERE $(table.target) = " & xml.item ("$(field.name)", "")
+          endif
+>    on error resume next
+>    If oa_trace = 1 Then
+.         if platform = "asp"
+>        Response.Write sql
+.         else
+>        Trace "$(handler)", sql
+.         endif
+>    End If
+>    Set Rs = APDB.Execute (sql)
+>    Rs.Close
+.       endif
+      endfor
+    endfor
+    endif
+endfunction
+
+#############################################################################
+.macro do_handler_delete   ()
+.#############################################################################
+
+'********************************   DELETE   *********************************
+'   Input:
+'           <oal do   = "delete"
+'                user = "userid" />
+'           Object value...
+'
+'   Output:
+'           <oal done = "ok"/>
+'           <oal done    = "error"
+'                cause   = "db"|"ua"|"id"|"wf"
+'                message = "error message" />
+
+.if platform = "asp"
+Private Function oa_delete_$(name) (xml, objdate)
+.else
+Private Function oa_delete_$(name) (xml As SCL_XMLSTORELib.xmlstore, connect_string As String) As String
+    Dim rc    As String
+    Dim sql   As String
+.        if platform = "vbsp"
+    Dim Param As ADODB.Parameter
+.        endif
+.   header_func (1)
+.endif
+    rc = ""
+.   for view where name = "delete"
+.     for table
+.       generate_delete_table ()
+.     endfor
+.   endfor
+    oa_delete_$(object.name) = rc
+.   footer_func (1)
+End Function
+.endmacro
+
+.macro generate_delete_table
+.## ADD all field needed by delete rule into the view
+.  for dfl.table as dbtable where dbtable.name = table.name
+.    for dbtable.field as dbfield where count (rule, when = "delete")
+.      if count (table.field, name = dbfield.name) = 0
+.        copy dbfield to table
+.          for table.field as dfield where name = dbfield.name
+.             dfield.add4delete = 1
+.             dfield.calculated = 0
+.             dfield.size       = dbfield.size?30
+.          endfor
+.      endif
+.    endfor
+.  endfor
+.  soft_delete = 0
+.  for dfl.table as dbtable where dbtable.name = table.name
+.    for dbtable.rule where name = "soft delete"
+.       soft_delete = 1
+.    endfor
+.  endfor
+     oa_userid = xml.attr ("user",  0)
+.#### ONLY FOR STORED PROCEDURE ######
+.    if platform = "vbsp"
+.      if table.type = "root"
+.        delete_level = ""
+     xml.item_set_current ("$(table.name)")
+     Cmd.CommandText = "$(object.name)_delete"
+.        else
+.          if delete_level = ""
+.            delete_level = 1
+.          else
+.            delete_level += 1
+.          endif
+.        if mts ?= 1
+     Set Cmd$(delete_level) = context.CreateInstance("ADODB.Command")
+.        else
+     Set Cmd$(delete_level) = new ADODB.Command
+.        endif
+     Cmd$(delete_level).ActiveConnection = connect_string
+     Cmd$(delete_level).CommandType      = adCmdStoredProc
+     Cmd$(delete_level).CommandTimeout   = 60
+     Cmd$(delete_level).CommandText = "$(object.name)_delete_$(table.name)"
+.    endif
+.      set_field_target_type ()
+.    if soft_delete ?= 1
+.        for field where !defined (group) & calculated ?= 0
+.          if count (index, name = "primary") > 0
+.            create_stored_proc_param ("xml.item_child_value (\"$(field.name:)\")", "IN", "$(delete_level)")
+.            endif
+.            for rule where when = "delete"
+.                if name = "userid"
+.            create_stored_proc_param ("oa_userid", "IN", "$(delete_level)")
+.                elsif name = "timestamp"
+.            create_stored_proc_param ("objdate.timestamp", "INOUT", "$(delete_level)")
+.                endif
+.            endfor
+.            comma = ","
+.        endfor
+.      else
+.        for field where count (index, name = "primary") > 0 & !defined (group)
+.          create_stored_proc_param ("xml.item_child_value (\"$(field.name:)\")", "IN", "$(delete_level)")
+.        endfor
+.      endif
+    On Error Resume Next
+    Cmd$(delete_level).Execute
+    If Err.Number = 0 Then
+.    if table.type = "root"
+        rc = "<oal done=""ok"">"
+.    else
+        rc = rc + "<oal done=""ok"" object=""$(table.name)"">"
+.    endif
+.    for field where calculated ?= 0
+.      for table where type = "child"
+.        generate_delete_table ()
+.      endfor
+.    endfor
+        rc = rc + "</oal>"
+    Else
+        rc = rc + "<oal done=""error"" cause=""db"" message=""" & err.description & """/>"
+        oa_error = TRUE
+        oa_delete_$(object.name) = rc
+.       footer_func (1)
+        Exit Function
+    End IF
+.#### END OF STORED PROCEDURE ########
+.   else
+.    if table.type = "root"
+.        delete_level = 1
+    xml.item_set_current ("$(table.name)")
+.    else
+.        delete_level += 1
+.    endif
+.#   if soft delete, count number of field to update, if 0 -> no update
+.    if soft_delete ?= 1
+.        field_count = 0
+.        for field where count (index, name = "primary") = 0 &  !defined (group) & calculated = 0
+.            for rule where when = "delete"
+.                field_count += 1
+.            endfor
+.        endfor
+.    else
+.        field_count = 1
+.    endif
+.   if field_count > 0
+'
+'   Select table $(table.name) to delete
+'
+.   make_table_select ()
+    sql = "SELECT $(table.select:) FROM $(realname:)"                                           & _
+.   delim = " WHERE "
+.    for field where count (index, name = "primary") > 0
+.        if table.type = "root"
+.            if field.type = "textual"
+          "$(delim:)$(field.realname) = "  & astr (xml.item_child_value ("$(field.name)", "$(default:)")) & _
+.            else
+          "$(delim:)$(field.realname) = "  & xml.item_child_value ("$(field.name)", $(default:)) & _
+.            endif
+.        else
+          "$(delim:)$(target) = " & Rs$(delete_level - 1) ("$(field.realname)")                 & _
+.        endif
+.        delim = " AND    "
+.    endfor
+          " "
+.    if platform = "asp"
+    Set Rs$(delete_level) = Server.CreateObject ("ADODB.Recordset")
+.    else
+.   if mts ?= 1
+    Set Rs$(delete_level) = context.CreateInstance ("ADODB.Recordset")
+.   else
+    Set Rs$(delete_level) = new ADODB.Recordset
+.   endif
+.    endif
+    Rs$(delete_level).Open sql, APDB, adOpenKeyset, adLockPessimistic, adCmdText
+
+'   Check error
+    If Rs$(delete_level).EOF Then
+        rc = rc + "<oal done=""error"" cause=""db"" message=""" & err.description & """/>"
+        oa_error = TRUE
+        oa_delete_$(object.name) = rc
+        Rs$(delete_level).Close
+        Set Rs$(delete_level) = Nothing
+.       footer_func (1)
+        Exit Function
+    End If
+
+.    if table.type = "root"
+    rc = rc + "<oal done=""ok"">"
+.    else
+    rc = rc + "<oal done=""ok"" object=""$(table.name)"">"
+.    endif
+.    if soft_delete ?= 1
+'
+'   Update fields value when delete
+.        for field where count (index, name = "primary") = 0 &  !defined (group) & calculated = 0
+.            for rule where when = "delete"
+.                if    name = "timestamp"
+    Rs$(delete_level) ("$(realname)")  = objdate.timestamp
+.                elsif name = "userid"
+    Rs$(delete_level) ("$(realname)")  = oa_userid
+.                elsif name = "set"
+    Rs$(delete_level) ("$(realname)")  = $(value)
+.                else
+.                    abort "$(script): unknown rule '$(name)' for '$(field.name)'"
+.                endif
+.            endfor
+.        endfor
+
+.    endif
+.    for field where calculated ?= 0
+.        for table where type = "child"
+.            generate_delete_table ()
+.        endfor
+.    endfor
+.    if soft_delete ?= 1
+    Rs$(delete_level).Update
+.    else
+    Rs$(delete_level).Delete
+.    endif
+    Rs$(delete_level).Close
+    Set Rs$(delete_level) = Nothing
+    rc = rc + "</oal>"
+.    else
+'   No field to update
+.        if table.type = "root"
+    rc = rc + "<oal done=""ok""/>"
+.        else
+    rc = rc + "<oal done=""ok"" object=""$(table.name)""/>"
+.        endif
+.    endif
+.    delete_level -= 1
+.  endif
+.  for table.field as tmpfield where defined (add4delete)
+.      delete tmpfield
+.  endfor
+.endmacro
+
+#############################################################################
+.macro do_handler_query    ()
+.#############################################################################
+
+.if count (subselect)
+'************************** SUB SELECT DEFINITION ****************************
+
+.template 0
+for subselect
+    using_index    = 1
+    if platform <> "asp"
+      delim          = "xml As SCL_XMLSTORELib.xmlstore, connect_string As string, "
+    else
+      delim          = ""
+    endif
+    function_param = ""
+    param_type     = ""
+    while defined (using$(using_index))
+        if platform <> "asp"
+            if using$(using_index)_type = "textual"
+                param_type = " As String"
+            elsif using$(using_index)_type = "timestamp"
+                param_type = " As Double"
+            else
+                param_type = " As Long"
+            endif
+        endif
+        function_param += delim + using$(using_index) + param_type
+        delim = ", "
+        using_index += 1
+    endwhile
+    for subselect.field as sfield
+        if platform <> "asp"
+            if sfield.type = "textual"
+                param_type = " As String"
+            elsif sfield.type = "timestamp" | sfield.decs ?> 0 
+                param_type = " As Double"
+            else
+                param_type = " As Long"
+            endif
+        endif
+        function_param += delim + sfield.name + param_type
+        delim = ", "
+    endfor
+    arg_index = 1
+    while defined (arg$(arg_index))
+        if platform <> "asp"
+            if arg$(arg_index)_type = "textual"
+                param_type = " As String"
+            elsif arg$(arg_index)_type = "timestamp"
+                param_type = " As Double"
+            else
+                param_type = " As Long"
+            endif
+        endif
+        function_param += delim + arg$(arg_index) + param_type
+        delim = ", "
+        arg_index += 1
+    endwhile
+
+  if platform = "asp"
+>Private Function oa_subselect_$(name) ($(function_param))
+  else
+>Private Function oa_subselect_$(name) ($(function_param)) As Integer
+  endif
+  if platform = "vbc"
+>Dim Sql  As String
+>Dim Rs1  As ADODB.Recordset
+>Dim APDB As ADODB.Connection
+      if mts ?= 1
+> Set APDB = context.CreateInstance ("ADODB.Connection")
+      else
+> Set APDB = new ADODB.Connection
+      endif
+> APDB.Open connect_string
+  endif
+>    oa_subselect_$(name) = 0
+  if platform <> "vbsp"
+      if !defined (subselect.parsed_sql)
+          #  loop for arg1..n
+          using_index = 1
+          while defined (using$(using_index))
+              if using$(using_index)_type = "textual"
+                  using$(using_index) = "'\" & $(using$(using_index)_original) & \"'"
+              else
+                  using$(using_index) = "\" & $(using$(using_index)_original) & \""
+              endif
+              using_index += 1
+          endwhile
+          
+          arg_index = 1
+          while defined (arg$(arg_index))
+              if arg$(arg_index)_type = "textual"
+                  arg$(arg_index) = "'\" & $(arg$(arg_index)) & \"'"
+              else
+                  arg$(arg_index) = "\" & $(arg$(arg_index)) & \""
+              endif
+              arg_index += 1
+          endwhile
+
+          # Set Fetch value in select
+          fields = ""
+          delim = ""
+          for subselect.field as sfield
+             fields += delim + sfield.source + " As " + sfield.name
+             delim = ", "
+          endfor
+          gsl 'subselect.parsed_sql = \"$(subselect.value:)\"'
+      endif
+>    sql = "$(parsed_sql:)"
+>    on error resume next
+>    If oa_trace = 1 Then
+     if platform = "asp"
+>        Response.Write "<br>" & sql
+     else
+>        Trace "$(handler)", sql
+     endif
+>    End If
+>    Set Rs1 = APDB.Execute (sql)
+>    If Err.number = 0 AND not rs1.EOF AND not rs1.BOF Then
+      for subselect.field as sfield
+>        $(sfield.name:) = Rs1 ("$(sfield.name:)")
+      endfor
+>        oa_subselect_$(name) = 1
+>    End If
+>    Rs1.Close
+>    Set Rs1 = Nothing
+>    Err.Clear
+     if platform = "vbc"
+>    APDB.Close
+>    Set APDB = Nothing
+     endif
+  else
+>    Dim Param    As ADODB.Parameter
+     header_func ()
+     if mts ?= 1   
+>    Set Cmd1 = context.CreateInstance("ADODB.Command")
+     else
+>    Set Cmd1 = new ADODB.Command
+     endif
+>    Cmd1.ActiveConnection = connect_string
+>    Cmd1.CommandType      = adCmdStoredProc
+>    Cmd1.CommandTimeout   = 60
+>
+     using_index = 1
+     while defined (using$(using_index))
+         if using$(using_index)_type = "textual"
+>    Set Param = Cmd1.CreateParameter ("$(using$(using_index))", $(sp_type_varchar:), adParamInput,  using$(using_index)_size, $(using$(using_index)))
+         elsif using$(using_index)_type = "timestamp"
+>    Set Param = Cmd1.CreateParameter ("$(using$(using_index))", adDouble,  adParamInput,    , $(using$(using_index)))
+         else
+>    Set Param = Cmd1.CreateParameter ("$(using$(using_index))", adInteger, adParamInput,    , $(using$(using_index)))
+         endif
+         using_index += 1
+>    Cmd1.Parameters.Append Param
+     endwhile
+
+     arg_index = 1
+     while defined (arg$(arg_index))
+         if arg$(arg_index)_type = "textual"
+>    Set Param = Cmd1.CreateParameter ("$(arg$(arg_index))", $(sp_type_varchar:),  adParamInput,  arg$(arg_index)_size, $(arg$(arg_index)))
+         elsif arg$(arg_index)_type = "timestamp"
+>    Set Param = Cmd1.CreateParameter ("$(arg$(arg_index))", adDouble,  adParamInput,    , $(arg$(arg_index)))
+         else
+>    Set Param = Cmd1.CreateParameter ("$(arg$(arg_index))", adInteger,  adParamInput,    , $(arg$(arg_index)))
+         endif
+         arg_index += 1
+>    Cmd1.Parameters.Append Param
+     endwhile
+
+     for subselect.field as sfield
+         if sfield.type = "textual"
+>    Set Param = Cmd1.CreateParameter ("$(sfield.name)", $(sp_type_varchar:),  adParamOutput,  $(sfield.size), $(sfield.name))
+         elsif sfield.type = "timestamp" | sfield.decs ?> 0
+>    Set Param = Cmd1.CreateParameter ("$(sfield.name)", adDouble,   adParamOutput,    , $(sfield.name))
+         else
+>    Set Param = Cmd1.CreateParameter ("$(sfield.name)", adInteger,  adParamOutput,    , $(sfield.name))
+         endif
+>    Cmd1.Parameters.Append Param
+     endfor
+>    Cmd1.CommandText = "$(object.name)_subselect_$(subselect.name)"
+>    On Error Resume Next
+>    Cmd1.Execute
+>    If Err.number = 0 Then
+>        oa_subselect_$(name) = 1
+     for subselect.field as sfield
+>        If not IsNull (Cmd1 ("$(sfield.name)")) Then
+         if sfield.type = "textual"
+>            $(sfield.name)  = Cmd1 ("$(sfield.name)")
+         elsif type = "timestamp"
+>            $(sfield.name)  = CDbl (Cmd1 ("$(sfield.name)"))
+         else
+>            $(sfield.name)  = CLng (Cmd1 ("$(sfield.name)"))
+         endif
+>        Else
+         if sfield.type = "textual"
+>            $(sfield.name)  = ""
+         else
+>            $(sfield.name)  = 0
+         endif
+>        End If
+     endfor
+>    Else
+>        Err.Clear 
+>    End If
+>    Set Cmd1 = Nothing
+.    footer_func ()
+  endif
+>End Function
+>
+endfor
+endtemplate  
+
+'*************** END OF SUB SELECT *******************************************
+
+.endif
+'*********************************   QUERY   *********************************
+'   Input:
+'           <oal do       = "query" 
+'              [ query    = "queryname" ] 
+'              [ control  = "first"|"last"|"gt"|"lt"|"ge"|"le"|"eq" ]
+'              [ limit    = "number" ]
+'              [ user     = "userid" ] 
+'              [ inverted = "0"|"1"  ]  >
+'              <object_name><field_name [match = "1"]>field value</field_name></object_name>
+'           </oal>
+'   Output:
+'           <oal done    = "ok"
+'                count   = "querysize"
+'                view    = "viewname" 
+'                write   = "0" | "1"
+'                delete  = "0" | "1"
+'                <object id = "objectid" revised = "timestamp" >
+'                   object data
+'                </object>...
+'           </oal>
+'           <oal done    = "error"
+'                cause   = "ns"|"db"|"ua"|"tm"
+'                message = "error message" />
+
+.if platform = "asp"
+Private Function oa_query_$(name) (xml, objdate)
+.else
+Private Function oa_query_$(name) (xml As SCL_XMLSTORELib.xmlstore, connect_string As String) As String
+.endif
+    Select Case xml.attr ("query")
+.   for query
+        Case "$(name)"
+.     if platform = "asp"
+            oa_query_$(object.name) = oa_query_$(object.name)_$(query.name) (xml, objdate)
+.     else
+            oa_query_$(object.name) = oa_query_$(object.name)_$(query.name) (xml, connect_string)
+.     endif
+.   endfor
+        Case Else
+            oa_query_$(object.name) = "<oal done=""error"" cause=""ns""/>"
+            oa_error = TRUE
+    End Select
+End Function
+.   for query
+.## ADD all fields needed by query into the view
+.     for object.view where name = query.view
+.       for table
+.         for dfl.table as dbtable where dbtable.name = table.name
+.           for dbtable.field as dbfield where count (rule, when = "update" & name = "timestamp")
+.             if count (table.field, name = dbfield.name) = 0
+.               copy dbfield to table
+.               for table.field as dfield where name = dbfield.name
+.                 dfield.add4query  = 1
+.                 dfield.calculated = 0
+.                 dfield.size       = dbfield.size?30
+.               endfor
+.             endif
+.           endfor
+.         endfor
+.         make_table_select ()
+.       endfor
+.     endfor
+
+.if platform = "asp"
+Private Function oa_query_$(object.name)_$(query.name) (xml, objdate)
+.else
+Private Function oa_query_$(object.name)_$(query.name) (xml As SCL_XMLSTORELib.xmlstore, connect_string As String) As String
+    Dim limit              As Integer
+    Dim inverted           As Integer
+    Dim invert_data        As Integer
+    Dim rec_count          As Integer
+    Dim recno              As Integer
+    Dim control            As String
+    Dim sql                As String
+.   if platform = "vbsp"
+    Dim Param              As ADODB.Parameter
+.   endif
+    Dim match_nb_field     As Integer
+    Dim nb_field           As Integer
+    Dim have_empty_field   As Boolean
+.   arg_index = 1
+.   while defined (arg$(arg_index))
+    Dim arg_$(arg$(arg_index)) As String
+.       arg_index += 1
+.   endwhile
+.   if defined (query.filter)
+    Dim filter_condition As String
+    Dim filter_text      As String
+    Dim filter_what      As String
+.     if !defined (query.real_filter)
+.       for object.view where name = query.view
+.         for table
+.           for dfl.table as dtable where dtable.name = table.name
+.             for dtable.field where name = query.filter
+.               query.real_filter = field.realname
+.             endfor
+.           endfor
+.         endfor
+.       endfor
+.     endif
+.   endif
+
+.#  Declare calculated field
+.   for object.view where name = query.view
+.     for table
+.       for field where calculated = 1
+.         if type = "textual" 
+    Dim $(field.realname:) As String
+.         elsif  type = "timestamp" | decs ?> 0
+    Dim $(field.realname:) As Double
+.         else
+    Dim $(field.realname:) As Long
+.         endif
+.       endfor
+.     endfor
+.   endfor
+.   header_func ()
+.endif
+
+    '   Set optional parameters
+    limit    = CInt (xml.attr ("limit",    20))
+    inverted = CInt (xml.attr ("inverted", 0))
+
+.   if defined (query.filter)
+    filter_text = xml.attr ("filter_text", "")
+    filter_what = xml.attr ("filter_what", "")
+    if filter_text <> "" then
+        if filter_what = "START" then
+            filter_condition = filter_text & "%"
+        elseif filter_what = "CONTAIN" then
+            filter_condition = "%" & filter_text & "%"
+        else
+            filter_condition = filter_text
+        end if            
+    else
+        filter_condition = " "
+    end if
+.   endif
+
+.   arg_index = 1
+.   while defined (arg$(arg_index))
+    arg_$(arg$(arg_index)) = xml.attr ("$(arg$(arg_index))")
+.       arg_index += 1
+.   endwhile
+
+    '   Set data order flag
+    control = xml.attr ("control", "first")
+
+    If control = "first" OR control = "gt" OR control = "ge" Then
+        invert_data = inverted
+    Else
+        invert_data = not inverted
+    End If
+
+.   for object.view where name = query.view
+.     for table
+.       if count (field, calculated = 1)
+    ' Initialise calculated field
+.         for field where calculated = 1
+.           if type = "textual"
+    $(field.realname:) = ""
+.           elsif type = "timestamp" | decs ?> 0
+    $(field.realname:) = 0.0
+.           else
+    $(field.realname:) = 0
+.         endif
+.       endfor
+
+.       endif
+    xml.item_set_current ("$(table.name)")
+    xml.push_position
+    match_nb_field   = 0
+    nb_field         = 0
+    have_empty_field = FALSE
+.       for dfl.table as dfltable where dfltable.name = table.name
+.         for index where name = "$(query.index?"primary")" & count (field) > 0
+.           nb_field_index = count (index.field)
+.           for index.field
+    xml.item_set_current ("$(field.name)")
+    IF xml.valid Then
+        IF not IsNull (xml.item)Then
+            If xml.attr ("match", 0) = "1" Then
+                match_nb_field = match_nb_field + 1
+            End If
+            If  have_empty_field = FALSE Then
+                nb_field = nb_field + 1
+            End If
+        Else
+            have_empty_field = TRUE
+        End IF
+        xml.item_parent
+    End If
+.           endfor
+.         endfor
+.       endfor
+    xml.pop_position
+.#### ONLY FOR STORED PROCEDURE ######
+.   if platform = "vbsp"
+.       set_field_target_type ()
+
+    Set Param = Cmd.CreateParameter ("position_mode",   $(sp_type_varchar:),    adParamInput,  10, control)
+    Cmd.Parameters.Append Param
+.       if nb_field_index > 1
+    Set Param = Cmd.CreateParameter ("match_nb_field",  adInteger,    adParamInput,    , match_nb_field)
+    Cmd.Parameters.Append Param
+.       endif
+.       for dfl.table as dfltable where dfltable.name = table.name
+.         for index where name = "$(query.index?"primary")" & count (field) > 0
+.           for field
+.             if type = "textual"
+.                   create_stored_proc_param ('xml.item ("$(field.name:)", "\' \'")', "IN", "")
+.             else
+.                   create_stored_proc_param ('xml.item ("$(field.name:)", 0)', "IN", "")
+.             endif
+.           endfor
+.         endfor
+.       endfor
+.       if defined (query.condition) 
+.         #  loop for arg1..n
+.         arg_index = 1
+.       while defined (query.arg$(arg_index))  
+    Set Param = Cmd.CreateParameter ("$(arg$(arg_index))",   $(sp_type_varchar:),    adParamInput, $(arg$(arg_index)_size?30), arg_$(arg$(arg_index)))
+    Cmd.Parameters.Append Param
+.                arg_index += 1
+.        endwhile
+.       endif
+.   if defined (query.filter)
+    Set Param = Cmd.CreateParameter ("filter", $(sp_type_varchar:),    adParamInput, 255, filter_condition) 
+    Cmd.Parameters.Append Param
+.   endif
+    Cmd.CommandText = "$(object.name)_query_$(query.name)"
+    On Error Resume Next
+    Set Rs = Cmd.Execute
+    If Err.number <> 0 Then
+        oa_query_$(object.name)_$(query.name) = "<oal done=""error"" cause=""db"" message=""" & _
+                         err.Description & " ""/>"
+        oa_error = TRUE
+        Rs.Close
+        Set Rs = Nothing
+.       footer_func ()
+        Exit Function
+    End If
+.#### END OF STORED PROCEDURE ########
+.   else
+    select case control
+        case "first"
+.           query_index (">=", "<=", "false",  "first", query)
+        case "last"
+.           query_index ("<=", ">=", "true",   "last", query)
+        case "gt"
+.           query_index (">",  "<",  "false",  "match", query)
+        case "lt"
+.           query_index ("<",  ">",  "true",   "match", query)
+        case "ge"
+.           query_index (">=", "<=", "false",  "match", query)
+        case "le"
+.           query_index ("<=", ">=", "true",   "match", query)
+        case "eq"
+.           query_index ("=",  "=",  "false",  "match", query)
+    end select
+
+.   execute_sql ("oa_query_$(object.name)_$(query.name)")
+.   endif
+  
+    xml.value = "<oal done=""ok"" />"
+    xml.attr ("write")  = "$(view.write)"
+    xml.attr ("delete") = "$(view.delete)"
+    xml.attr ("view")   = "$(view.name)"
+
+    rec_count = 0
+    For recno = 1 to limit
+        If not Rs.Eof AND Err.Number = 0 Then
+            If invert_data = FALSE Then
+                xml.item_new   "$(table.name)"
+                xml.item_last_child
+            Else
+                xml.item_first_child
+                If xml.valid Then
+                    xml.item_insert "$(table.name)"
+                    xml.item_parent
+                    xml.item_first_child
+                Else
+                    xml.item_new   "$(table.name)"
+                    xml.item_last_child
+                End If
+            End If
+.      for query.subselect as qsubselect
+.        for object.subselect as subselect where subselect.name = qsubselect.name         
+.            using_index    = 1
+.            if platform <> "asp"
+.              delim          = "xml, connect_string, "
+.            else
+.              delim          = ""
+.            endif
+.            function_param = ""
+.            while defined (subselect.using$(using_index))
+.              if using$(using_index)_type = "textual"
+.                function_param += delim + "CStr (Rs (\"$(using$(using_index)_real)\"))"
+.              elsif using$(using_index)_type = "timestamp"
+.                function_param += delim + "CDbl (Rs (\"$(using$(using_index)_real)\"))"
+.              else
+.                function_param += delim + "CLng (Rs (\"$(using$(using_index)_real)\"))"
+.              endif
+.              delim        = ", "
+.              using_index += 1
+.            endwhile
+.            fetch_index = 1
+.            for subselect.field as sfield
+.              function_param += delim + sfield.name
+.            endfor
+.            arg_index    = 1
+.            while defined (subselect.arg$(arg_index)_original)
+.              if arg$(arg_index)_type = "textual"
+.                function_param += delim + arg$(arg_index)_original
+.              elsif arg$(arg_index)_type = "timestamp"
+.                function_param += delim + "CDbl (arg_$(arg$(arg_index)_original))"
+.              else
+.                function_param += delim + "CLng (arg_$(arg$(arg_index)_original))"
+.              endif
+.              delim        = ", "
+.              arg_index += 1
+.            endwhile
+            oa_subselect_$(subselect.name) $(function_param:)
+.       endfor
+.     endfor
+
+.   for field by size
+.     if calculated = 0
+.#      
+.#      Save Revised Time Stamp
+.#
+.       if count (rule, when = "update" & name = "timestamp")
+.           for rule where when = "update" & name = "timestamp"
+        ' Save revised time stamp
+            If Not IsNull (Rs ("$(field.realname)")) Then
+                xml.attr ("revised") = Rs ("$(field.realname)")
+            End If
+.          endfor
+.       endif
+.       if field.type =  "textual"
+.           if field.size ?<= dfl.longtext_limit
+            if not isnull (Rs ("$(field.realname)"))  then xml.item_new "$(field.name)",  RTrim (Rs ("$(field.realname)"))
+.           else
+            xml.item_new "$(field.name)",  get_memo (Rs, "$(field.realname)")
+.           endif
+.       else
+            if not isnull (Rs ("$(field.realname)"))  then xml.item_new "$(field.name)",  Rs ("$(field.realname)")
+.       endif
+.       link_level = ""
+.       oa_fetch_view_links (1)
+.     else
+            xml.item_new "$(field.name)",    $(field.realname)
+.     endif
+.   endfor
+            rec_count = rec_count + 1
+            Rs.MoveNext
+            xml.item_parent
+        Else
+            Exit For
+        End If 
+    next
+    If Rs.EOF or control = "last" Then
+        xml.attr ("more")  = 0
+    Else
+        xml.attr ("more")  = 1
+    End If
+    Rs.Close
+    Set Rs = Nothing
+    xml.attr ("count") = rec_count
+.         for table.field as tmpfield where defined (add4query)
+.           delete tmpfield
+.         endfor
+.       endfor
+    If Err.Number = 0 OR rec_count > 0 Then
+        oa_query_$(object.name)_$(query.name) = xml.value
+    Else
+        oa_query_$(object.name)_$(query.name) = "<oal done=""error"" cause=""db"" message=""" & _
+                                                err.Description & " ""/>"
+        oa_error = TRUE
+    End If
+.   footer_func ()
+end function
+.       endfor 
+.   endfor query
+.endmacro

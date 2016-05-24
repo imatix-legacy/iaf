@@ -1,0 +1,28 @@
+<defaults>
+    <!-- These are default screen properties           -->
+    <property name = "labelwidth"    value = "35%"        />
+    <property name = "hintswidth"    value = "18%"        />
+    <property name = "formattrs"     value = "border=1 cellspacing=1 cellpadding=1 frame=above rules=rows" />
+    <property name = "limit"         value = "20"         />
+    <property name = "banner_color"  value = "Session (&quot;MENUHEADCOLOR&quot;)"  />
+    <property name = "formbg_color"  value = "Session (&quot;TABLEROWCOLOR1&quot;)" />
+    <property name = "thead_color"   value = "Session (&quot;TABLEHEADCOLOR&quot;)" />
+    <property name = "trow1_color"   value = "Session (&quot;TABLEROWCOLOR1&quot;)" />
+    <property name = "trow2_color"   value = "Session (&quot;TABLEROWCOLOR2&quot;)" />
+
+    <!-- These are the application globals             -->
+    <global name = "cur_language"      initial = "EN"   />
+    <global name = "cur_charset"       />
+    <global name = "cur_datefmt"       initial = "dmy"  />
+    <global name = "cur_moneyfmt"      initial = "."    />
+    <global name = "cur_showdecs"      type = "numeric" initial = "TRUE" />
+    <global name = "cur_userid"        type = "numeric" />
+    <global name = "cur_usertype"      type = "numeric" />
+    <global name = "cur_userlogin"     />
+    <global name = "cur_usersurname"   />
+    <global name = "cur_userforename"  />
+    <global name = "cur_useremail"     />
+    <global name = "cur_role"          />
+    <global name = "cur_switch_module" type = "numeric" />
+</defaults>
+

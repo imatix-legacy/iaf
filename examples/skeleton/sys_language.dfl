@@ -1,0 +1,17 @@
+<table name = "language" description = "Language definitions">
+Definition of all languages used in applications
+    <field name = "code"     domain = "language"  />
+    <field name = "name"     domain = "shortname" />
+    <field name = "codepage" domain = "int"       default = "1252"/>
+    <field name = "lcid"     domain = "longint"   default = "2048"/>
+    <field name = "charset"  domain = "shortname" default = "iso-8859-1"/>
+    <field                   domain = "audit"     />
+    <index name = "primary">
+        <field name = "code" />
+    </index>
+    <index name = "byname">
+        <field name = "name" />
+        <field name = "code" />
+    </index>
+</table>
+

@@ -1,0 +1,206 @@
+<dfl>
+<domain name = "audit" type = "group" >Audit information
+<rule name = "soft delete" when = "object" what = "active" value = "0" />
+<field name = "createdts"    domain = "timestamp">Date/time record was created
+    <rule name = "timestamp" when = "insert" />
+    <rule name = "show"      when = "all"    what = "hidden" value = "1" />
+    <rule name = "ignore"    when = "object" />
+</field>
+<field name = "createdby"    domain = "id">User who created record
+    <rule name = "userid"    when = "insert" />
+    <rule name = "show"      when = "all"    what = "hidden" value = "1" />
+    <rule name = "ignore"    when = "object" />
+</field>
+<field name = "revisedts"    domain = "timestamp">Date/time record was modified
+    <rule name = "timestamp" when = "insert" />
+    <rule name = "timestamp" when = "update" />
+    <rule name = "timestamp" when = "delete" />
+    <rule name = "show"      when = "all"    what = "hidden" value = "1" />
+    <rule name = "ignore"    when = "object" />
+</field>
+<field name = "revisedby"    domain = "id">User who modified record
+    <rule name = "userid"    when = "insert" />
+    <rule name = "userid"    when = "update" />
+    <rule name = "userid"    when = "delete" />
+    <rule name = "show"      when = "all"    what = "hidden" value = "1" />
+    <rule name = "ignore"    when = "object" />
+</field>
+<field name = "active"       domain = "boolean">Is record active?
+    <rule name = "set"       when = "insert" value = "1" />
+    <rule name = "set"       when = "delete" value = "0" />
+    <rule name = "show"      when = "all"    what = "hidden" value = "1" />
+    <rule name = "ignore"    when = "object" />
+</field>
+</domain>
+
+<domain name = "createdts"   type = "timestamp">Date/time record was created
+    <rule name = "timestamp" when = "insert" />
+    <rule name = "show"      when = "all"    what = "hidden" value = "1" />
+    <rule name = "ignore"    when = "object" />
+</domain>
+
+<domain name = "revisedts"   type = "timestamp">Date/time record was modified
+    <rule name = "timestamp" when = "insert" />
+    <rule name = "timestamp" when = "update" />
+    <rule name = "show"      when = "all"    what = "hidden" value = "1" />
+    <rule name = "ignore"    when = "object" />
+</domain>
+
+<domain name = "id"          type = "numeric" size = "9"     >
+    <rule name = "show" when = "all" what = "hidden" value = "1" />
+</domain>
+
+<domain name = "language" type = "textual" size = "5" default = "en" />
+
+<domain name = "address"    type = "group">Address information
+    <field name = "address1"  domain = "addrline" >Address line 1</field>
+    <field name = "address2"  domain = "addrline" >Address line 2</field>
+    <field name = "address3"  domain = "addrline" >Address line 3</field>
+</domain>
+
+<domain name = "addrline"   type = "textual" size = "60"   >
+    <rule name = "show" when = "all" what = "showsize" value = "40" />
+</domain>
+
+<domain name = "phonefax"  type = "group">Phone information
+    <field name = "telephone"   domain = "telephone" >Telephone number</field>
+    <field name = "fax"         domain = "telephone" >Fax number</field>
+</domain>
+
+<domain name = "telephone"  type = "textual" size = "40"   >
+    <rule name = "show" when = "all" what = "showsize" value = "20" />
+</domain>
+
+<domain name = "fullname"  type = "group">Full name
+    <field name = "salute"      type = "textual" size = "6" >Salutation</field>
+    <field name = "surname"     type = "textual" size = "40">Last name
+        <rule name = "show" when = "all" what = "showsize" value = "25" />
+    </field>
+    <field name = "forename"    type = "textual" size = "40">First name
+        <rule name = "show" when = "all" what = "showsize" value = "25" />
+    </field>
+    <field name = "initial"     type = "textual" size = "1" >Middle initial
+        <rule name = "show" when = "all" what = "case" value = "upper" />
+    </field>
+</domain>
+
+<domain name = "timerange" type = "group">
+    <field name = "from" domain = "timeslot">Start time</field>
+    <field name = "to"   domain = "timeslot">End time
+        <rule name = "show" when = "layout" what = "label" value = "End time" />
+        <rule name = "show" when = "layout" what = "join"  value = "1"   />
+    </field>
+</domain>
+
+<domain name = "timeslot" type = "time">
+    <rule name = "show" when = "all" what = "starthour" value = "0"  />
+    <rule name = "show" when = "all" what = "endhour"   value = "23" />
+    <rule name = "show" when = "all" what = "interval"  value = "15" />
+</domain>
+        
+<domain name = "daterange" type = "group">
+    <field name = "from"  domain = "targetdate" >Start date</field>
+    <field name = "to"    domain = "targetdate" >End date
+        <rule name = "show" when = "layout" what = "label" value = "End date" />
+        <rule name = "show" when = "layout" what = "join"  value = "1"   />
+    </field>
+</domain>
+
+<domain name = "targetdate" type = "date">
+    <rule name = "show" when = "all" what = "startyear" value = "-1" />
+    <rule name = "show" when = "all" what = "endyear"   value = "+2" />
+</domain>
+        
+<domain name = "datefmt" type = "textual" size = "3" default = "mdy" >
+<value key = "mdy" label = "m-d-y" />
+<value key = "dmy" label = "d-m-y" />
+<value key = "ymd" label = "y-m-d" />
+<rule name = "show" when = "all" what = "select" value = "radio" />
+</domain>
+
+<domain name = "moneyfmt" type = "textual" size = "1" default = "." >
+<value key = "." label = "9,999.00" />
+<value key = "," label = "9.999,00" />
+<rule name = "show" when = "all" what = "select" value = "radio" />
+</domain>
+
+<domain name = "money" type = "numeric" size = "15" >
+<rule name = "show" when = "all" what = "blank" value = "1" />
+<rule name = "show" when = "all" what = "money" value = "1" />
+</domain>
+
+<domain name = "recordid" type = "numeric" size = "9" required = "1" >
+    <rule name = "recordid" when = "insert" />
+    <rule name = "show"     when = "all" what = "hidden" value = "1" />
+</domain>
+
+<domain name = "comments"   type = "textual" size = "1000" >
+    <rule name = "show" when = "layout" what = "rows" value = "4"  />
+    <rule name = "show" when = "all"    what = "cols" value = "60" />
+</domain>
+
+<domain name = "notepad"    type = "textual" size = "8000" >
+    <rule name = "show" when = "layout" what = "rows" value = "12" />
+    <rule name = "show" when = "all"    what = "cols" value = "85" />
+</domain>
+
+<domain name = "longname"   type = "textual" size = "150"  >
+    <rule name = "show" when = "all" what = "showsize" value = "50" />
+</domain>
+
+<domain name = "shortname"  type = "textual" size = "50"  >
+    <rule name = "show" when = "all" what = "showsize" value = "40" />
+</domain>
+
+<domain name = "currency"   type = "textual" size = "3"    >
+    <rule name = "show" when = "all" what = "case" value = "upper" />
+</domain>
+
+<domain name = "email"  type = "textual" size = "80"   >
+    <rule name = "show"  when = "all" what = "showsize" value = "40" />
+    <rule name = "show"  when = "all" what = "email"    value = "1" />
+</domain>
+
+<domain name = "url"         type = "textual" size = "255"   >
+    <rule name = "show"  when = "all" what = "showsize" value = "40" />
+</domain>
+
+<domain name = "date"        type = "date"                  >
+    <rule name = "show" when = "all" what = "startyear" value = "-1" />
+    <rule name = "show" when = "all" what = "endyear"   value = "+10" />
+</domain>
+
+<domain name = "birthdate"   type = "date"                  >
+    <rule name = "show" when = "all" what = "startyear" value = "-90" />
+    <rule name = "show" when = "all" what = "endyear"   value = "+0"  />
+</domain>
+
+<domain name = "filename"    type = "textual" size = "255"  >
+    <rule name = "show"  when = "all" what = "showsize" value = "40" />
+</domain>
+
+<domain name = "shortref"    type = "textual" size = "40"  >
+    <rule name = "show"  when = "all" what = "showsize" value = "15" />
+</domain>
+
+<domain name = "longtext"    type = "textual" size = "8000" />
+<domain name = "timestamp"   type = "timestamp"             />
+<domain name = "timezone"    type = "textual" size = "5"    />
+<domain name = "boolean"     type = "boolean"               />
+<domain name = "time"        type = "time"                  />
+<domain name = "int"         type = "numeric" size = "4"    />
+<domain name = "longint"     type = "numeric" size = "9"    />
+<domain name = "shorttext"   type = "textual" size = "40"   />
+<domain name = "message"     type = "textual" size = "80"   />
+
+<domain name = "weekday" type = "numeric" size = "1" default = "1" >
+    <value key = "1"  label = "Monday"    />
+    <value key = "2"  label = "Tuesday"   />
+    <value key = "3"  label = "Wednesday" />
+    <value key = "4"  label = "Thursday"  />
+    <value key = "5"  label = "Friday"    />
+    <value key = "6"  label = "Saturday"  />
+    <value key = "7"  label = "Sunday"    />
+</domain>
+
+</dfl>

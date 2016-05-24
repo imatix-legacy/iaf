@@ -1,0 +1,22 @@
+<table name = "form" description = "Customisable Data Capture Form" >
+ The form object provides a general solution to the problem of customising
+ the application to specific customers' needs.  Forms allow an administrator
+ to define a data capture form that will be shown when the end-user creates
+ specific types of object, such as orders, in specific situations.
+    <field name = "id"          domain = "recordid" >Record id</field>
+    <field name = "parentname"  domain = "shortname">Parent object name</field>
+    <field name = "parentid"    domain = "id"       >Parent object id</field>
+    <field name = "objectname"  domain = "shortname">Object name</field>
+    <field name = "comments"    domain = "comments" >Comments</field>
+    <field name = "hints"       domain = "longtext" >User hints
+        <rule name = "show" when = "layout"  what = "rows" value = "10" />
+        <rule name = "show" when = "all"     what = "cols" value = "60" />
+    </field>
+    <field                      domain = "audit"   />
+
+    <index name = "byobject">
+        <field name = "parentname"  />
+        <field name = "parentid"    />
+        <field name = "objectname"  />
+    </index>
+</table>

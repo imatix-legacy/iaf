@@ -1,0 +1,49 @@
+/*  BROWSE_DYN
+ *
+ *  This style implements a 'browse' detail screen with a form
+ *  component.  It requires that the query and view used have the same
+ *  name, e.g. 'detail'.
+ */ 
+function style_browse_dyn ()
+    screen.view  ?= "detail"
+    screen.query ?= screen.view
+
+    xml '
+<style>
+<use object = "$(object)" />
+<var name   = "form_data" />
+<var name   = "form_id"   />
+<handler event = "on_global" source = "sub_formio.asp" />
+<handler event = "on_init">
+    $(object)_recv_key
+    <fetch view = "$(view)">
+        <ok>
+        form_fetch Session ("form_parent_name"), Session ("form_parent_id"), Session ("form_object_name"), ""
+        form_data = fld_$(object)_formdata
+        form_id   = Session ("form_id")
+        </ok>
+    </fetch>
+</handler>
+<handler event = "on_return">
+    Session ("form_id") = form_id
+</handler>
+
+<page title = "$(item:) Details" name = "detail" view = "$(view)">
+<form>
+  <hints>
+  <hint>These are the properties for the $(item) you selected.</hint>
+  </hints>
+  <layout>
+    <field name = "*" />
+    <text join = "1">&lt;% form_display "output", 0, "" %&gt;</text>
+    <action name = "cancel" text = "Done" />
+  </layout>
+</form>
+<handler action = "cancel">
+    return_to_parent
+</handler>
+</page>
+</style>
+'
+endfunction
+

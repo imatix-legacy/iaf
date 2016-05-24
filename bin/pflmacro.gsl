@@ -1,0 +1,47 @@
+/*   
+    Screen macros
+  
+    Macros define an arbitrary structure that can be invoked by name at any
+    point in a screen.  Macros are globally unique and are defined at the PFL
+    level.  To invoke a macro use the <invoke macro="xxx"/> tag.  Macro
+    contents are copied without modification into the PFL tree at the point
+    of the <invoke> tag (which is then deleted).  <macro_attr> tags in the
+    macro define attributes assigned (if not already defined) to the parent
+    of the <invoke>.
+
+    This is a nice example of a recursive function that manipulates parent
+    levels using unreadable relative addressing (e.g. '-3.$(name)').
+*/  
+
+function resolve_screen_macros ()
+    if name () = "invoke"
+        if    count (pfl.macro, count.name ?= macro) = 0
+            abort "Invoked macro '$(macro)' does not exist"
+        elsif count (pfl.macro, count.name ?= macro) = 0
+            abort "Macro '$(macro)' is defined more than once"
+        else
+            for pfl.macro where name ?= macro
+                for . as macro_item
+                    if name () = "macro_attr"
+                        -3.$(name) ?= value
+                    else
+                        copy macro_item before child
+                    endif
+                endfor
+                #   Append macro body to parent item body
+                if defined (macro.)
+                    if defined ($(-2).)
+                        $(-2). = $(-2). + macro.
+                    else
+                        $(-2). = macro.
+                    endif
+                endif
+            endfor
+        endif
+        delete child
+    else
+        for . as child
+            resolve_screen_macros ()
+        endfor
+    endif
+endfunction

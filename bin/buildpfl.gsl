@@ -1,0 +1,34 @@
+#
+#   buildpfl.gsl
+#
+#   Load DFL, OFL, and PFL files, generate screens for application, and save
+#   the exploded PFL tree as testout.pfl.
+#
+#   Arguments to script:
+#
+#   -pfl:       name of PFL file, without extension
+#   -match:     generate only screens starting with this string
+#   -verify:1   check PFL redundancies, don't generate
+#   -debug:1    runtime debugging support
+#               
+
+include "mod_pfl.gsl"
+pfl_load ("$(pfl).pfl")
+if debug?1 = 1
+    debug_mode = 1
+else
+    debug_mode = 0
+endif
+if verify ?= 1
+   for root.ofl
+       for object
+           for query where !defined (used) & name <> "detail" & name <> "summary"
+               >Object: $(object.name) query: $(query.name) -- not used
+           endfor
+       endfor
+   endfor
+else
+    generate_screens ()
+endif
+save root-> pfl as "testout.pfl"
+

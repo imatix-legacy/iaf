@@ -1,0 +1,334 @@
+<!--    Show users of one specific usertype only, sorted by name    -->
+<screen name   = "user_list_by_usertype" 
+        object = "user"
+        style  = "list"
+        query  = "byusertype">
+       
+<match name = "usertypeid" value = "Session (&quot;usertype_id_adm&quot;)" />
+<handler event = "on_showpage" page = "list" >
+    page_title = Session ("usertype_name_adm") & " User List"
+</handler>
+<invoke macro = "user_summary" />
+</screen>
+
+<!--    Show all users, sorted by name   -->
+<screen name   = "user_list_byname"
+        object = "user"
+        style  = "rolist"
+        title  = "All Users by Name"
+        query  = "byname"
+        view   = "summary"
+        hints  = "0"
+        alpha  = "1" >
+<page>
+<form><summary>
+    <field name = "surname"    object = "user" label = "Last name"  /> 
+    <field name = "forename"   object = "user" label = "First name" /> 
+    <field name = "login"      object = "user" label = "Login id"   />
+    <field name = "usertypeid" object = "user">
+       <lookup>
+          <field name = "name"  />
+       </lookup>
+    </field>
+    <field name = "status"     object = "user" label = "Status"     />
+    <field name = "lastlogin"  object = "user" label = "Last login" />
+</summary></form>
+    <handler event = "on_select" >
+         Session ("id")      = fld_user_id
+         chain_to "user_detail"
+    </handler>
+</page>    
+</screen>
+
+<!--    Select from all users, sorted by name   -->
+<screen name   = "user_select"
+        object = "user"
+        style  = "select"
+        title  = "Select from all Users by Name"
+        query  = "byname"
+        alpha  = "1" >
+<invoke macro = "user_summary" />
+</screen>
+
+<macro name = "user_summary" >
+<macro_attr name = "hints" value = "0" />
+<macro_attr name = "item"  value = "User" />
+<page>
+<form><summary>
+    <field name = "surname"    object = "user" label = "Last name"  /> 
+    <field name = "forename"   object = "user" label = "First name" /> 
+    <field name = "login"      object = "user" label = "Login id"   />
+    <field name = "usertypeid" object = "user">
+       <lookup>
+          <field name = "name"  />
+       </lookup>
+    </field>
+    <field name = "status"     object = "user" label = "Status"     />
+    <field name = "lastlogin"  object = "user" label = "Last login" />
+</summary></form>
+</page>
+</macro>
+
+
+<!--    Create a new user profile     -->
+
+<screen name   = "user_create"
+        object = "user"
+        style  = "create"
+        item   = "User Profile">
+<use object = "user"     />
+<use object = "usertype" />
+<var name = "fld_passtext"  />
+<handler event = "on_init">
+    set Security             = Server.CreateObject ("scl.Security")
+    fld_passtext             = Security.random_password (9)
+    fld_user_showhints       = 1
+    fld_user_usertypeid      = Session ("usertype_id_adm")
+    fld_user_usertypeid_id   = Session ("usertype_id_adm")
+    fld_user_usertypeid_name = Session ("usertype_name_adm")
+    set Security             = Nothing
+    fld_usertype_id = fld_user_usertypeid
+    <fetch object = "usertype" />
+</handler>
+
+<page name = "create" view = "create" >
+<form mode = "input">
+  <layout>
+    <invoke macro = "user_layout" />
+    <field name = "passtext"  size = "30" required = "1" label = "Initial password" />
+    <action name = "random"   text = "Random Password" hint = "Generate a random password"  />
+  </layout>
+</form>
+<handler action = "create">
+    set Security      = Server.CreateObject ("scl.Security")
+    fld_user_password = Security.Hash (fld_passtext)
+    set Security      = Nothing
+    <invoke macro = "user_validate" />
+    <create>
+        <ok>return_to_parent</ok>
+    </create>
+</handler>
+<handler action = "random" >
+    set Security = Server.CreateObject ("scl.Security")
+    fld_passtext = Security.random_password (9)
+    set Security = Nothing
+</handler>
+</page>
+</screen>
+
+<macro name = "user_layout" >
+    <field name = "usertypeid">
+        <lookup>
+           <field name = "name" label = "User Type"   attr = "plain"/>
+       </lookup>
+    </field>
+    <field name = "surname"    />
+    <field name = "salute"     join = "1" />
+    <field name = "forename"   />
+    <field name = "initial"    join = "1" />
+    <field name = "login"      />
+    <field name = "status"     />
+    <line/>
+    <field name = "language"   >
+        <lookup>
+            <field name = "name" />
+        </lookup>
+    </field> 
+    <field name = "datefmt"    />
+    <field name = "moneyfmt"   />
+    <field name = "email"      />
+    <field name = "address1"   />
+    <field name = "address2"   />
+    <field name = "address3"   />
+    <field name = "telephone"  />
+    <field name = "fax"        />
+</macro>
+
+<macro name = "user_validate">
+    <!-- Leave query limit gt 1, else current item is squashed if we have a match -->
+    <query name = "bylogin" control = "eq" >
+      <found>
+        pxml.item_first_child
+        found_id = Cint (pxml.item_child_value ("id", 0))
+        if found_id &lt;&gt; fld_user_id then
+            cur_message = "A user with this login already exists"
+            cur_error   = "login"
+            exception_raised = TRUE
+        end if
+    </found>
+    </query>
+</macro>
+
+
+<!--    Show/update a user profile, for administrator   -->
+
+<screen name   = "user_detail"
+        object = "user"
+        item   = "User Profile">
+<use object = "user"     />
+<use object = "usertype" />
+<handler event  = "on_init">
+    fld_user_id = Session ("id")
+    <fetch object = "user" />
+    <step>
+    fld_usertype_id = fld_user_usertypeid
+    </step>
+    <fetch object = "usertype" />
+</handler>
+
+<page name = "detail" view = "summary">
+<form mode = "output">
+  <layout>
+    <invoke macro = "user_layout" />
+    <line/>
+    <field name = "lastlogin"    attr = "plain"      />
+    <field name = "timeslogin"   attr = "plain"      />
+    <field name = "failures"     attr = "plain"      />
+    <action name = "edit"   text = "Edit"   toolbar = "1"              />
+    <action name = "delete" text = "Delete" toolbar = "1" join = "1"  confirm = "Okay to delete user profile?" />
+    <action name = "done"   text = "Done"                 join = "1"   />
+  </layout>
+</form>
+<handler action = "done">
+   return_to_parent
+</handler>
+<handler action = "edit">
+   cur_page = "modify"
+</handler>
+<handler action = "delete">
+   <delete object = "user"/>
+   <step>
+   return_to_parent
+   </step>
+</handler>
+</page>
+<page name = "modify" view = "summary">
+<form mode = "input">
+  <layout>
+    <invoke macro = "user_layout" />
+    <action name = "update"   />
+    <action name = "cancel"   join = "1" getdata = "0" />
+    <action name = "password" join = "1" />
+  </layout>
+</form>
+</page>
+
+<handler action = "cancel">
+    cur_page = "detail" 
+</handler>
+<handler action = "update">
+    <invoke macro = "user_validate" />
+    <update/>
+    cur_page = "detail"
+</handler>
+<handler action = "password" page = "modify" >
+    chain_to "user_password"
+</handler>
+<handler event = "on_return" >
+    if cur_called = "user_password" and Session ("new_password") &lt;&gt; "" then
+        fld_user_password = Session ("new_password")
+    end if
+</handler>
+</screen>
+
+
+<!--    Set a new password     -->
+
+<screen name = "user_password" >
+<var name = "fld_passtext"   />
+<page title = "Assign New Password">
+<form mode = "input" >
+  <hints>
+  <hint>You can let the system choose a random password, or assign one yourself.</hint>
+  <hint>Choose a secure password, at least 6 letters and/or digits long.</hint>
+  <hint>To leave the password unmodified, click '&amp;lt;Back'</hint>
+  </hints>
+  <layout>
+    <field name = "passtext" size = "30" label = "New password" />
+    <action name = "random" join = "1"  hint = "Generate a random password" type = "link" />
+    <action name = "change" fields = "1" />
+    <action name = "cancel" join = "1"   getdata = "0" />
+  </layout>
+</form>
+<handler action = "random" >
+    set Security = Server.CreateObject ("scl.Security")
+    fld_passtext = Security.random_password (9)
+    set Security = Nothing
+</handler>
+<handler action = "change">
+    set Security             = Server.CreateObject ("scl.Security")
+    Session ("new_password") = Security.Hash (fld_passtext)
+    set Security             = Nothing
+    cur_message = "Click 'Ok' to save new password."
+    return_to_parent
+</handler>
+<handler action = "cancel">
+    Session ("new_password") = ""
+    return_to_parent
+</handler>
+</page>
+</screen>
+
+
+<!--    User manages their own profile     -->
+
+<screen name = "user_profile" >
+<use object = "user"   />
+<var name = "fld_passtext"   />
+
+<handler event = "on_init" replace = "1" >
+    fld_user_id = Session ("cur_userid")
+    <fetch object = "user" view = "detail" />
+</handler>
+
+<page name = "main" title = "Edit Personal Profile" view = "detail" >
+<form mode = "input">
+  <hints>
+  <hint>You can check and correct your personal data at any time.</hint>
+  <hint>It's a good idea to change your password every few months.</hint>
+  </hints>
+  <layout>
+    <field name = "surname"    />
+    <field name = "salute"     join = "1" />
+    <field name = "forename"   />
+    <field name = "initial"    join = "1" />
+    <line/>
+    <field name = "language"   >
+        <lookup>
+            <field name = "name" />
+        </lookup>
+    </field> 
+    <field name = "datefmt"    />
+    <field name = "moneyfmt"   />
+    <field name = "email"      />
+    <field name = "address1"   />
+    <field name = "address2"   />
+    <field name = "address3"   />
+    <field name = "telephone"  />
+    <field name = "fax"        />
+    <field name = "showhints"  />
+    <action name = "password" text = "Change password" type = "link" />
+    <action name = "update" toolbar = "1" text = "Ok" fields = "1" hint = "Save your changes now" />
+    <action name = "cancel" join = "1"    getdata = "0"            hint = "Lose your changes"     />
+  </layout>
+</form>
+<handler action = "password" >
+    chain_to "user_password"
+</handler>
+<handler action = "update" >
+    <update object = "user" />
+    <step>
+    return_to_parent
+    </step>
+</handler>
+<handler action = "cancel" >
+    return_to_parent
+</handler>
+</page>
+<handler event = "on_return" >
+    if cur_called = "user_password" and Session ("new_password") &lt;&gt; "" then
+        fld_user_password = Session ("new_password")
+    end if
+</handler>
+</screen>
+

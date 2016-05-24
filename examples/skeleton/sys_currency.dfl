@@ -1,0 +1,12 @@
+<table name = "currency"    description = "Currency" >
+ Currency lookup table.
+    <field name = "isocode"     domain = "currency" >ISO currency code</field>
+    <field name = "name"        domain = "longname" >Currency name</field>
+    <field name = "showcents"   domain = "boolean"  >Show cents?</field>
+    <field                      domain = "audit"   />
+    <index name = "primary">
+        <field name = "isocode" />
+    </index>
+</table>
+
+

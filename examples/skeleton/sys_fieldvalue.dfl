@@ -1,0 +1,22 @@
+<table name = "fieldvalue" description = "Form Field Selection Value">
+ Lists the values for select and radio fields.  Text, textbox, date,
+ number, and checkbox fields do not use the fieldval table.  Field values
+ are defined with an internal encoding and a displayed value that is shown
+ to the user.
+    <field name = "id"          domain = "recordid" >Record id</field>
+    <field name = "fieldid"     domain = "id"       >Parent field record</field>
+    <field name = "shownvalue"  domain = "longname" >Name shown on screen</field>
+    <field name = "encoding"    domain = "shortname">Value actually stored</field>
+    <field name = "order"       domain = "int"      >Order on screen
+        <rule name = "show" when = "all" what = "blank" value = "1" />
+    </field>
+    <field                      domain = "audit"   />
+
+    <link type = "childof" table = "field" />
+
+    <index name = "byfield">
+        <field name = "fieldid" />
+        <field name = "order"   />
+        <field name = "id"      />
+    </index>
+</table>

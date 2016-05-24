@@ -1,0 +1,164 @@
+.----------------------------------------------------------------------------
+.- markstat.gsl : Markup Static Definition
+.-
+.- Created: 1999/11/11 Pascal Antonnaux <pascal@imatix.com>
+.- Revised: 2002/05/13 Pascal Antonnaux <pascal@imatix.com>
+.-
+.----------------------------------------------------------------------------
+.echo "Generate mark$(markup.name:c).h"
+.output "mark$(markup.name:c).h"
+/*  ----------------------------------------------------------------<Prolog>-
+    name:       mark$(markup.name:c).h
+    title:      Markup Definition for $(markup.name) version $(markup.version)
+    package:    Markup Translator
+
+    Generated:  $(date) $(time) from $(script)
+
+    copyright:  Copyright (C) 1991-99 Imatix Corporation
+ ------------------------------------------------------------------</Prolog>-*/
+
+#ifndef _mark$(markup.name:c)_included    /*  allow multiple inclusions        */
+#define _mark$(markup.name:c)_included
+
+.define index = 0
+.for tag
+.    define new_name = "$(NAME:c)"
+#define MARKUP_$(MARKUP.NAME:c)_$(NEW_NAME%-15s) $(index%5s)
+.  define index = index + 1
+.endfor
+#define $(MARKUP.NAME:c)_NB_TAG $(index)
+
+/*- Function prototypes ---------------------------------------------------- */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+MARKUP_TAG *$(markup.name:c)_load            (char *file_name);
+void        $(markup.name:c)_del_skipped     (MARKUP_TAG *tag);
+void        $(markup.name:c)_remove_link     (MARKUP_TAG *tag);
+void        $(markup.name:c)_add_string_attr (MARKUP_TAG *tag);
+void        $(markup.name:c)_init            (void);
+void        $(markup.name:c)_free            (void);
+
+#ifdef __cplusplus
+}
+#endif
+#endif
+.close
+.echo "Generate mark$(markup.name:c).c"
+.output "mark$(markup.name:c).c"
+/*  ----------------------------------------------------------------<Prolog>-
+    name:       mark$(markup.name:c).c
+    title:      Markup Definition for $(markup.name) version $(markup.version)
+    package:    Markup Translator
+
+    Gerered By GSLGEN schema markstat on $(date) $(time)
+
+    copyright:  Copyright (C) 1991-99 Imatix Corporation
+ ------------------------------------------------------------------</Prolog>-*/
+#include "sfl.h"
+#include "markcfg.h"
+#include "marklib.h"
+#include "markload.h"
+#include "mark$(markup.name:c).h"
+
+
+MARKUP_DEF markup_$(markup.name:c)_tag [$(MARKUP.NAME:c)_NB_TAG] = {
+.for tag
+.    define tag_name      = "\"$(name)\""
+.    define need_end_tag  = "$(end_tag?"TRUE")"
+.    define token         = "\"" + "$(end_token?)" + ">\"" 
+.    define new_name      = "$(NAME:c)"
+.    define is_script     = "$(tag.script?"FALSE")"
+.    define skip_tag      = "$(skip?"FALSE")"
+.    define link_tag      = "$(link?"FALSE")"
+.    define parse_str_tag = "$(parse_str?"FALSE")"
+.    define tag_length    = "$(length (name))"
+.    define endtag_length = "$(length (token) - 2)"
+.-
+.    if index (tag) = count (markup.tag)
+.        define TERM = " "
+.    else
+.        define TERM = ","
+.    endif
+ {MARKUP_$(MARKUP.NAME:c)_$(NEW_NAME%-10s), $(tag_name%-12s), $(NEED_END_TAG%-5s), $(TOKEN:%5s), $(IS_SCRIPT%-5s), $(SKIP_TAG%-5s), $(LINK_TAG%-5s), $(PARSE_STR_TAG%-5s), $(TAG_LENGTH%-2s), $(ENDTAG_LENGTH%-1s)}$(term) /* $(Description%-25s)*/
+.endfor
+};
+
+/*  -------------------------------------------------------------------------
+    Function: $(markup.name:c)_load
+
+    Synopsis: Load $(markup.name:c) file.
+    -------------------------------------------------------------------------*/
+
+MARKUP_TAG *
+$(markup.name:c)_load (char *file_name)
+{
+    return (markup_load (file_name, (MARKUP_DEF *)markup_$(markup.name:c)_tag,
+                         $(MARKUP.NAME:C)_NB_TAG));
+}
+
+
+/*  -------------------------------------------------------------------------
+    Function: $(markup.name:c)_del_skipped
+
+    Synopsis: Delete all $(markup.name:c) skipped tag.
+    -------------------------------------------------------------------------*/
+
+void
+$(markup.name:c)_del_skipped (MARKUP_TAG *tag)
+{
+    tag_del_skipped   (tag, (MARKUP_DEF *)markup_$(markup.name:c)_tag);
+}
+
+/*  -------------------------------------------------------------------------
+    Function: $(markup.name:c)_remove_link
+
+    Synopsis: Replace all $(markup.name:c) link tag.
+    -------------------------------------------------------------------------*/
+
+void
+$(markup.name:c)_remove_link (MARKUP_TAG *tag)
+{
+    tag_remove_link (tag, (MARKUP_DEF *)markup_$(markup.name:c)_tag);
+}
+
+/*  -------------------------------------------------------------------------
+    Function: $(markup.name:c)_add_string_attr
+
+    Synopsis: Replace all $(markup.name:c) link tag.
+    -------------------------------------------------------------------------*/
+
+void
+$(markup.name:c)_add_string_attr (MARKUP_TAG *tag)
+{
+    tag_add_string_attr (tag, (MARKUP_DEF *)markup_$(markup.name:c)_tag);
+}
+
+/*  -------------------------------------------------------------------------
+    Function: $(markup.name:c)_init
+
+    Synopsis: Initialise $(markup.name:c) parser resource.
+    -------------------------------------------------------------------------*/
+
+void
+$(markup.name:c)_init (void)
+{
+    initialise_markup_resource ((MARKUP_DEF *)markup_$(markup.name:c)_tag,
+                                $(MARKUP.NAME:C)_NB_TAG);
+}
+
+/*  -------------------------------------------------------------------------
+    Function: $(markup.name:c)_free
+
+    Synopsis: Free $(markup.name:c) parser resource.
+    -------------------------------------------------------------------------*/
+
+void
+$(markup.name:c)_free (void)
+{
+    free_markup_resource ();
+}
+
+.close

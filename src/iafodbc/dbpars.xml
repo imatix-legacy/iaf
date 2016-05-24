@@ -1,0 +1,373 @@
+<SET
+    name = "white_space" >
+    <STRING
+        value = " \n\r\t" />
+</SET>
+
+
+
+<SET
+    name = "first_name_char" >
+    <RANGE
+        min = "a"
+        max = "z" />
+    <RANGE
+        min = "A"
+        max = "Z" />
+    <STRING
+        value = "_:" />
+</SET>
+
+
+<SET
+    name = "name_char" >
+    <RANGE
+        min = "a"
+        max = "z" />
+    <RANGE
+        min = "A"
+        max = "Z" />
+    <RANGE
+        min = "0"
+        max = "9" />
+    <STRING
+        value = "-_.:" />
+</SET>
+
+
+
+<!-- [1] export_doc ::= '<export>' S* table S* ( record S*)* '</export>' -->
+
+
+<ITEM
+  name = "export_doc"
+  parent_struct  = "XML_ITEM"
+  main = "1" >
+    <COMPONENT
+      type = "constant_string"
+      value = "&lt;export&gt;" />
+    <COMPONENT
+      type = "item"
+      name = "white_spaces"
+      count = "zero_or_more" />
+    <COMPONENT
+      type = "item"
+      name = "table"
+      fills = "parent_struct" />
+    <COMPONENT
+      type = "item"
+      name = "white_spaces"
+      count = "zero_or_more" />
+    <COMPONENT
+      type = "union"
+      count = "zero_or_more" >
+        <COMPONENT
+          type = "item"
+          name = "record"
+          fills = "parent_struct" />
+        <COMPONENT
+          type = "item"
+          name = "white_spaces"
+          count = "zero_or_more" />
+    </COMPONENT>
+    <COMPONENT
+      type = "constant_string"
+      value = "&lt;/export&gt;" />
+</ITEM>
+
+
+
+<!-- [2] table ::= '<' 'table' (S+ attr)+ S* '>' (S* field)+ (S* key)* S* </table> -->
+
+<ITEM
+  name = "table"
+  parent_struct  = "XML_ITEM"
+  child_struct  = "XML_ITEM"
+  create_child  = "alloc_xml_item"
+  free_child    = "xml_free"
+  attach_child  = "table_management" >
+    <COMPONENT
+      type = "constant_char"
+      value = "&lt;" />
+    <COMPONENT
+      type = "constant_string"
+      value = "table"
+      handler = "set_xml_item_name" />
+    <COMPONENT
+      type = "union"
+      count = "once_or_more" >
+        <COMPONENT
+          type = "item"
+          name = "white_spaces"
+          count = "once_or_more" />
+        <COMPONENT
+          type = "item"
+          name = "attr"
+          fills = "parent_struct" />     <!-- bug in script. Actually, child struct is filled -->
+    </COMPONENT>
+    <COMPONENT
+      type = "item"
+      name = "white_spaces"
+      count = "zero_or_more" />
+    <COMPONENT
+      type = "constant_char"
+      value = "&gt;" />
+    <COMPONENT
+      type = "union"
+      count = "once_or_more" >
+        <COMPONENT
+          type = "item"
+          name = "white_spaces"
+          count = "zero_or_more" />
+        <COMPONENT
+          type = "item"
+          name = "field"
+          fills = "parent_struct" />     <!-- bug in script. Actually, child struct is filled -->
+    </COMPONENT>
+    <COMPONENT
+      type = "union"
+      count = "zero_or_more" >
+        <COMPONENT
+          type = "item"
+          name = "white_spaces"
+          count = "zero_or_more" />
+        <COMPONENT
+          type = "item"
+          name = "key"
+          fills = "parent_struct" />     <!-- bug in script. Actually, child struct is filled -->
+    </COMPONENT>
+    <COMPONENT
+      type = "item"
+      name = "white_spaces"
+      count = "zero_or_more" />
+    <COMPONENT
+      type = "constant_string"
+      value = "&lt;/table&gt;" />
+</ITEM>
+
+
+<!-- [3] record ::= '<' 'record' (S+ attr)+ S* '/>'> -->
+
+<ITEM
+  name = "record"
+  parent_struct = "XML_ITEM"
+  child_struct = "XML_ITEM"
+  create_child  = "alloc_xml_item"
+  free_child    = "xml_free"
+  attach_child  = "record_management" >
+    <COMPONENT
+      type = "constant_char"
+      value = "&lt;" />
+    <COMPONENT
+      type = "constant_string"
+      value = "record"
+      handler = "set_xml_item_name" />
+    <COMPONENT
+      type = "union"
+      count = "once_or_more" >
+        <COMPONENT
+          type = "item"
+          name = "white_spaces"
+          count = "once_or_more" />
+        <COMPONENT
+          type = "item"
+          name = "attr"
+          fills = "parent_struct" />     <!-- bug in script. Actually, child struct is filled -->
+    </COMPONENT>
+    <COMPONENT
+      type = "item"
+      name = "white_spaces"
+      count = "zero_or_more" />
+    <COMPONENT
+      type = "constant_string"
+      value = "/&gt;" />
+</ITEM>
+
+
+<!-- [4] S ::= ... -->
+
+<ITEM
+    name = "white_spaces">
+    <COMPONENT
+        type = "char_in_set"
+        name = "white_space" />
+</ITEM>
+
+
+
+
+<!-- [5] attr ::= name eq att_value -->
+
+<ITEM
+  name = "attr"
+  parent_struct = "XML_ITEM"
+  child_struct  = "XML_ATTR"
+  create_child  = "alloc_xml_attr"
+  free_child    = "xml_free_attr"
+  attach_child  = "link_xml_attr">
+    <COMPONENT
+      type = "item"
+      name = "name"
+      handler = "set_xml_attr_name" />
+    <COMPONENT
+      type = "item"
+      name = "eq" />
+    <COMPONENT
+      type = "item"
+      name = "att_value"
+      fills = "child_struct" />
+</ITEM>
+
+
+
+<!-- [6] field = '<' 'field' (S+ attr)+ S* '/>' -->
+
+<ITEM
+  name = "field"
+  parent_struct = "XML_ITEM"
+  child_struct  = "XML_ITEM"
+  create_child  = "alloc_xml_item"
+  free_child    = "xml_free"
+  attach_child  = "link_xml_child">
+    <COMPONENT
+      type = "constant_char"
+      value = "&lt;" />
+    <COMPONENT
+      type = "constant_string"
+      value = "field"
+      handler = "set_xml_item_name" />
+    <COMPONENT
+      type = "union"
+      count = "once_or_more" >
+        <COMPONENT
+          type = "item"
+          name = "white_spaces"
+          count = "once_or_more" />
+        <COMPONENT
+          type = "item"
+          name = "attr"
+          fills = "parent_struct" />     <!-- bug in script. Actually, child struct is filled -->
+    </COMPONENT>
+    <COMPONENT
+      type = "item"
+      name = "white_spaces"
+      count = "zero_or_more" />
+    <COMPONENT
+      type = "constant_string"
+      value = "/&gt;" />
+</ITEM>
+
+
+<!-- [7] key ::= '<' 'key' (S+ attr)+ S* '>' (S* field)+ S* '</key>' -->
+
+
+<ITEM
+  name = "key"
+  parent_struct = "XML_ITEM"
+  child_struct  = "XML_ITEM"
+  create_child  = "alloc_xml_item"
+  free_child    = "xml_free"
+  attach_child  = "link_xml_child">
+    <COMPONENT
+      type = "constant_char"
+      value = "&lt;" />
+    <COMPONENT
+      type = "constant_string"
+      value = "key"
+      handler = "set_xml_item_name" />
+    <COMPONENT
+      type = "union"
+      count = "once_or_more" >
+        <COMPONENT
+          type = "item"
+          name = "white_spaces"
+          count = "once_or_more" />
+        <COMPONENT
+          type = "item"
+          name = "attr"
+          fills = "parent_struct" />     <!-- bug in script. Actually, child struct is filled -->
+    </COMPONENT>
+    <COMPONENT
+      type = "item"
+      name = "white_spaces"
+      count = "zero_or_more" />
+    <COMPONENT
+      type = "constant_char"
+      value = "&gt;" />
+    <COMPONENT
+      type = "union"
+      count = "once_or_more" >
+        <COMPONENT
+          type = "item"
+          name = "white_spaces"
+          count = "once_or_more" />
+        <COMPONENT
+          type = "item"
+          name = "field"
+          fills = "parent_struct" />     <!-- bug in script. Actually, child struct is filled -->
+    </COMPONENT>
+    <COMPONENT
+      type = "item"
+      name = "white_spaces"
+      count = "zero_or_more" />
+    <COMPONENT
+      type = "constant_string"
+      value = "&lt;/key&gt;" />
+</ITEM>
+
+
+
+
+<!-- [8] name ::= ... -->
+
+<ITEM
+    name = "name" >
+    <COMPONENT
+        type = "char_in_set"
+        name = "first_name_char" />
+    <COMPONENT
+        type  = "union"
+        count = "zero_or_more" >
+        <COMPONENT
+            type = "char_in_set"
+            name = "name_char" />
+    </COMPONENT>
+</ITEM>
+
+
+<!-- [9] eq ::=    S* '='  S* -->
+
+<ITEM
+    name = "eq" >
+    <COMPONENT
+        type  = "item"
+        name  = "white_spaces"
+        count = "zero_or_more" />
+    <COMPONENT
+        type  = "constant_char"
+        value = "=" />
+    <COMPONENT
+        type  = "item"
+        name  = "white_spaces"
+        count = "zero_or_more" />
+</ITEM>
+
+
+<!-- [10] att_value ::= '"'  any(decodeHTTP) '"' -->
+
+<ITEM
+    name          = "att_value"
+    parent_struct = "XML_ATTR" >
+    <COMPONENT
+        type  = "constant_char"
+        value = "\&quot;" />
+    <COMPONENT
+        type = "any_before_char"
+        value = "\&quot;"
+        handler = "set_xml_attr_value"
+        decode_http = "FALSE"
+        allow_empty = "TRUE" />
+    <COMPONENT
+        type  = "constant_char"
+        value = "\&quot;" />
+</ITEM>

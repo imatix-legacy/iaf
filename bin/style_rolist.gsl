@@ -1,0 +1,90 @@
+/*  ROLIST
+ *
+ *  This style implements a read-only list screen that allows browsing
+ *  of data but no creation.  Default detail program is '_browse'.
+ */
+
+function style_rolist ()
+    #   Set defaults for called programs
+    screen.detail   ?= "$(object)_browse"
+    screen.view     ?= "summary"
+    screen.query    ?= screen.view
+    screen.emptymsg ?= "There are no $(item) entries to display"
+
+    xml '
+<style>
+<use object = "$(object)" />
+<handler event  = "on_init">
+    <query name = "$(query)" control = "first">
+        <empty>
+        cur_message = "$(emptymsg:)"
+        return_to_parent
+        </empty>
+    </query>
+</handler>
+<page title = "$(title?'$(item:) Entries':)" name = "list" view = "$(view)">
+<toolbar>
+  <action name = "first"    text = "|<"   hint = "Go to the start of the list"  />
+  <action name = "previous" text = "<<"   hint = "Go backwards in the list"     />
+  <action name = "next"     text = ">>"   hint = "Go forwards in the list"      />
+  <action name = "last"     text = ">|"   hint = "Go to the end of the list"    />
+</toolbar>
+<form>
+  <hints>
+  <hint>This screen shows one page of $(item) entries at a time.</hint>
+  <hint>To scroll through the entire list, use the toolbar actions.</hint>
+  <hint>To look at a specific $(item), click the $(item) name.</hint>
+  </hints>
+  <summary>
+  <field name = "*" />
+  </summary>
+  <action name = "next" text = "More..." hint = "Show next page"
+          condition = "query_more" />
+  <action name = "done" />
+</form>
+<handler action = "first"  >
+    <query name = "$(query)" control = "first" />
+</handler>
+<handler action = "last"   >
+    <query name = "$(query)" control = "last" />
+</handler>
+<handler action = "next"   >
+    <query name = "$(query)" control = "gt" >
+    <empty>
+        cur_message = "This is the end of the list.  Click |&lt; to scroll back."
+        <query name = "$(query)" control = "last" />
+    </empty>
+    </query>
+</handler>
+<handler action = "previous">
+    <query name = "$(query)" control = "lt">
+    <empty>
+        <query name = "$(query)" control = "first" />
+    </empty>
+    </query>
+</handler>
+<handler event = "on_select">
+    $(object)_pass_key
+    chain_to "$(detail)"
+</handler>
+<handler action = "done">
+    return_to_parent
+</handler>
+</page>
+<handler event = "on_filter">
+    <query name = "$(query)" />
+</handler>
+<handler event = "on_return">
+    if redirect_to = "" then
+        <query name = "$(query)" />
+        <step>
+        if query_count = 0 then
+            return_to_parent
+        end if
+    end if
+    </step>
+</handler>
+</style>
+'
+endfunction
+

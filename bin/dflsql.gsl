@@ -1,0 +1,289 @@
+#
+#   dflsql.gsl - generate various types of SQL from DFL tree
+#
+#   Written: 1999/12/24  Pieter Hintjens <ph@imatix.com>
+#   Revised: 2001/11/20  Pieter Hintjens <ph@imatix.com>
+#
+
+#----------------------------------------------------------------------
+    function set_sql_target (target)
+#
+#   Defines the target database product.  The valid values for this are:
+#   "odbc", "mssql" or "mysql".
+#-----------------------------------------------------------------------
+    for root.dfl
+        dfl.target_db     = target
+        dfl.varchar_limit = 10
+        if target = "odbc"
+            dfl.dbname         = "MS Access"
+            dfl.longtext_limit = 255
+            dfl.type_char      = "char"
+            dfl.type_varchar   = "varchar"
+            dfl.type_longtext  = "longtext"
+            dfl.type_boolean   = "byte"
+            dfl.type_date      = "long"
+            dfl.type_time      = "long"
+            dfl.type_int       = "integer"
+            dfl.type_long      = "long"
+            dfl.type_huge      = "double"
+            dfl.type_decimal   = "double"
+            dfl.type_timestamp = "double"
+            dfl.type_datetime  = "datetime"
+        elsif target = "mssql"
+            dfl.dbname         = "MS SQLServer"
+            dfl.longtext_limit = 5000
+            if unicode ?= 1
+                dfl.type_char      = "nchar"
+                dfl.type_varchar   = "nvarchar"
+                dfl.type_longtext  = "ntext"
+            else
+                dfl.type_char      = "char"
+                dfl.type_varchar   = "varchar"
+                dfl.type_longtext  = "text"
+            endif
+            dfl.type_boolean   = "tinyint"
+            dfl.type_date      = "numeric ($(size?9))"
+            dfl.type_time      = "numeric ($(size?9))"
+            dfl.type_int       = "integer"
+            dfl.type_long      = "numeric ($(size?9))"
+            dfl.type_huge      = "numeric ($(size?15))"
+            dfl.type_decimal   = "decimal"
+            dfl.type_timestamp = "decimal (18, 7)"
+        elsif target = "mysql"
+            dfl.dbname         = "mysql"
+            dfl.longtext_limit = 255
+            dfl.type_char      = "char"
+            dfl.type_varchar   = "varchar"
+            dfl.type_longtext  = "longtext"
+            dfl.type_boolean   = "tinyint"
+            dfl.type_date      = "integer"
+            dfl.type_time      = "integer"
+            dfl.type_int       = "integer"
+            dfl.type_long      = "integer"
+            dfl.type_huge      = "real"
+            dfl.type_decimal   = "real"
+            dfl.type_timestamp = "real"
+        else
+            abort "Unknown SQL target: '$(target:)'"
+        endif
+        for table
+            set_field_target_type ()
+        endfor
+    endfor
+endfunction
+
+function set_field_target_type ()
+    for field where ! defined (group)
+        if type = "numeric"
+            if decs ?> 0
+                if dfl.type_decimal ?= "double"
+                    usetype = "decimal"
+                else
+                    usetype = "decimal ($(size), $(decs))"
+                endif
+            elsif size > 9
+                usetype = "huge"
+            elsif size > 4
+                usetype = "long"
+            else
+                usetype = "int"
+            endif
+        elsif type = "date" \
+            | type = "time" \
+            | type = "boolean" \
+            | type = "timestamp" \
+            | type = "datetime"
+            usetype = type
+        elsif type = "textual"
+            if unicode ?= 1
+                if size > dfl.longtext_limit
+                    usetype = "longtext"
+                elsif size > dfl.varchar_limit
+                    usetype = "nvarchar ($(size))"
+                else
+                    usetype = "nchar ($(size))"
+                endif
+            else
+                if size > dfl.longtext_limit
+                    usetype = "longtext"
+                elsif size > dfl.varchar_limit
+                    usetype = "varchar ($(size))"
+                else
+                    usetype = "char ($(size))"
+                endif
+            endif
+        else
+            abort "Unknown type '$(type)', field '$(field.name)' in $(table.name?)"
+        endif
+        if defined ("$(dfl.type_$(usetype))")
+            field.target_type = "$(dfl.type_$(usetype))"
+        else
+            field.target_type = usetype
+        endif
+    endfor
+endfunction
+#----------------------------------------------------------------------
+    function sql_create_tables (sqlfile)
+#
+#   Generates an SQL file to create the dfl currently loaded.
+#   Before using this function, use dfl::dfl_load to load the DFL file,
+#   and dfl::set_sql_target to set the SQL target database.
+#-----------------------------------------------------------------------
+    for root.dfl
+        echo "Creating $(sqlfile) for $(dfl.dbname:)..."
+        output sqlfile
+        for table where build
+>DROP   TABLE $(table.realname:c);
+>CREATE TABLE $(table.realname:c) (
+            comma = " "
+            primary_key = ""
+            for field where ! defined (group)
+                if dfl.target_db = "odbc"
+>   $(comma) $(field.realname:c) \
+>                           $(TARGET_TYPE)
+                elsif dfl.target_db = "mssql"
+                    have_null   = ""
+                    if required ?= 1
+                        have_null = "NOT NULL"
+                    else
+                        have_null = "NULL"
+                    endif
+                    auto_indent = ""
+                    if count (rule, when = "insert" & name = "recordid") > 0
+                        auto_indent = "IDENTITY"
+                    endif
+
+                    if unicode ?= 1 & field.size ?> dfl.longtext_limit
+                        field.target_type = "ntext"
+                    endif
+>   $(comma) $(field.realname:c) \
+>                           $(TARGET_TYPE)        $(have_null:) $(auto_indent:)
+                elsif dfl.target_db = "mysql"
+                    have_null   = ""
+                    if required ?= 1
+                        have_null = "NOT NULL"
+                    else
+                        have_null = ""
+                    endif
+                    auto_indent = ""
+                    if count (rule, when = "insert" & name = "recordid") > 0
+                        auto_indent = "AUTO_INCREMENT"
+                        primary_key = field.realname
+                    endif
+>   $(comma) $(field.realname:c) \
+>                           $(TARGET_TYPE)        $(have_null:) $(auto_indent:)
+                endif
+            comma = ","
+            endfor
+            if dfl.target_db = "mysql" & primary_key <> ""
+>   $(comma) primary key ($(primary_key:c))
+            endif
+>);
+>
+            for index
+                if dfl.target_db = "odbc"
+>CREATE INDEX $(index.realname:c) ON $(table.realname:c) (
+                    comma = " "
+                    for field
+                        if ! defined (.realname)
+                        abort "No realname for field $(field.name) in index $(index.name) in $(table.name)"
+                        endif
+>   $(comma) $(field.realname:c)
+                        comma = ","
+                    endfor
+                    if name = "primary"
+>) WITH PRIMARY;
+                    else
+>);
+                   endif
+>
+                elsif dfl.target_db = "mssql"
+                    his_primary = ""
+                    if name = "primary" | index.unique ?= 1
+                        his_primary = "UNIQUE"
+                    endif
+>CREATE $(his_primary:) INDEX $(index.realname:c) ON $(table.realname:c) (
+                    comma = " "
+                    for field
+                        if ! defined (.realname)
+                        abort "No realname for field $(field.name) in index $(index.name) in $(table.name)"
+                        endif
+>   $(comma) $(field.realname:c)
+                        comma = ","
+                    endfor
+>);
+>
+                elsif dfl.target_db = "mysql"
+                    his_primary = ""
+                    if name = "primary" | index.unique ?= 1
+                        his_primary = "UNIQUE"
+                    endif
+>CREATE $(his_primary:) INDEX $(index.realname:c) ON $(table.realname:c) (
+                    comma = " "
+                    for field
+                        if ! defined (.realname)
+                        abort "No realname for field $(field.name) in index $(index.name) in $(table.name)"
+                        endif
+>   $(comma) $(field.realname:c)
+                        comma = ","
+                    endfor
+>);
+>
+                endif
+            endfor
+        endfor table
+    endfor dfl
+endfunction
+
+
+#----------------------------------------------------------------------
+    function sql_reindex_tables (sqlfile)
+#
+#   Generates an SQL file to reindex the dfl currently loaded.
+#   Before using this function, use dfl::dfl_load to load the DFL file,
+#   and dfl::set_sql_target to set the SQL target database.
+#-----------------------------------------------------------------------
+    echo "Creating $(sqlfile)..."
+    output sqlfile
+    for root.dfl
+        for table where build
+            for index
+>DROP INDEX $(table.realname:c).$(index.realname:c);
+                if dfl.target_db = "odbc"
+>CREATE INDEX $(index.realname:c) ON $(table.realname:c) (
+                    comma = " "
+                    for field
+                        if ! defined (.realname)
+                        abort "No realname for field $(field.name) in index $(index.name) in $(table.name)"
+                        endif
+>   $(comma) $(field.realname:c)
+                        comma = ","
+                    endfor
+                    if name = "primary"
+>) WITH PRIMARY;
+                    else
+>);
+                   endif
+>
+                elsif dfl.target_db = "mssql"
+                    his_primary = ""
+                    if name = "primary" | index.unique ?= 1
+                        his_primary = "UNIQUE"
+                    endif
+>CREATE $(his_primary:) INDEX $(index.realname:c) ON $(table.realname:c) (
+                    comma = " "
+                    for field
+                        if ! defined (.realname)
+                        abort "No realname for field $(field.name) in index $(index.name) in $(table.name)"
+                        endif
+>   $(comma) $(field.realname:c)
+                        comma = ","
+                    endfor
+>);
+>
+                endif
+            endfor
+        endfor table
+    endfor dfl
+endfunction
+

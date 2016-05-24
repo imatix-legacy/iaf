@@ -1,0 +1,180 @@
+<screen object = "fieldrule" style = "list"  query = "bysource" >
+<handler event = "on_init" >
+    fld_field_name           = Session ("field_name")
+    fld_fieldrule_sourceid   = Session ("field_id")
+    fld_fieldrule_formid     = Session ("form_id")
+</handler>
+    <invoke macro = "fieldrule" />
+<match name = "sourceid" />
+</screen>
+
+<screen object = "fieldrule" style = "select" >
+<handler event = "on_init" >
+    fld_field_name           = Session ("field_name")
+    fld_fieldrule_sourceid   = Session ("field_id")
+    fld_fieldrule_formid     = Session ("form_id")
+</handler>
+    <invoke macro = "fieldrule" />
+</screen>
+
+<screen object = "fieldrule" style = "create" >
+<invoke macro = "fieldrule" />
+<var name = "fld_field_name"   />
+<var name = "fld_target_name"  />
+<handler event = "on_init" >
+    fld_field_name           = Session ("field_name")
+    fld_fieldrule_sourceid   = Session ("field_id")
+    fld_fieldrule_formid     = Session ("form_id")
+</handler>
+<page><form>
+<layout>
+<field name = "field_name"  label = "First field"  size = "50" attr = "plain" />
+<field name = "target_name" label = "Second field" size = "50" attr = "plain" />
+<action name = "target" image = "select" type = "image" join = "1"/>
+<field name = "rule" />
+<text>The field formats specify a structure for the field contents.  Each character
+in the format is matched with one corresponding character in the field value.
+</text>
+<text>To match numeric digits, use '9'.  To match any letter, use 'X'.  To match any 
+character at all, use '?'.
+</text>
+<text>To stop matching (i.e. allow anything else to follow) use '*'.
+</text>
+<text>All other characters in the format - e.g. hyphens, dots, other letters - specify
+characters that must occur in the value literally.
+</text>
+<text>If you want to match 'X' or '9' literally, specify '\\X' or '\\9' in the format.
+</text>
+<if condition = "Session (&quot;field_type&quot;) = FIELDTYPE_SELECT or Session (&quot;field_type&quot;) = FIELDTYPE_RADIO">
+    <field name = "field_valueid_name" label = "Field value" attr = "plain"/>
+    <action name = "field_value" image = "select" type = "image" join = "1"/>
+</if>
+<field name = "sourceparam" />
+<field name = "targetparam" />
+</layout>
+</form>
+<handler action = "target">
+    Session ("field_select") = "target"
+    chain_to "field_select"
+</handler>
+<handler action = "field_value">
+    chain_to "fieldvalue_select"
+</handler>
+</page>
+</screen>
+
+<screen object = "fieldrule" style = "update" >
+<invoke macro = "fieldrule" />
+<var name = "fld_field_name"/>
+<handler event = "on_init" replace = "1">
+    fld_field_name           = Session ("field_name")
+    fld_fieldrule_sourceid   = Session ("field_id")
+    fld_fieldrule_formid     = Session ("form_id")
+    fieldrule_recv_key
+    <fetch/>
+    <step>
+    if fld_fieldrule_rule = FIELDRULE_FORVALUE or _
+       fld_fieldrule_rule = FIELDRULE_FORVALUE_EMPTY then
+        fld_field_valueid      = fld_fieldrule_sourceparam
+        fld_field_valueid_name = fld_fieldrule_targetparam
+        fld_fieldrule_sourceparam = ""
+        fld_fieldrule_targetparam = ""
+    end if
+    </step>
+</handler>
+<page><form>
+<layout>
+<field name  = "field_name"  label = "First field"  size = "50" attr = "plain" />
+<field name  = "targetid">
+    <lookup>
+        <field name = "name"/>
+    </lookup>
+</field>
+<field name  = "rule" />
+<if condition = "Session (&quot;field_type&quot;) = FIELDTYPE_SELECT or Session (&quot;field_type&quot;) = FIELDTYPE_RADIO">
+    <field name  = "field_valueid_name" label = "Field value" attr = "plain"/>
+    <action name = "field_value" image = "select" type = "image" join = "1"/>
+</if>
+<field name = "sourceparam" />
+<field name = "targetparam" />
+</layout>
+</form>
+<handler action = "target">
+    chain_to "field_select"
+</handler>
+<handler action = "field_value">
+    chain_to "fieldvalue_select"
+</handler>
+</page>
+</screen>
+
+<macro name = "fieldrule" >
+<macro_attr name = "detail" value = "fieldrule_update" />
+<macro_attr name = "item"   value = "Form Field Rule"  />
+<enum domain = "fieldtype"/>
+<match name = "formid" />
+<var name = "fld_field_valueid"     />
+<var name = "fld_field_valueid_name"/>
+<handler event = "on_return">
+    if Session ("select_made") = 1 then
+        select case cur_called
+            case "field_select"
+                fld_fieldrule_targetid = Session ("id")
+                fld_target_name        = Session ("name")
+            case "fieldvalue_select"
+                fld_field_valueid      = Session ("encoding")
+                fld_field_valueid_name = Session ("shownvalue")
+        end select
+    end if
+</handler>
+<handler event = "on_accept">
+    select case CLng (fld_fieldrule_rule)
+        case FIELDRULE_FORMATTED
+            source_fmt = 1
+            target_fmt = 0
+        case FIELDRULE_DEPENDENT
+            source_fmt = 0
+            target_fmt = 1
+        case FIELDRULE_FORMATDEP
+            source_fmt = 1
+            target_fmt = 1
+        case else
+            source_fmt = 0
+            target_fmt = 0
+    end select
+    If source_fmt = 1 and fld_fieldrule_sourceparam = "" Then
+        cur_message = "Enter format for first field"
+        cur_error   = "sourceparam"
+        exception_raised = TRUE          
+    elseif target_fmt = 1 and fld_fieldrule_targetparam = "" Then
+        cur_message = "Enter format for second field"
+        cur_error   = "targetparam"
+        exception_raised = TRUE          
+    End If
+    If exception_raised = FALSE and CLng (fld_fieldrule_rule) &lt;&gt; FIELDRULE_FORMATTED and fld_fieldrule_targetid = 0 then
+        cur_message = "Enter Second Field"
+        exception_raised = TRUE          
+    end If
+    If exception_raised = FALSE and CLng (fld_fieldrule_rule) &lt;&gt; FIELDRULE_FORMATTED and _
+       fld_fieldrule_targetid = fld_fieldrule_sourceid then
+        cur_message = "Target must be not the same than source field"
+        exception_raised = TRUE          
+    end If
+    If exception_raised = FALSE and ( _
+       CLng (fld_fieldrule_rule) = FIELDRULE_FORVALUE or _
+              CLng (fld_fieldrule_rule) = FIELDRULE_FORVALUE_EMPTY )Then
+        If Session ("field_type") &lt;&gt; FIELDTYPE_SELECT and _
+           Session ("field_type") &lt;&gt; FIELDTYPE_SELECT then
+            cur_message = "Wrong rule, only for type select or radio"
+            exception_raised = TRUE
+        ElseIf fld_field_valueid_name = "" Then
+            cur_message = "Select value for the field"
+            exception_raised = TRUE
+        Else
+            fld_fieldrule_sourceparam = fld_field_valueid
+            fld_fieldrule_targetparam = fld_field_valueid_name
+        End If
+    End If
+</handler>
+</macro>
+

@@ -1,0 +1,146 @@
+/*
+    SQL optimizing loader -- Pieter Hintjens 2003-03-27
+
+    This script generates the storeproc .bat/.sql/.pl files along
+    with *.sql_load and *.sql_new files for each stored procedure.
+    Requires Perl on the database server system.
+    
+    Package these files for use on the database server:
+        - storeproc.bat
+        - storeproc.sql
+        - storeproc.pl
+        - *.sql_load
+        - *.sql_new
+    
+    All filenames have a 'u' suffix when generated for Unicode.
+    On the database server, run:
+
+        storeproc fast      for a fast reload
+        storeproc full      for a full reload
+        storeproc clean     to remove cached SQL files
+
+    Note that the 'fast' reload will be slow the very first time it runs.
+    Do not delete the resulting *.sql_old files - these are a cache of
+    what is in the database, and the 'fast' reload uses these to detect
+    and load only changed procedures.
+*/
+if !defined (switches.database)
+    abort "Syntax: gsl -database:odbcname storeproc"
+endif
+.template
+.xml from "storeproc.xml"
+.for root.storeproc
+.   if unicode
+.       suffix = "u"
+.   else
+.       suffix = ""
+.   endif
+.   output "storeproc$(suffix).bat"
+@echo off
+rem Generate SQL optimizing loader
+rem Requires Perl on the database server system.
+rem
+rem Package these files for use on the database server:
+rem     - storeproc.bat
+rem     - storeproc.sql
+rem     - storeproc.pl
+rem     - *.sql_load
+rem     - *.sql_new
+rem
+rem All filenames have a 'u' suffix when generated for Unicode.
+rem On the database server, run:
+rem
+rem     storeproc fast      for a fast reload
+rem     storeproc full      for a full reload
+rem 
+rem note that the 'fast' reload will be slow the first time you run it.
+rem Do not delete the resulting *.sql_old files - these are a cache of
+rem what is in the database, and the 'fast' reload uses these to detect
+rem and load only changed procedures.
+rem
+if %1.==fast. goto fast
+if %1.==full. goto full
+if %1.==full. goto clean
+echo Syntax: storeproc$(suffix) fast/full
+goto exit
+
+:full
+    isql -d $(switches.database) -U sa -P -n -i storeproc$(suffix).sql
+    if exist *.sql_new  del *.sql_new
+    if exist *.sql_load del *.sql_load
+    goto exit
+
+:fast
+    if not exist .sqlcache\\nul mkdir .sqlcache
+.   for procedure
+    if not exist $(name)$(suffix).sql_new goto ignore_$(index ())
+    if not exist .sqlcache\\$(name)$(suffix).sql_old isql -d $(switches.database) -U sa -P -Q "sp_helptext $(name)" | perl storeproc.pl > .sqlcache\\$(name)$(suffix).sql_old
+    diff -B -w .sqlcache\\$(name)$(suffix).sql_old $(name)$(suffix).sql_new >nul
+    if not errorlevel 1 goto skip_$(index ())
+        echo Loading $(name)$(suffix)...
+        isql -d $(switches.database) -U sa -P -n -i $(name)$(suffix).sql_load
+:skip_$(index ())
+    copy/y $(name)$(suffix).sql_new .sqlcache\\$(name)$(suffix).sql_old >nul
+    del $(name)$(suffix).sql_new
+    del $(name)$(suffix).sql_load
+:ignore_$(index ())
+
+.   endfor
+    goto exit
+
+:clean
+    del/s/q .storeproc
+    goto exit
+    
+:exit
+.   for procedure
+.       output "$(name)$(suffix).sql_new"
+Text
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+$(string.trim (text):)
+.       output "$(name)$(suffix).sql_load"
+IF exists (select * from sysobjects where id = object_id('dbo.$(name:)'))
+    drop procedure dbo.$(name:)
+GO
+$(string.trim (text):)
+GO
+GRANT EXECUTE ON dbo.$(name) TO public
+GO
+.   endfor
+.   output "storeproc$(suffix).sql"
+.   for procedure
+IF exists (select * from sysobjects where id = object_id('dbo.$(name:)'))
+    drop procedure dbo.$(name:)
+GO
+$(string.trim (text):)
+GO
+GRANT EXECUTE ON dbo.$(name) TO public
+GO
+
+.   endfor
+.endfor
+.output "storeproc.pl"
+#   Reformats a stored procedure printed by sp_helptext
+#   Gives something resembling an original SQL file.
+#   sp_helptext produces lines folded with spaces and tabs
+#   A space-line following a tab-line signals a new real line
+#   
+while (<>) {
+    chop;
+    if (/^ /) {
+        s/^\\s//;
+        s/\\s*$//;
+        print "\\n" if $had_tab;
+        print $_;
+        $had_tab = 0;
+    }
+    elsif (/^\\t/) {
+        s/^\\s//;
+        s/\\s*$//;
+        print $_;
+        $had_tab = 1;
+    }
+}
+print "\\n";
+.endtemplate
+

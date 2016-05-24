@@ -1,0 +1,10 @@
+<object name = "language">
+    <view name = "summary" >
+        <field name = "code"  />
+        <field name = "name"  />
+    </view>
+    <require>
+        <field name = "code" />
+        <field name = "name" />
+    </require>            
+</object>

@@ -1,0 +1,102 @@
+#
+#   pflload.gsl - Load PFL file and de-normalise it
+#
+#   Written: 1999/12/24  Pieter Hintjens <ph@imatix.com>
+#   Revised: 2000/02/25  Pieter Hintjens <ph@imatix.com>
+#
+
+include "pflparse.gsl"      #   Generated from pfl.xnf
+include "pflmacro.gsl"      #   Screen macros
+include "pflstyle.gsl"      #   Screen styles
+
+------------------------------------------------------------------------
+    function pfl_load (pflfile)
+#
+#   Loads and validates a pfl file as a child of the root scope, called
+#   "pfl".  Implicitly loads and validates the corresponding OFL
+#   and DFL files.
+#
+------------------------------------------------------------------------
+
+if ! exists (pflfile)
+    abort "$(pflfile) not found"
+else
+    xml from pflfile
+endif
+
+if count (root.ofl) = 0
+    oflfile = root-> pfl.ofl? root-> pfl.name + ".ofl" 
+    ofl_load (oflfile)
+endif
+
+echo "Loading and processing $(pflfile)..."
+for root.dfl
+for root.ofl
+for root.pfl
+
+    #   Include everything from <include> files
+    for [include]
+        xml to pfl from filename
+        for pfl.pfl
+            abort "$(filename) is not a valid include file"
+        endfor
+    endfor
+
+    #   Validate PFL and resolve families and styles
+    errors = 0
+
+    echo "Resolving screen macros..."
+    for macro as child
+        resolve_screen_macros ()
+    endfor
+    for . as child
+        resolve_screen_macros ()
+    endfor
+
+    echo "Resolving screen styles..."
+    for screen where defined (style)
+        resolve_screen_style ()
+    endfor
+
+    if exists ("rebuild.pfl")
+        xml to root as build_screen from "rebuild.pfl"
+        for screen
+            if count (root.build_screen, count.name = screen.name)
+                screen.build = 1
+            else
+                screen.build = 0
+            endif
+        endfor
+    else
+        for screen
+            screen.build = 1
+        endfor
+    endif
+
+    echo "Parsing screen definitions..."
+    #   We'll do just one screen if match is specified
+    for screen where !defined (match) | substr (name,0,,length (match)) = match
+        if screen.build
+            pfl_parse_screen ()
+        endif
+    endfor
+    if errors = 1
+        abort "1 error in PFL file - aborting"
+    elsif errors > 0
+        abort "$(errors) errors in PFL file - aborting"
+    endif
+
+endfor pfl
+endfor ofl
+endfor dfl
+endfunction
+
+#   General error handler, aborts after 16 errors
+function error (message)
+    echo message
+    errors += 1
+    if errors > 16
+        abort "Too many errors - aborting"
+    endif
+endfunction
+

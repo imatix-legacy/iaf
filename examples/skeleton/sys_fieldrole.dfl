@@ -1,0 +1,18 @@
+<table name = "fieldrole" description = "Form field showed for one role">
+    <field name = "formid"      domain = "id"       >Parent form</field>
+    <field name = "fieldid"     domain = "id"       >Field id</field>
+    <field name = "role"        domain = "shortname">Role value</field>
+
+    <link type = "childof" table = "form"  />
+    <link type = "childof" table = "field" />
+
+    <index name = "primary">
+        <field name = "role"    />
+        <field name = "fieldid" />
+    </index>    
+    <index name = "byrole">
+        <field name = "formid"  />
+        <field name = "role"    />
+        <field name = "fieldid" />
+    </index>
+</table>

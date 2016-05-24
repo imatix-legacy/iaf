@@ -1,0 +1,54 @@
+<table name = "fieldrule" description = "Form field rule">
+ Defines a dependency rule between two dataform fields.  Dependency rules
+ allow form validation involving two fields.  The rules are tested in the
+ order that they are defined.
+    <field name = "id"          domain = "recordid" >Record id</field>
+    <field name = "formid"      domain = "id"       >Parent form</field>
+    <field name = "sourceid"    domain = "id"       >Source field id</field>
+    <field name = "targetid"    domain = "id"       >Target field id</field>
+    <field name = "rule"        domain = "fieldrule">Rule to apply</field>
+    <field name = "sourceparam" domain = "longname" >Format for first field
+        <rule name = "show" when = "all" what = "showsize" value = "30" />
+    </field>
+    <field name = "targetparam" domain = "longname" >Format for second field
+        <rule name = "show" when = "all" what = "showsize" value = "30" />
+    </field>
+    <field                      domain = "audit"   />
+
+    <link type = "childof" table = "form" />
+    <link type = "childof" table = "field" ><field name = "sourceid"/></link>
+    <link type = "childof" table = "field" ><field name = "targetid"/></link>
+
+    <index name = "bysource">
+        <field name = "formid"  />
+        <field name = "sourceid"/>
+        <field name = "id"      />
+    </index>
+    <index name = "bytarget">
+        <field name = "formid"  />
+        <field name = "targetid"/>
+        <field name = "id"      />
+    </index>
+</table>
+
+<domain name = "fieldrule" type = "numeric" size = "2" default = "1">
+    <value key = "1" label = "If first field filled, second must be filled"
+           name = "both"  />
+    <value key = "2" label = "If first field filled, second must be empty"
+           name = "either"  />
+    <value key = "3" label = "First field must follow a specific format"
+           name = "formatted"  />
+    <value key = "4" label = "If first field filled, second must follow format"
+           name = "dependent"  />
+    <value key = "5" label = "If first field follows format, second must also follow format"
+           name = "formatdep"  />
+    <value key = "6" label = "If first field have this value, second must be filled"
+           name = "forvalue"  />
+    <value key = "7" label = "If first field have this value, second must be empty"
+           name = "forvalue_empty"  />
+    <rule name = "show" when = "all" what = "select" value = "drop down" />
+</domain>
+
+<domain name = "formdata" type = "textual" size = "8000" required = "1" >
+    <rule name = "show" when = "all" what = "hidden" value = "1" />
+</domain>

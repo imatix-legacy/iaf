@@ -1,0 +1,473 @@
+./*
+    workflow.gsl - Implement object workflow state-machine
+  
+    Written:    1999/11/28  Pieter Hintjens  <ph@imatix.com>
+    Revised:    2000/08/09  Pieter Hintjens  <ph@imatix.com>
+  
+    Generates the workflow engine for an object.  We do not try
+    to use a compact table-driven FSM - the implementation is a
+    simple multi-level case statement.
+
+.*/
+.engine ?= "dynamic"
+.template 0
+#   Resolve state class inheritence
+for state where defined (class)
+    if count (workflow.class, count.name = state.class) = 0
+        abort "Class '$(state.class)' is not defined in workflow"
+    endif
+    for workflow.class where name = state.class
+        for event 
+            if count (state.event, count.name = event.name) = 0
+                copy event to state
+            endif
+        endfor
+    endfor
+endfor
+
+#   Enumerate actions at workflow level and number them all
+for state
+    for event
+        for action
+            if count (workflow.action, count.name = action.name) = 0
+                copy action to workflow
+            endif
+            if defined (what)
+                for workflow.action as wfaction where name = action.name
+                    if count (what, name = action.what) = 0
+                        new what to wfaction
+                            what.name = action.what
+                        endnew
+                    endif 
+                endfor
+            endif
+            if defined (argument)
+                event.argument = argument
+            endif
+            for workflow.action as wfaction where name = action.name
+                event.actionlist = "$(event.actionlist?)" + item () + " "
+            endfor
+        endfor
+    endfor
+endfor
+
+.endtemplate
+.if engine = "static"
+.echo "Creating wf_$(workflow.name).asp..."
+.output "wf_$(workflow.name).asp"
+<%
+'
+'   wf_$(name).asp - Workflow layer for $(name)
+'
+'   Generated: $(date)
+'   Schema written by iMatix Corporation <pieter.hintjens@imatix.com>
+'
+'   Set initial state for object
+
+function wf_$(workflow.name)_initial_state
+.   for state where item () = 1
+    wf_$(workflow.name)_initial_state = "$(name)"
+.   endfor
+end function
+
+'   This subroutine implements the workflow state-machine for the
+'   $(name) object.  The workflow subroutine accepts a state and
+'   event as input and returns a state after all actions have been
+'   executed.
+'   Input:  cur_state   Name of current state
+'           cur_event   Name of event that was invoked
+'   Output: cur_state   New state after transition
+'
+'   The function return code is 0 if the state transition was valid,
+'   -1 if the cur_event is illegal in this state, and -2 if cur_state
+'   is not a valid state.
+'
+'   After calling a program from the workflow, you must call this
+'   routine again with the current state name and "_continue" event.
+'   When the workflow settles in a steady state, we call the subroutine
+'   wf_$(name)_update to update the database workflow state as required.
+'
+the_next_event = ""
+function wf_$(workflow.name)_execute (cur_state, cur_event)
+    wf_$(workflow.name)_execute = 0
+    exception_raised = FALSE
+    return_requested = FALSE
+    safety_net = 10
+    dim actions
+    if cur_event <> "_continue" then
+.for handler where name = "on_execute"
+    $(handler.)
+.endfor
+    end if
+
+    '   Loop so long as the workflow produces internal events
+    do until cur_event = "" or exception_raised
+        if cur_event = "_continue" then
+            ' Continue after calling subprogram
+            the_next_event = Session ("$(workflow.name)_nextevent")
+            nextstate      = Session ("$(workflow.name)_nextstate")
+            action_list    = Session ("$(workflow.name)_action_list")
+            action_args    = Session ("$(workflow.name)_action_args")
+            action         = Session ("$(workflow.name)_action")
+        else
+            the_next_event = ""
+            action_list    = ""
+            select case cur_state
+.for state
+                case "$(name)"
+                    select case cur_event
+.   for event
+                        case "$(name)"
+                            action_list = "$(actionlist?)"
+                            action_args = "$(event.argument?)"
+                            nextstate   = "$(nextstate?state.name)"
+.       if count (workflow.state, count.name = nextstate?state.name) = 0
+.           echo "Next state: $(nextstate) not defined"
+.       endif
+.   endfor
+                        case else
+                            wf_$(workflow.name)_execute = -1
+                            cur_message = "Invalid event: " & cur_event
+                            exit function
+                    end select
+.endfor
+                case else
+                    wf_$(workflow.name)_execute = -2
+                    cur_message = "Invalid state: " & cur_state
+                    exit function
+            end select
+            action  = 0
+        end if        
+
+        '   Now execute the action list
+        actions = Split (action_list)
+        do while action < UBound (actions)
+            Select Case CInt (actions (action))
+.for action
+.   if name = "return-to-parent"
+                case $(item ()) return_requested = TRUE
+.   else
+                case $(item ()) $(name:c) action_args
+.   endif
+.endfor
+            end select
+            action = action + 1
+            if exception_raised then exit do
+            if redirect_to <> "" then
+                Session ("$(workflow.name)_nextevent") = the_next_event
+                Session ("$(workflow.name)_nextstate") = nextstate
+                Session ("$(workflow.name)_action_list") = action_list
+                Session ("$(workflow.name)_action_args") = action_args
+                Session ("$(workflow.name)_action") = action
+                exit function
+            end if
+        loop
+        cur_event = the_next_event
+        Session ("$(workflow.name)_action_list") = ""
+        Session ("$(workflow.name)_action") = 0   
+        Session ("$(workflow.name)_nextstate") = ""
+
+        if not exception_raised and nextstate <> "" then 
+            cur_state = nextstate
+        end if
+        safety_net = safety_net - 1
+        if safety_net = 0 then
+            cur_message = "Workflow was looping in " & cur_state
+            exit function
+        end if
+    loop
+    if not exception_raised then
+        wf_$(name)_update cur_state
+    end if
+.for handler where name = "on_commit"
+    if not exception_raised then
+    $(handler.)
+    endif
+.endfor
+.for handler where name = "on_rollback"
+    if exception_raised then
+    $(handler.)
+    endif
+.endfor
+    if return_requested then return_to_parent
+end function
+
+
+'   Returns list of methods (events) that are valid in the current state,
+'   depending on the role specified.
+'
+.template 0
+#  Invert events and roles to get list of events per role in state
+for state
+    for event
+        if count (workflow.event, count.name = event.name) = 0
+            copy event to workflow
+        endif
+        for role
+            if count (state.role, count.name = role.name) = 0
+                new role to state as newrole
+                    newrole.name    = role.name
+                    newrole.methods = ""
+                endnew
+            endif
+            for state.role as staterole where name = role.name | role.name = "*"
+                if count (staterole.event, count.name = event.name) = 0 \
+                &  count (workflow.method, count.name = event.name) > 0
+                    new event to staterole as newevent
+                        newevent.name = event.name
+                    endnew
+                    staterole.methods += "$(event.name)" + " "
+                endif
+            endfor
+        endfor
+    endfor
+endfor
+.endtemplate
+.-
+function wf_$(workflow.name)_methods (cur_state, role)
+    wf_$(workflow.name)_methods = ""
+    select case cur_state
+.for state where count (role)
+        case "$(name)"
+.   if count (role) = 1
+.       if state-> role.name = "*"
+            wf_$(workflow.name)_methods = "$(state-> role.methods:)"
+.       else
+            if role = "$(state-> role.name:)" then
+                wf_$(workflow.name)_methods = "$(state-> role.methods:)"
+            end if
+.       endif
+.   else
+            Select case role
+.       for role where name <> "*"
+                case "$(name:)"
+                    wf_$(workflow.name)_methods = "$(methods:)"
+.       endfor
+.       for role where name = "*"
+                case else
+                    wf_$(workflow.name)_methods = "$(methods:)"
+.       endfor
+            end select
+.   endif
+.endfor
+    end select
+end function
+
+function wf_$(workflow.name)_text (state)
+    select case state
+.for state
+        case "$(name)"
+.   text = trim (state.?"")
+.   char_nbr = 0
+.   while char_nbr < length (text)
+.       if substr (text, char_nbr,,1) = "\n"
+.           if char_nbr > 0
+.               text = substr (text, 0, char_nbr - 1) + " " + substr (text, char_nbr + 1)
+.           else
+.               text = " " + substr (text, char_nbr + 1)
+.           endif
+.       endif
+.       char_nbr += 1
+.   endwhile
+            wf_$(workflow.name)_text = "$(text:)"
+.endfor
+    end select
+end function
+
+function wf_$(workflow.name)_hint (method)
+    select case method
+.for method
+        case "$(name)"
+            wf_$(workflow.name)_hint = "$(hint:)"
+.endfor
+    end select
+end function
+
+function wf_$(workflow.name)_logged (method)
+    select case method
+.for method
+        case "$(name)"
+            wf_$(workflow.name)_logged = $(log?0)
+.endfor
+        case else
+            wf_$(workflow.name)_logged = 0
+    end select
+end function
+%>
+.-
+.close
+.endif
+.output "wf_$(workflow.name).lst"
+.for workflow.action
+.title = "   " + "$(name:upper)" + "   "
+.while length (title) < 74
+.   title = "*" + title + "*"
+.endwhile
+.if length (title) < 75
+.   title += "*"
+.endif
+.title = "'" + title + "'"
+$(title:)
+
+.if defined (what)
+sub $(name:c) (argument)
+    Select case argument
+.   for what
+        case "$(name)"
+.   endfor
+    end select
+.else
+sub $(name:c) (args)
+.endif
+end sub
+
+
+.endfor
+
+Events:
+.for workflow.event
+$(name)
+.endfor
+.output "wf_$(workflow.name).txt"
+Workflow Diagram - $(workflow.name).wfl
+.for state
+
+    State: $(name)
+    ----------------------------------------
+    $(trim (state.?""):)
+    
+    Event:      Allowed roles:                      Next state:
+.for event
+.   roles = ""
+.   for role
+.       roles += name + " "
+.   endfor
+    $(name)     $(roles)                        ==> $(nextstate?"Unchanged")
+.   for action
+              ( $(name) ($(argument?))          )
+.   endfor
+.-
+.endfor
+.endfor
+.close
+.-
+.if engine = "dynamic"
+.filename = "sub_$(workflow.name)_core.asp"
+.echo "Creating $(filename)..."
+.output filename
+<%
+'
+'   $(filename) - Workflow Core
+'   
+'   This subroutine implements the workflow state-machine for the
+'   $(name) object.  The workflow subroutine accepts a state and
+'   event as input and returns a state after all actions have been
+'   executed.
+'   Input:  cur_state   Name of current state
+'           cur_event   Name of event that was invoked
+'   Output: cur_state   New state after transition
+'
+'   The function return code is 0 if the state transition was valid,
+'   -1 if the cur_event is illegal in this state, and -2 if cur_state
+'   is not a valid state.
+'
+'   After calling a program from the workflow, you must call this
+'   routine again with the current state name and "_continue" event.
+'   When the workflow settles in a steady state, we call the subroutine
+'   wf_$(name)_update to update the database workflow state as required.
+'
+the_next_event = ""
+function wf_$(workflow.name)_execute (cur_state, cur_event)
+    wf_$(workflow.name)_execute = 0
+    exception_raised = FALSE
+    return_requested = FALSE
+    safety_net = 10
+    dim actions
+    if cur_event <> "_continue" then
+.for handler where name = "on_execute"
+    $(handler.)
+.endfor
+    end if
+
+    '   Loop so long as the workflow produces internal events
+    do until cur_event = "" or exception_raised
+        if Session ("workflow_debug") = 1 then
+            cur_message = cur_message & " State=" & cur_state & " event=" & cur_event
+        end if
+        if cur_event = "_continue" then
+            ' Continue after calling subprogram
+            the_next_event = Session ("$(workflow.name)_nextevent")
+            nextstate      = Session ("$(workflow.name)_nextstate")
+            action_list    = Session ("$(workflow.name)_action_list")
+            action_args    = Session ("$(workflow.name)_action_args")
+            action         = Session ("$(workflow.name)_action")
+        else
+            the_next_event = ""
+            action_list    = Session ("wf_$(workflow.name)").action_list (cur_state, cur_event)
+            nextstate      = Session ("wf_$(workflow.name)").next_state (cur_state, cur_event)
+            action_args    = Session ("wf_$(workflow.name)").action_args (cur_state, cur_event)
+            action         = 0
+        end if        
+
+        '   Now execute the action list
+        actions = Split (action_list)
+        if Session ("workflow_debug") = 1 then
+            cur_message = cur_message & " Exec action=" & action & "/" & UBound (actions)
+        end if
+        do while action < UBound (actions)
+            if Session ("workflow_debug") = 1 then
+                cur_message = cur_message & " Action=" & actions (action)
+            end if
+            Select Case actions (action)
+.for action
+                case "$(name:c)"
+.   if name = "return-to-parent"
+                    return_requested = TRUE
+.   else
+                      $(name:c)                         action_args
+.   endif
+.endfor
+            end select
+            action = action + 1
+            if exception_raised then exit do
+            if redirect_to <> "" then
+                Session ("$(workflow.name)_nextevent") = the_next_event
+                Session ("$(workflow.name)_nextstate") = nextstate
+                Session ("$(workflow.name)_action_list") = action_list
+                Session ("$(workflow.name)_action_args") = action_args
+                Session ("$(workflow.name)_action") = action
+                exit function
+            end if
+        loop
+        cur_event = the_next_event
+        Session ("$(workflow.name)_action_list") = ""
+        Session ("$(workflow.name)_action") = 0   
+        Session ("$(workflow.name)_nextstate") = ""
+
+        if not exception_raised and nextstate <> "" then 
+            cur_state = nextstate
+        end if
+        safety_net = safety_net - 1
+        if safety_net = 0 then
+            cur_message "Workflow was looping in " & cur_state
+            exit function
+        end if
+    loop
+    if not exception_raised then
+        wf_$(name)_update cur_state
+    end if
+.for handler where name = "on_commit"
+    if not exception_raised then
+    $(handler.)
+    endif
+.endfor
+.for handler where name = "on_rollback"
+    if exception_raised then
+    $(handler.)
+    endif
+.endfor
+    if return_requested then return_to_parent
+end function
+%>
+.close
+.endif

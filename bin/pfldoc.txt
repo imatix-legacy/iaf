@@ -1,0 +1,780 @@
+PFL DOCUMENTATION NOTES
+
+    The following document is a brutal summary of the PFL syntax.  This is
+    a work in progress.  A fuller PFL user's guide will be available soon
+    from iMatix.
+
+<screen
+    name                    ASP program name
+    item                    ... should be dfl table description
+    main                    if 1, is main program of application
+    labelwidth              can be overridden in <page>
+    formattrs               TABLE attributes used for page form
+    initial                 initial page, else first in screen
+    query                   default query name
+    limit                   default limit for queries
+    hints                   if 0, hints are not shown
+
+<use object = "xxx"  />
+    includes specified object handler interface - 0 or more
+    
+<global
+    name                    a global application variable
+    type                    (textual) | numeric
+    initial                 initial value for variable ("" or 0)
+    
+<var
+    name                    name of variable - initialise in on_init
+    type                    textual, numeric, date, etc.
+    value                   initial value for variable
+    occurs                  if defined, creates array
+
+<enum
+    domain                  name of DFL domain, numeric enumerated
+    
+<page                       
+    title                   title shown on screen
+    name                    internal name, optional if just 1 page
+    labelwidth              width of label for detail blocks
+    padding                 padding between table cells
+    object                  name of object, default 1st on screen
+    view                    name of view, if none, no data access
+
+    <toolbar                toolbar for screen
+        visible             0 | (1)
+        <action
+            name            name of action
+            text            displayed prompt, default is Name
+            fields          1 | (0) - check required fields
+            confirm         message to show to confirm action
+            condition       VBScript condition that shows/hides action
+            shortcut        Shortcut key (MSIE only)
+            hint            Popup, status bar message
+            url             Action links directly to URL
+
+    <form...                see details below
+    <handler                specific handler for this page
+</page>
+
+<handler
+    action              name of action
+    event               name of standard event:
+                          * on_global       - when program (re)starts
+                          * on_init         - when program initialises
+                          * on_exit         - when program terminates
+                          * on_return       - after return from called program
+                          * on_savecontext  - context save
+                          * on_loadcontext  - context load
+                          * on_oalerror     - after an OAL error
+                          * on_fatalerror   - after an OAL error
+                          * on_fetch        - after fetch of data, may specify object
+                          * on_create       - before create, all objects
+                          * on_update       - before update, all objects
+                          * on_accept       - before create or update, all objects
+                          * on_delete       - before delete, all objects
+                          * on_lookup       - before a lookup call
+                          * on_chainto      - before calling a program
+                          * on_initpage     - (page) at initialisation
+                          * on_showpage     - (page) before showing a page
+                          * on_getdata      - (page) after getting data from page
+                          * on_click        - (page) when clicking on a field
+                          * on_select       - (page) when selecting from a list
+                                              or selecting a drop-down value
+                          * on_goback       - (page) on Back action
+                          * on_toolbar      - (page) instead of normal toolbar
+                          * on_showrow      - (page) showing each summary row
+                          * on_enter        - (page) after Enter on input screens
+    page                in screen handler, pushes to page level
+    source              name of source file containing code
+    language            optional language constraint
+    getdata             (1) | 0 - get data from form
+    .body               action body output to generated program
+
+    statements:
+    <query              send OAL 'query' to object handler
+        object          name of object, default is first 'use'
+        name            name of query, default is screen.query or "summary"
+        control         (first) | last | gt | ge | lt | ge | eq | same
+        limit           1..n (20)
+        inverted        (0)|1
+        <match          Match these fields
+            name        field name
+            value       optional expression for field
+        <queryarg       Query argument
+            name        field name
+            value       optional expression for field
+        <found>         statements when 1 or more items found
+        <each>          statement executed for each found item
+        <empty>         statements when zero items found
+        <error>         statements when error occurred
+
+    <create             send OAL 'create' to object handler
+        object          name of object, default is first 'use'
+        <ok>            statements when create was successful
+        <error>         statements when error occurred
+
+    <fetch              send OAL 'fetch' to object handler
+        object          name of object, default is first 'use'
+        view            name of view, default is "detail"
+        <ok>            statements when item was found
+        <missing>       statements when item was not found
+        <error>         statements when error occurred
+
+    <update             send OAL 'update' to object handler
+        object          name of object, default is first 'use'
+        view            name of view, default is "detail"
+        <ok>            statements when update was successful
+        <error>         statements when error occurred
+
+    <delete             send OAL 'delete' to object handler
+        object          name of object, default is first 'use'
+        <ok>            statements when delete was successful
+        <error>         statements when error occurred
+
+    <execute            send OAL 'execute' to object handler
+        object          name of object, default is first 'use'
+        method          name of method
+        <ok>            statements when execute was successful
+        <error>         statements when error occurred
+
+    <step
+        .body           action body output to generated program
+
+    <save>              save last OAL result tree (allows sub queries)
+
+    <store              save object view in ODX (Object Data Exchange) XML tree
+        object          name of object, default is first 'use'
+        view            name of view, default is "detail"
+
+ODX is <object name = "xxx">
+          <field name = "xxx">value</field>
+          ...
+       </object>
+
+VBScript API for Handler code
+    fld_xxx             fields shown on screen 
+    cur_message         current displayed error message
+    cur_cursor          position of cursor, must be an input field name
+    cur_page            name of current page, or next to display
+    cur_userid          current user id
+    cur_userlogin       current user login name
+    cur_usersurname     current user surname
+    cur_userforename    current user forename
+    cur_useremail       current user email    
+    chain_to "X"        call program X passing arguments Y
+    return_to_parent    return to parent program
+    return_to_login     logout user, return to login screen
+    return_to "X"       return to program X
+    fatal_error "X"     abort session with fatal error message
+    object_id           current object id or primary key field
+    cur_message         error message in error event handlers
+    cur_object          object used in last OAL access
+    cur_called          last program called
+    page_title          title of current page
+    [obj]_[query]_put_params    Set OAL parameters for specified query
+    [obj]_[query]_get_params    Get parameters from OAL
+    [obj]_[view]_put_item       Put item (object) for specified view
+    [obj]_[view]_get_item       Get item for specified view
+    [obj]_put_key               Put object key fields to OAL
+    [obj]_get_key               Get object key fields from OAL
+    [obj]_pass_key              Put object key fields to session
+    [obj]_recv_key              Put object key fields to session
+    [page]_select_item          Select object in list, get item
+
+After <query>
+    query_count         number of items returned
+    query_limit         max. number of items requested
+    
+in on_click
+    click_field         field selected (layout form)
+in on_select
+    fld_xxx             record selected (summary form)
+    
+Session variables
+    showlogo            if 1, logo is displayed.  If 0, not shown.
+    other               anything passed to/from programs
+
+    Tag syntax:
+    
+        <form
+            mode            (output)|input
+
+        <banner
+            image           image filename
+            label           alt text for image
+
+        <hints              hints block
+            <hint
+            .body           hints text
+            
+        <layout>
+
+        <summary
+            alpha           add alpha lookup index 
+            control         if specified, variable is summary size
+
+        <lookup>
+            table           default is first field table
+            select          program to chain to for lookup
+            condition       if false, no selection is possible
+            
+        <sublist>
+            table           default is first field table
+            occurs          for input grids, default is 5
+
+        <text>    
+            before          spacing before, if none, continuous
+            after           spacing after, if none, continuous
+            color           text font color, if not default
+            nowrap          (0)|1  in summary screens
+            align           In summary screens, default is left
+            width           In summary screens, default is automatic
+            script          GSL script that generates HTML output
+            join            if 1, text comes on same line as previous
+                            (layout mode)
+            .body           text body output
+
+        <field>
+            name            name of data item, can come from object
+                            "*" means copy all object view fields
+            object          name of data object, optional
+            view            name of data view, optional
+            type            (textual) | numeric | date | boolean
+            size            Shown and/or internal size
+            required        if 1, field is mandatory
+            value           value for field
+            attr            (input), plain, hilite, title, click
+            cursor          if 1, cursor is placed on field
+            - Can be inherited from DFL domain:
+            hidden	        Field is hidden.
+            html	        Field contains HTML text.
+            password	    Field is a password.  
+            email	        Field is an e-mail address.  
+            attachment	    Field is a file attachment.
+            money           Field contains a monetary amount.
+            startyear	    Field is a date with a specific year range.
+            endyear	        Field is a date with a specific year range.
+            starthour	    Field is a time with a specific hour range.
+            endhour	        Field is a time with a specific hour range.
+            interval	    Field is a time with a minute interval > 1.
+            true	        Field is a boolean field - 'true' text (Yes).
+            false	        Field is a boolean field - 'false' text (No).
+            truncate        (1) Do/don't truncate long text field on lists
+            showsize	    Size of field on screen for textual/numeric fields.
+            rows	        Rows for textbox field.  
+            cols	        Cols for textbox field.
+            label	        Label used for the field.
+            select	        Multi-value select style: (drop down)|radio|radio down
+                            if dynamic=1, label specifies field name
+                            containing non-blank label value
+            case	        Case-conversion rule (none)|upper|lower
+            blank	        If 1, numeric field zero shown as blank.
+            join	        Field is shown on same line as previous field.  
+                            (layout mode)
+            nowrap          (0)|1  in summary screens
+            align           In summary screens, default is left
+            width           In summary screens, default is automatic
+            condition       VBScript condition that shows/hides field
+                            Form fields and layout fields only... do not
+                            put input fields within <if> blocks.
+            prefix          Text shown before field value
+            <rule>.</rule>  Code executed before showing field
+
+            <value          Show field as select or radio field
+                key         field value key
+                label       and label shown on screen
+
+        <action>
+            name            name of action    
+            text            displayed action text, default is Name
+            fields          1 | (0) - check required fields
+            label           optional label shown in layout mode
+            type            (link) | button | image
+            style           HTML stylesheet tag, default 'action'
+            image           filename for images
+            confirm         message to show to confirm action
+            hint            Popup, status bar message
+            join            if 1, field comes on same line as previous
+                            (layout mode, don't mix with 'before')
+            nowrap          (0)|1  in summary screens
+            align           In summary screens, default is left
+            width           In summary screens, default is automatic
+            toolbar         if 1, action also shown on toolbar
+            active          if 0, action is disabled
+            condition       VBScript condition that shows/hides action
+            shortcut        Shortcut key (MSIE only)
+            separator       (1)|0, use separating vertical bars
+
+        <if                 start conditional If block
+            condition       VBScript condition, e.g. boolean variable
+
+    - first page in screen is first page shown to user
+    - names of input and fixed items are unique in entire screen
+    - fields shown outside a block are just stuck together
+    - fields in layout block are formatted in 2-column table
+    - fields in summary block are formatted as tabular list
+    - join applies equally to input and output blocks
+    - in list, primary key is default click
+
+Styles:
+
+    A whole ball game in itself - see pflstyle.gsl for initial
+    explanations.  Most screens are now based on styles.
+
+Macros:
+
+    See pflmacro.gsl.
+    Page name = "*" can contain layout block, which should be defined with
+    'append = "0"', and this is copied after the hints on any page, or
+    before any other items on any page, if the page exists.  Otherwise it
+    is copied *as* each style page (and the style is then applied to it).
+
+PFL
+
+    screen                  :== <screen>
+                                   screen-element
+                                </screen>
+
+    Specifies the name of a screen.  One screen is implemented as a single
+    program, consisting of one or more pages that share common data and
+    code.
+
+    screen-element          :==  [ use                  ]... |
+                                 [ var                  ]... |
+                                 [ cosmetic             ]... |
+                                 { page                 }... |
+                                 [ screen-handler       ]...
+
+    Specifies elements that can be used in a screen.  All screen elements
+    can be inherited from the screen style (to be implemented).
+
+    use                     :== <use>
+                                </use>
+
+    Specifies the name of an object that the screen works with.  The
+    objects must be listed so that the screen can correctly bind with them
+    at initialisation time.  The first object listed acts as the default
+    for pages that do not explicitly refer to an object.
+
+    var                     :== <var>
+                                </var>
+
+    Declares one variable that is global to the screen.
+
+    cosmetic                :== <cosmetic>
+                                </cosmetic>
+
+    Defines a screen cosmetic value - these affect the look and feel of the
+    screen shown to the user.  The possible cosmetic values are defined by
+    the PFL implementation.  For example, for HTML pages, these define the
+    page background color, font size and color, etc.
+
+    page                    :== <page>
+                                   page-element
+                                </page>
+
+    Specifies the name of a screen page.  Each page can show a mix of data
+    and actions as required by the user interface designer.  The first page
+    in the screen is shown by default (unless the on_init event handler
+    specifies another page).
+
+    page-element            :==  [ toolbar              ] |
+                                   form                   |
+                                 [ page-handler         ]...
+
+    Specifies elements that can be used in a screen.  All screen elements
+    can be inherited from the screen style (to be implemented).
+
+    toolbar                 :== <toolbar>
+                                 [ toolbar-action       ]...
+                                </toolbar>
+
+    The toolbar handles the actions that the user can use in any specific
+    page.
+
+    toolbar-action          :== <action>
+                                </action>
+
+    Specifies the actions that appear on the toolbar.  Each action is
+    implemented by one action handler.
+
+    form                    :== <form>
+                                   form-element
+                                </form>
+
+    Specifies the form on a page.  Required, exactly one form per page.
+
+    form-element            :==  [ form-banner          ] |
+                                 [ form-hints           ] |
+                                 [ form-field           ]... |
+                                 [ form-text            ]... |
+                                 [ form-line            ]... |
+                                 [ form-action          ]... |
+                                 [ form-if-block        ]... |
+                                 [ layout-block         ]... |
+                                 [ summary-block        ]...
+
+    Specifies elements that can be placed directly in form.  Data, text,
+    and action fields are formatted without line breaks, as continuous
+    text.  If 1+ objects are used in screen, data fields outside
+    an object block are assumed to be in object specified by first use.
+
+    form-banner             :== <banner>
+                                </banner>
+
+    Specifies a graphic displayed at the top of the form.
+
+    form-hints              :== <hints>
+                                   form-hint-element
+                                </hints>
+
+    The hints block, if defined, appears at the left-hand side of the form
+    and provides hints to the user.  The application can decide to enable
+    or disable the display of hints.
+
+    form-hint-element       :==  [ form-hint            ]... |
+                                 [ form-hint-text       ]... |
+                                 [ form-action          ]... |
+                                 [ form-field           ]... |
+                                 [ form-hint-if-block   ]...
+
+    Specifies the elements allowed in a hints block.
+
+    form-hint               :== <hint>
+                                </hint>
+
+    Each hint is shown as a paragraph of text.
+
+    form-hint-text          :== <text>
+                                </text>
+
+    Outputs HTML text, with or without line breaks before and after.
+    Without breaks, the text is stuck together with the preceding
+    and/or following elements.  Uses the 'hint' style ID.
+
+    form-hint-if-block      :== <if>
+                                   form-hint-element
+                                </if>
+
+    The set of elements within the if block are output only if the
+    condition is true.
+
+    form-field              :== <field>
+                                 [ form-lookup-block    ]... |
+                                 [ field-rule           ]... |
+                                 [ field-value          ]...
+                                </field>
+
+    Specifies a form field, input or output.  The field is shown as
+    part of the surrounding HTML text, with no layout.
+
+    form-lookup-block       :== <lookup>
+                                 { form-lookup-field    }...
+                                </lookup>
+
+    Specifies a fields coming from a lookup on the current field.  The
+    lookup block can specify the table - by default it's the first lookup
+    table for the field.
+
+    form-lookup-field       :== <field>
+                                 [ field-rule           ]...
+                                </field>
+
+    A lookup field cannot contain further blocks.
+
+    field-rule              :== <rule>
+                                </rule>
+
+    Inserts some programmer-defined code to calculate or manipulate the
+    field.  Field rules are executed before showing the field.
+
+    field-value             :== <value>
+                                </value>
+
+    Field values are used for drop-down or radio-type fields.
+
+    form-text               :== <text>
+                                </text>
+
+    Outputs HTML text, with or without line breaks before and after.
+    Without breaks, the text is stuck together with the preceding
+    and/or following elements.
+
+    form-line               :== <line>
+                                </line>
+
+    Outputs a HTML horizontal rule.
+
+    form-action             :== <action>
+                                </action>
+
+    Outputs an image, hyperlink, or button action.  The action is shown
+    as part of the surrounding HTML text, with no layout.
+
+    form-if-block           :== <if>
+                                   form-element
+                                </if>
+
+    The set of elements within the if block are output only if the
+    condition is true.
+
+    layout-block            :== <layout>
+                                   layout-element
+                                </layout>
+
+    Starts a layout block where fields are shown with label and value
+    in two blocks.
+
+    layout-element          :==  [ layout-field         ]... |
+                                 [ layout-text          ]... |
+                                 [ layout-action        ]... |
+                                 [ layout-if-block      ]...
+
+    layout blocks cannot contain further layout blocks.
+
+    layout-field            :== <field>
+                                 [ layout-lookup-block  ]... |
+                                 [ sublist-block        ]... |
+                                 [ field-rule           ]... |
+                                 [ field-value          ]...
+                                </field>
+
+    Specifies a form field, input or output.  The field is shown as
+    part of the surrounding HTML text, with no layout.
+
+    layout-lookup-block     :== <lookup>
+                                 { layout-lookup-field  }...
+                                </lookup>
+
+    Specifies a fields coming from a lookup on the current field.  The
+    lookup block can specify the table - by default it's the first lookup
+    table for the field.
+
+    layout-lookup-field     :== <field>
+                                 [ field-rule           ]...
+                                </field>
+
+    A lookup field cannot contain further blocks.
+
+    layout-text             :== <text>
+                                </text>
+
+    Outputs HTML text, with or without line breaks before and after.
+    Without breaks, the text is stuck together with the preceding
+    and/or following elements.
+
+    layout-action           :== <action>
+                                </action>
+
+    Outputs an image, hyperlink, or button action.  The action is shown
+    as part of the surrounding HTML text, with no layout.
+
+    layout-if-block         :== <if>
+                                   layout-element
+                                </if>
+
+    The set of elements within the if block are output only if the
+    condition is true.
+
+    summary-block           :== <summary>
+                                   summary-element
+                                </summary>
+
+    A table block shows fields and elements for a set of objects
+    returned from a query.
+
+    summary-element         :==  [ summary-field        ]... |
+                                 [ summary-text         ]... |
+                                 [ summary-action       ]... |
+                                 [ summary-if-block     ]...
+
+    We allow text, data, and actions on each line.
+
+    summary-field           :== <field>
+                                 [ summary-lookup-block  ]... |
+                                 [ field-rule           ]... |
+                                 [ field-value          ]...
+                                </field>
+
+    Specifies a form field, input or output.  The field is shown in
+    the summary tabular form.
+
+    summary-lookup-block    :== <lookup>
+                                 { summary-lookup-field  }...
+                                </lookup>
+
+    Specifies a fields coming from a lookup on the current field.  The
+    lookup block can specify the table - by default it's the first lookup
+    table for the field.
+
+    summary-lookup-field    :== <field>
+                                 [ field-rule           ]...
+                                </field>
+
+    A lookup field cannot contain further blocks.
+
+    summary-text            :== <text>
+                                </text>
+
+    Outputs HTML text, with or without line breaks before and after.
+    The text is formatted using the summary tabular form.
+
+    summary-action          :== <action>
+                                </action>
+
+    Outputs an image, hyperlink, or button action.  The action is shown
+    in the summary tabular form.
+
+    summary-if-block        :== <if>
+                                   summary-element
+                                </if>
+
+    The set of elements within the if block are output only if the
+    condition is true.
+
+    sublist-block           :== <sublist>
+                                   sublist-element
+                                </sublist>
+
+    Specifies a fields coming from a sublist (child) table of the current
+    field.  The sublist block can specify the table - by default it's the
+    first child table for the field.
+
+    sublist-element         :==  [ sublist-field        ]... |
+                                 [ sublist-text         ]... |
+                                 [ sublist-action       ]... |
+                                 [ sublist-if-block     ]...
+
+    We allow text, data, and actions on each line.
+
+    sublist-field           :== <field>
+                                 [ sublist-lookup-block  ]... |
+                                 [ field-rule           ]... |
+                                 [ field-value          ]...
+                                </field>
+
+    Specifies a form field, input or output.  The field is shown as
+    part of the surrounding HTML text, with no layout.
+
+    sublist-lookup-block    :== <lookup>
+                                 { sublist-lookup-field  }...
+                                </lookup>
+
+    Specifies a fields coming from a lookup on the current field.  The
+    lookup block can specify the table - by default it's the first lookup
+    table for the field.
+
+    sublist-lookup-field    :== <field>
+                                 [ field-rule           ]...
+                                </field>
+
+    A lookup field cannot contain further blocks.
+
+    sublist-text            :== <text>
+                                </text>
+
+    Outputs HTML text, with or without line breaks before and after.
+    Without breaks, the text is stuck together with the preceding
+    and/or following elements.
+
+    sublist-action          :== <action>
+                                </action>
+
+    Outputs an image, hyperlink, or button action.  The action is shown
+    as part of the surrounding HTML text, with no layout.
+
+    sublist-if-block        :== <if>
+                                   sublist-element
+                                </if>
+
+    The set of elements within the if block are output only if the
+    condition is true.
+
+    screen-handler          :== <handler>
+                                   handler-statement
+                                </handler>
+
+    Defines a screen-level event or action handler.  Action handlers can
+    be specified at the page or screen level, with page handlers overriding
+    screen handlers.
+
+    page-handler            :== <handler>
+                                   handler-statement
+                                </handler>
+
+    Defines a page-level event or action handler.  Action handlers can
+    be specified at the page or screen level, with page handlers overriding
+    screen handlers.
+
+    handler-statement       :==  [ query-statement      ]... |
+                                 [ create-statement     ]... |
+                                 [ fetch-statement      ]... |
+                                 [ update-statement     ]... |
+                                 [ delete-statement     ]... |
+                                 [ execute-statement    ]... |
+                                 [ step-statement       ]...
+
+    Specifies the statements that are allowed in a handler.  Each statement
+    is compiled into code that implements the necessary work.
+
+    query-statement         :== <query>
+                                 [ found-statement      ] |
+                                 [ empty-statement      ] |
+                                 [ error-statement      ]
+                                </query>
+
+    Specifies an OAL query request.  The query returns a set of data objects
+    that can be shown in a summary screen, or in a detail screen (in which
+    case only the first object will be shown if there are several).
+
+    create-statement        :== <create>
+                                 [ ok-statement         ] |
+                                 [ error-statement      ]
+                                </create>
+
+    Specifies an OAL create request.
+
+    fetch-statement         :== <fetch>
+                                 [ found-statement      ] |
+                                 [ lost-statement       ] |
+                                 [ error-statement      ]
+                                </fetch>
+
+    update-statement        :== <update>
+                                 [ ok-statement         ] |
+                                 [ error-statement      ]
+                                </update>
+
+    delete-statement        :== <delete>
+                                 [ ok-statement         ] |
+                                 [ error-statement      ]
+                                </delete>
+
+    execute-statement       :== <execute>
+                                 [ ok-statement         ] |
+                                 [ error-statement      ]
+                                </execute>
+
+    step-statement          :== <step>
+                                </step>
+
+    ok-statement            :== <ok>
+                                   handler-statement
+                                </ok>
+
+    error-statement         :== <error>
+                                   handler-statement
+                                </error>
+
+    found-statement         :== <found>
+                                   handler-statement
+                                </found>
+
+    empty-statement         :== <empty>
+                                   handler-statement
+                                </empty>
+
+    lost-statement          :== <lost>
+                                </lost>
+
+

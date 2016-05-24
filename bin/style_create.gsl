@@ -1,0 +1,37 @@
+/*  CREATE
+ *
+ *  This style implements a 'create' detail screen.  It requires that
+ *  the detail query and view used have the same name, e.g. 'detail'.
+ */
+function style_create ()
+    screen.view   ?= "detail"
+    screen.initial = "create"
+    xml '
+<style>
+<use object = "$(object)" />
+<page title = "Create New $(item:)" name = "create" view = "create">
+<form mode = "input">
+  <hints>
+  <hint>To create a new $(item), enter the values indicated and click Ok.</hint>
+  <hint>After you have created the $(item), you can easily edit it as necessary.</hint>
+  <hint>Required fields are shown in bold text - you must supply these.</hint>
+  </hints>
+  <layout>
+    <field name = "*" />
+    <action name = "create" toolbar = "1" text = "Ok" fields = "1" hint = "Create a new $(item)" />
+    <action name = "cancel" join = "1"  />
+  </layout>
+</form>
+<handler action = "create">
+  <create>
+    <ok>return_to_parent</ok>
+  </create>
+</handler>
+<handler action = "cancel">
+    return_to_parent
+</handler>
+</page>
+</style>
+'
+endfunction
+

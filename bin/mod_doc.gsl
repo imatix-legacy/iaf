@@ -1,0 +1,241 @@
+----------------------------------------------------------------------------
+-
+-  Name:       mod_doc.gsl
+-  Title:      Library for Document processing.
+-
+-  Written:    2000/01/05  Pascal Antonnaux <pascal@imatix.com>
+-  Revised:
+-
+----------------------------------------------------------------------------
+
+function SET_DOCUMENT_TYPE (TYPE)
+  DOCUMENT_TYPE = TYPE
+  if DOCUMENT_TYPE = "rtf"
+    FILE_EXTENSION = RTF_FILE_EXTENSION
+  elsif DOCUMENT_TYPE = "html"
+    FILE_EXTENSION = HTML_FILE_EXTENSION
+  endif
+endfunction
+
+-===========================================================================
+-    Start a document
+-===========================================================================
+function START_DOCUMENT (TITLE, AUTHOR, KEYWORD, DOCCOMM)
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_START_DOCUMENT (TITLE, AUTHOR, KEYWORD, DOCCOMM)
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_START_DOCUMENT (TITLE, AUTHOR, KEYWORD, DOCCOMM)
+  endif
+endfunction
+
+-===========================================================================
+-    Define title value and level
+-        LEVEL = Level of title (H0->H9)
+-        TITLE = Title value
+-===========================================================================
+function SET_TITLE (LEVEL, TITLE)
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_SET_TITLE (LEVEL, TITLE)
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_SET_TITLE (LEVEL, TITLE)
+  endif
+endfunction
+
+-===========================================================================
+-    Add index entry
+-===========================================================================
+function ADD_INDEX (INDEX)
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_ADD_INDEX (INDEX)
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_ADD_INDEX (INDEX)
+  endif
+endfunction
+
+-===========================================================================
+-    Table definition
+-===========================================================================
+function BEGIN_TABLE (POSITION)
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_BEGIN_TABLE (POSITION)
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_BEGIN_TABLE (POSITION)
+  endif
+endfunction
+
+function END_TABLE
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_END_TABLE
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_END_TABLE
+  endif
+endfunction
+
+function BEGIN_ROW
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_BEGIN_ROW
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_BEGIN_ROW
+  endif
+endfunction
+
+function END_ROW
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_END_ROW
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_END_ROW
+  endif
+endfunction
+
+function BEGIN_CELL
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_BEGIN_CELL
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_BEGIN_CELL
+  endif
+endfunction
+
+function END_CELL
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_END_CELL
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_END_CELL
+  endif
+endfunction
+
+function CELL_PLAIN (text)
+    BEGIN_CELL ()
+    >$(text?:)
+    END_CELL ()
+endfunction
+
+function CELL_BOLD (text)
+    BEGIN_CELL ()
+    BEGIN_BOLD ()
+    >$(text?:)
+    END_BOLD ()
+    END_CELL ()
+endfunction
+
+function CELL_ITALIC (text)
+    BEGIN_CELL ()
+    BEGIN_ITALIC ()
+    >$(text?:)
+    END_ITALIC ()
+    END_CELL ()
+endfunction
+
+-===========================================================================
+-    Set table column definition
+-        Position (in mm)
+-        SHADOW = trame (Y/N)
+-===========================================================================
+
+function DEFINE_COLUMN (POSITION, BORDER)
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_DEFINE_COLUMN (POSITION, BORDER)
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_DEFINE_COLUMN (POSITION, BORDER)
+  endif
+endfunction
+
+function START_COLUMN_DEFINITION (POSITION)
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_START_COLUMN_DEFINITION (POSITION)
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_START_COLUMN_DEFINITION (POSITION)
+  endif
+endfunction
+
+-===========================================================================
+-    End a document
+-===========================================================================
+
+function END_DOCUMENT
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_END_DOCUMENT
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_END_DOCUMENT
+  endif
+endfunction
+
+function BEGIN_BOLD
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_BEGIN_BOLD
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_BEGIN_BOLD
+  endif
+endfunction
+
+function END_BOLD
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_END_BOLD
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_END_BOLD
+  endif
+endfunction
+
+function BEGIN_ITALIC
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_BEGIN_ITALIC
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_BEGIN_ITALIC
+  endif
+endfunction
+
+function END_ITALIC
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_END_ITALIC
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_END_ITALIC
+  endif
+endfunction
+
+function BEGIN_UNDERLINE
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_BEGIN_UNDERLINE
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_BEGIN_UNDERLINE
+  endif
+endfunction
+
+function END_UNDERLINE
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_END_UNDERLINE
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_END_UNDERLINE
+  endif
+endfunction
+
+function BEGIN_PAR
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_BEGIN_PAR
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_BEGIN_PAR
+  endif
+endfunction
+
+function END_PAR
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_END_PAR
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_END_PAR
+  endif
+endfunction
+
+function NEW_LINE
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_NEW_LINE
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_NEW_LINE
+  endif
+endfunction
+
+function NEW_PAGE
+  if DOCUMENT_TYPE = "rtf"
+      invoke RTF_NEW_PAGE
+  elsif DOCUMENT_TYPE = "html"
+      invoke HTML_NEW_PAGE
+  endif
+endfunction
+

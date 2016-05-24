@@ -1,0 +1,596 @@
+#############################################################################
+#
+#   oflobjt.gsl - Tools macro for OFL object handlers
+#
+#   Written: 2000/04/12  Pascal Antonnaux <pascal@imatix.com>
+#   Revised: 2000/11/20  Pascal Antonnaux <pascal@imatix.com>
+#
+#############################################################################
+
+#############################################################################
+function sql_fields (margin)
+#############################################################################
+    comma = "  "
+    for field  where calculated ?= 0 by size
+>$(margin)sql = sql + "$(comma)$(realname) "
+        comma = ", "
+    endfor
+endfunction
+
+#############################################################################
+#   Output SQL code: value, value, value
+#
+function sql_values (margin)
+#############################################################################
+    comma = " \"\""
+    for field  where calculated ?= 0 by size
+        if type = "textual" | type = "date" | type = "time"
+            value_text = "astr ($(realname))"
+        else
+            value_text = "      $(realname)"
+        endif
+>$(margin)sql = sql + $(comma)& $(value_text:)
+        comma = " \",\" "
+    endfor
+endfunction
+
+#############################################################################
+function make_table_select
+#############################################################################
+    table.select = ""
+    comma = ""
+    for table.field where calculated ?= 0 by size
+        table.select += comma + realname
+        comma = ", " 
+    endfor
+endfunction
+
+
+#############################################################################
+#   local macros used to produce SQL code
+#   Output SQL code: name, name, name
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+#   Output SQL code: WHERE objid = "id"
+#
+function sql_where_clause (margin)
+#############################################################################
+    define delim = " WHERE "
+    for table.field where count (index, name = "primary")
+        if type = "textual"
+>    $(margin)& "$(delim:)$(realname) = "  & astr (xml.item ("$(name)"))  _
+        else
+>    $(margin)& "$(delim:)$(realname) = "  & xml.item ("$(name)")         _
+        endif
+    define delim = "   AND "
+    endfor
+    if defined (table.have_active)
+>    $(margin)& "    AND $(table.have_active:) = 1"
+    else
+>    $(margin)& " "
+    endif
+endfunction
+
+#############################################################################
+#   Output execute SQL statement with error trapping
+#
+.macro execute_sql (subroutine)
+.#############################################################################
+    on error resume next
+    If oa_trace = 1 Then
+.    if platform = "asp"
+        Response.Write sql
+.    else
+        Trace "$(handler)", sql
+.    endif
+    End If
+    Set Rs = APDB.Execute (sql)
+    If Err.number <> 0 Then
+        $(subroutine:) = "<oal done=""error"" cause=""db"" message=""" & _
+                         err.Description & " ""/>"
+        oa_error = TRUE
+        Exit Function
+    End If
+.endmacro
+
+.#############################################################################
+.# Propagate data to object with inherit 
+.macro propagate_function
+.#############################################################################
+.if object.have_inherit_update ?= 1
+.  if platform = "asp"
+Private Function propagate_data (rs, xml)
+.  else
+Private Function propagate_data (rs as ADODB.RecordSet, xml As SCL_XMLSTORELib.xmlstore, connect_string As String) As Long
+.  if platform = "vbc"
+    Dim APDB As ADODB.Connection
+.  endif
+    Dim rsi     As ADODB.RecordSet
+    Dim sql     As String
+    Dim ts      As Double
+    Dim ts_date As SCL_DATELib.date
+.  endif
+.  if platform = "vbc"
+'   Open Database Connection
+.      if mts ?= 1
+    Set APDB = context.CreateInstance ("ADODB.Connection")
+.      else
+    Set APDB = New ADODB.Connection
+.      endif
+    APDB.Open connect_string
+.  endif
+.    if platform = "asp"
+    Set ts_date = Server.CreateObject ("scl.date")
+.    else
+.        if mts ?= 1
+    Set ts_date = context.createinstance ("scl.date")
+.        else
+    Set ts_date = New SCL_DATELib.date   
+.        endif
+.    endif
+    ts = ts_date.timestamp 
+    Set ts_date = Nothing
+.for root.ofl
+.for object as obj where obj.name <> object.name
+.for inherit where inherit.table = object.handler
+.    comma  = ""
+.    select = ""
+.    for field
+.        select += comma + t_realname
+.        comma = ", "
+.    endfor
+.    for dfl.table where name = obj.name
+.        for index where name = "primary"
+.            for field
+.                select += comma + field.realname
+.            endfor
+.        endfor
+.        for field where count (rule, name = "timestamp" & when = "update") > 0
+.            select += comma + field.realname
+.        endfor
+.    endfor
+
+     sql = "Select $(select)" & _
+           " FROM $(table_root_realname:) where " & _
+.    for link
+.        comma = ""
+.        for field
+           " $(comma)$(realname) = " & rs ("$(target_realname)") & _
+.          comma = " AND "
+.        endfor
+.    endfor
+           ""
+'    on error resume next
+    If oa_trace = 1 Then
+.    if platform = "asp"
+        Response.Write sql
+.    else
+        Trace "$(handler)", sql
+.    endif
+    End If
+.    if platform = "asp"
+    Set Rsi = Server.CreateObject ("ADODB.Recordset")
+.    elsif mts ?= 1
+    Set Rsi = context.CreateInstance ("ADODB.Recordset")
+.    else
+    Set Rsi = new ADODB.RecordSet
+.    endif
+    On Error Resume Next
+    Rsi.Open sql, APDB, adOpenKeyset, adLockPessimistic, adCmdText
+    If Err.number <> 0 Then
+        propagate_data = Err.number
+        oa_error = TRUE
+        Exit Function
+    End If
+    xml.push_position
+    xml.item_root
+    xml.item_set_current "$(inherit.table)"
+    Do While not Rsi.EOF
+.    for field
+.        if link_type = "copy"
+        If Rsi ("$(t_realname)") = Rs ("$(realname)") then
+.        endif     
+            IF not IsNull (xml.item_child_value ("$(source)")) Then
+                Rsi ("$(t_realname)") = xml.item_child_value ("$(source)")
+            End If
+.        if link_type = "copy"
+        End If
+.        endif     
+.    endfor
+.    for dfl.table where name = obj.name
+.        for field where count (rule, name = "timestamp" & when = "update") > 0
+        Rsi ("$(realname)") = ts
+.        endfor
+.    endfor
+        Rsi.Update
+        Rsi.MoveNext
+    Loop
+    xml.pop_position
+    Rsi.Close
+.  if platform = "vbc"
+    APDB.Close
+    Set APDB = Nothing
+.  endif
+.endfor
+.endfor
+.endfor
+    propagate_data = 0
+End Function
+.endif
+.endmacro
+
+#############################################################################
+#    Make where clause for index key in query
+#
+function query_index (sign, invert_sign, order_invert, value_type, query)
+#############################################################################
+    delim = " "
+    for dfl.table as dfltable where dfltable.name = table.name
+      for index where name = "$(query.index?"primary")"
+        nb_field = count (index.field)
+#       Make select statement for equal sign
+        if sign = invert_sign
+>            sql = "SELECT $(select) FROM $(table.realname) "                    & _
+            delim = " WHERE ( "
+            for field
+                get_query_field_value ("match", "")
+>                  "$(delim:)$(realname:)  =        $(value:)                         & _
+                delim = " AND "
+            endfor
+            end_of_query_select (order_invert, 0, value_type, query)
+        elsif nb_field > 1
+>            Select Case match_nb_field
+          match_index = 0
+          while (match_index < nb_field)
+>                Case $(match_index)
+>            sql = "SELECT $(select) FROM $(table.realname) "                    & _
+            if match_index = 0
+                delim = " WHERE (( "
+            else
+                delim = " WHERE ( "
+            endif
+#  Generate match field group            
+            for field
+              if index (field) <= match_index
+                get_query_field_value ("match", "")
+>                  "$(delim:)$(realname:)  =        $(value:)                         & _
+                delim = " AND "
+              endif
+            endfor
+            if (match_index > 0)
+              inter_group = " AND (("
+            else
+              inter_group = " WHERE (("
+            endif
+            inter_field = "      "
+            for field
+              if index () > match_index & value_type = "match"
+                last_index = index ()
+                for index.field as pfield 
+                  if index () > match_index & index () <= last_index
+                    get_query_field_value (value_type, pfield.order?"asc")
+                    if index () < last_index
+>                  "$(inter_group:)$(inter_field:)$(realname:)  =         $(value:)  & _
+                    else
+                      if pfield.order ?= "desc"
+>                  "$(inter_group:)$(inter_field:)$(realname:)  $(invert_sign:) $(value:)  & _
+                      else
+>                  "$(inter_group:)$(inter_field:)$(realname:)  $(sign:)  $(value:)  & _
+                      endif
+                    endif
+                    inter_group = "      "
+                    inter_field = "  AND "
+                  endif
+                endfor
+                inter_group = ") OR ("
+                inter_field = "      "
+              endif
+            endfor
+            if value_type = "match"
+              if match_index > 0  
+>                  "))" & _
+              else
+>                  ")"  & _
+              endif
+            endif
+            end_of_query_select (order_invert, match_index, value_type, query)
+            match_index += 1
+          endwhile
+>            End Select
+        else
+>            sql = "SELECT $(select) FROM $(table.realname) "                   & _
+          delim = " WHERE ("
+          if value_type = "match"
+            for field
+              get_query_field_value (value_type, field.order?"asc")
+              if field.order ?= "desc"
+>                    "$(delim:)$(realname:) $(invert_sign:)  $(value:)                 & _
+              else
+>                    "$(delim:)$(realname:) $(sign:)  $(value:)                        & _
+              endif
+              delim = " AND "
+            endfor
+          endif
+          end_of_query_select (order_invert, 0, value_type, query)
+        endif
+      endfor index
+    endfor dfl.table
+endfunction
+
+function get_query_field_value (value_type, field_order)
+  query_type = value_type
+  if field_order = "desc"
+    if    query_type  = "last"
+        query_type    = "first"
+    elsif query_type  = "first"
+        query_type    = "last"
+    endif
+  endif
+  if type = "textual"
+    if query_type = "last"
+      value  = "'" + ("z" * size?1) + "'"
+      value += "\""
+    elsif query_type = "first"
+      value = "' '"
+      value += "\""
+    else
+      value = "\" & astr (xml.item (\"$(name)\", \"' '\"))"
+    endif
+  else
+    if query_type = "last"
+      value  = "9" * size?1 
+      value += "\""
+    elsif query_type = "first"
+      value = "0"
+      value += "\""
+    else
+      value = "\" &      xml.item (\"$(name)\", 0)"
+    endif
+  endif
+endfunction
+
+function end_of_query_select (order_invert, match_index, value_type, query)
+    have_active = 0
+    for dfl.table as dfltable where dfltable.name = table.name
+      for rule where name = "soft delete"
+        for dfltable.field as dflfield where name = rule.what
+          if value_type = "match" | match_index > 0
+              delim = " ) AND"
+          else
+              delim = "WHERE "
+          endif
+          have_active = 1
+>                  "        $(delim) $(dflfield.realname) <> $(rule.value)"               & _
+        endfor
+      endfor
+    endfor
+    if have_active = 0 & (match_index > 0 | value_type = "match")
+>                  " ) " & _
+    endif
+    if defined (query.condition) 
+        if !defined (query.parsed_condition)
+            #  loop for arg1..n
+            arg_index = 1
+            while defined (query.arg$(arg_index))  
+                arg_type = query.arg$(arg_index)_type?"numeric"
+                if arg_type = "textual"
+                    arg$(arg_index) = "'\" & $(arg$(arg_index)) & \"'"
+                else
+                    arg$(arg_index) = "\" & $(arg$(arg_index)) & \""
+                endif
+                arg_index += 1
+            endwhile
+            gsl 'query.parsed_condition = \"$(condition:)\"'
+        endif
+          if value_type = "match" | match_index > 0 | have_active = 1
+              delim = "  AND "
+          else
+              delim = " WHERE "
+          endif
+>                  " $(delim) ($(query.parsed_condition:))"                                                  & _
+    endif
+    delim = " ORDER BY   "
+    for dfl.table as dfltable where dfltable.name = table.name
+    for dfltable.index where name = "$(query.index?"primary")"
+      if match_index > 0
+        for field
+          if index () = count (index.field)
+            if order_invert = "true"
+              if order ?= "desc"
+                match_order = "ASC"
+              else
+                match_order = "DESC"
+              endif
+             else
+               match_order = field.order?"ASC"
+            endif
+          endif
+        endfor 
+      endif
+    for field
+      if index () <= match_index
+          field_order = match_order
+      else
+        if order_invert = "true"
+          if order ?= "desc"
+            field_order = "ASC"
+          else
+            field_order = "DESC"
+          endif
+        else
+            field_order = field.order?"ASC"
+        endif
+      endif
+>                  "$(delim:)$(realname:) $(FIELD_ORDER)"                           & _
+       delim = "          , "
+    endfor field
+    endfor index
+    endfor dfl.table
+>                  ""
+endfunction
+#############################################################################
+.macro check_key_value (fcnt_name)
+.#############################################################################
+.    if type = "textual"
+             If xml.item ("$(field.name)", "") = "" Then
+.    else
+             If CInt (xml.item ("$(field.name)", 0)) = 0 Then
+.    endif
+                $(fcnt_name) = "<oal done=""error"" cause=""nf""" & _
+		         " message=""Missing key value for $(field.name)""/>"
+                Exit Function
+             End If
+.endmacro
+
+#############################################################################
+# GSL Macros and functions used only in VB project
+#############################################################################
+.macro do_handler_asp ()
+<%
+'
+'   $(handler).asp - handler for $(name) object
+'
+'   Application: $(ofl.name)
+'   Generated:   $(date)
+'   Script by:   iMatix Corporation <info@imatix.com>
+'
+'   The oa_do_$(name) function implements the object access layer for the
+'   $(name) object.  This function accepts one argument - an OAL (object
+'   access language) string, and returns an OAL string as reply.  Returns
+'   "" if there was an internal error, such as a lack of available memory.
+    
+Function oa_do_$(name) (OALstring)
+    Set $(ofl.name)_$(object.handler) = Server.CreateObject ("$(ofl.name)_$(object.handler).$(object.handler)")
+    oa_do_$(name) = $(ofl.name)_$(object.handler).oa_do (CStr (OALstring), CStr (Session ("APDB_ConnectionString")))
+    Set $(ofl.name)_$(object.handler) = Nothing
+End Function
+%>
+.endmacro
+
+#############################################################################
+.macro generate_vb_project_file
+.#############################################################################
+.    output "$(handler).vbp"
+Type=OleDll
+Reference=*\\G{00020430-0000-0000-C000-000000000046}#2.0#0#C:\\WINDOWS\\SYSTEM\\StdOle2.tlb#OLE Automation
+Reference=*\\G{00000200-0000-0010-8000-00AA006D2EA4}#2.0#0#C:\\PROGRAM FILES\\COMMON FILES\\SYSTEM\\ADO\\MSADO15.DLL#Microsoft ActiveX Data Objects 2.0 Library
+Reference=*\\G{00000300-0000-0010-8000-00AA006D2EA4}#2.0#0#C:\\PROGRAM FILES\\COMMON FILES\\SYSTEM\\ADO\\MSADOR15.DLL#Microsoft ActiveX Data Objects Recordset 2.0 Library
+Reference=*\\G{B97DF8A2-C99F-11D3-B3AF-00E09872C5B1}#1.0#0#.\\SCL_XMLSTORE.DLL#Standart Component Library - Xmlstore
+Reference=*\\G{B97DF8A2-C99F-11D3-B3AF-00E09872C5B5}#1.0#0#.\\SCL_DATE.DLL#Standart Component Library - Date
+.   if mts ?= 1
+Reference=*\\G{74C08640-CEDB-11CF-8B49-00AA00B8A790}#1.0#0#C:\\WINDOWS\\SYSTEM\\MTS\\MTXAS.DLL#Microsoft Transaction Server Type Library
+.   endif
+Class=$(handler); $(handler).cls
+Module=MainFunction; mainfunc.bas
+Startup="(None)"
+HelpFile=""
+Title="$(ofl.description?): $(handler)"
+ExeName32="$(ofl.name)_$(handler).dll"
+Command32=""
+Name="$(ofl.name)_$(handler)"
+HelpContextID="0"
+CompatibleMode="1"
+MajorVer=1
+MinorVer=0
+RevisionVer=0
+AutoIncrementVer=0
+ServerSupportFiles=0
+VersionCompanyName="iMatix"
+CompilationType=0
+OptimizationType=0
+FavorPentiumPro(tm)=0
+CodeViewDebugInfo=0
+NoAliasing=0
+BoundsCheck=0
+OverflowCheck=0
+FlPointCheck=0
+FDIVCheck=0
+UnroundedFP=0
+StartMode=1
+Unattended=-1
+Retained=1
+ThreadPerObject=0
+MaxNumberOfThreads=1
+DebugStartupOption=0
+.    close
+.endmacro
+
+
+.#############################################################################
+.    macro generate_vb_project_group
+.#
+.#   Generates VB Component Group project for the ofl (Visual Basic COM).
+.#
+.#############################################################################
+.for root.dfl
+.for root.ofl
+.    echo "--------- VB COM $(ofl.name) Project Group Files ----------"
+.    echo "Generating $(ofl.name).vbg..."
+.    output "$(ofl.name).vbg"
+VBGROUP 5.0
+.for object where build
+.    object.handler ?= root_table
+.   if index () = 1
+StartupProject=$(handler:).vbp
+.   else
+Project=$(handler:).vbp
+.   endif
+.endfor object
+.    close
+.    output "mainfunc.bas"
+Attribute VB_Name = "MainFunction"
+  
+
+Public Sub Trace(obj_name As String,vMsg As String)
+
+    Open "c:\\" & obj_name & ".log" For Append Shared As #1
+    Print #1, Now & " " & vMsg
+    Close #1
+      
+End Sub
+
+Public Function astr (value) As String
+    If Isnull (value) Then
+        astr = "''"
+    Else
+        astr = "'"
+        For position = 1 To Len (value)
+            If Mid (value, position, 1) = "'" Then
+                astr = astr & "''"
+            Else
+                astr = astr & Mid (value, position, 1)
+            End If
+        Next 
+        astr = astr & "'"
+    End If
+End Function
+.    close
+.endfor ofl
+.endfor dfl
+.endmacro
+
+#############################################################################
+.  macro get_inherit_field
+.#
+.# Get inherited field from parent record
+.#
+.#############################################################################
+.  if platform = "asp"
+    $(object.name)_inherit_from_$(inherit.table) Rs_inherit, $(inherit.function_param)
+.  else
+    $(object.name)_inherit_from_$(inherit.table) Rs_inherit, $(inherit.function_param), APDB
+.  endif
+    if Rs_inherit.Eof = FALSE and Err.number = 0 then    
+.  for inherit.field as ifield
+.    for view.table
+.      for table.field where name = ifield.target
+.        if ifield.link_type = "link"
+        $(t_realname) = Rs_inherit ("$(ifield.realname)")
+.        endif
+.      endfor
+.    endfor
+.  endfor
+    End If
+    Rs_inherit.Close
+    Set Rs_inherit = Nothing
+
+.endmacro

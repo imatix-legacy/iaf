@@ -1,0 +1,7 @@
+<object name = "usertype">
+    <query name = "byname" index = "byname" view = "summary"/>
+    <require>
+        <field name = "name"     />
+    </require>
+</object>
+

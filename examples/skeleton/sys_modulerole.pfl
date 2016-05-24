@@ -1,0 +1,35 @@
+<screen object = "modulerole" style = "list"   >
+    <invoke macro = "modulerole" />
+</screen>
+
+<screen object = "modulerole" style = "select" >
+    <invoke macro = "modulerole" />
+</screen>
+
+<screen object = "modulerole" style = "create" >
+    <invoke macro = "modulerole" />
+</screen>
+
+<screen object = "modulerole" style = "detail" >
+    <invoke macro = "modulerole" />
+</screen>
+
+<macro name = "modulerole" >
+<macro_attr name = "item"   value = "Module Role"  />
+<macro_attr name = "query"  value = "bymodule"     />
+<use object = "modulerole" />
+<var name = "fld_module_name" />
+<handler event = "on_init" >
+    fld_module_name          = Session ("module_name_adm")
+    fld_modulerole_moduleid  = Session ("module_id_adm")
+</handler>
+<match name = "moduleid" value = "Session (&quot;module_id_adm&quot;)" />
+<page name = "*">
+   <form>
+      <layout append = "0" >
+           <field name = "module_name" label = "Module" size = "50" attr = "plain" />
+      </layout>
+   </form>
+</page>
+</macro>
+

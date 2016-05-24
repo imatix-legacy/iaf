@@ -1,0 +1,85 @@
+------------------------------------------------------------------------
+-
+-   mod_esl - ESL (Email Service Layout) processing module
+-
+-   Written: 2001/03/20  Pascal Antonnaux <pascal@imatix.com>
+-   Revised: 2001/03/20  Pascal Antonnaux <pascal@imatix.com>
+-
+------------------------------------------------------------------------
+
+if ! defined (mod_esl_included)
+    mod_esl_included = 1
+    include "mod_dfl.gsl"
+
+#############################################################################
+  function load_esl (eslfile)
+#
+#   Loads and validates a ESL file as a child of the root scope, called
+#   "esl".
+#############################################################################
+
+if ! exists (eslfile)
+    abort "$(eslfile) not found"
+else
+    xml from eslfile 
+endif
+
+echo "Loading and processing $(eslfile)..."
+
+for root.esl
+    if exists ("$(esl.dfl)_out.dfl")
+        if timestamp ("$(esl.dfl)_out.dfl") < timestamp ("$(esl.dfl).dfl")
+            dfl_load ("$(esl.dfl).dfl")
+            save root-> dfl as "$(esl.dfl)_out.dfl"
+        else
+            xml to root from "$(esl.dfl)_out.dfl"
+        endif
+    else
+        dfl_load ("$(esl.dfl).dfl")
+        save root-> dfl as "$(esl.dfl)_out.dfl"
+    endif
+
+    for queue
+        update_table ()
+    endfor
+    for log
+        update_table ()
+    endfor
+
+endfor
+
+endfunction
+
+#############################################################################
+  function update_table
+
+#############################################################################
+  for table as esptable
+      for root.dfl
+          for dfl.table as dfltable where name = esptable.name
+              esptable.description = dftable.description?
+              esptable.realname    = dfltable.realname?
+              for index where name = "primary"
+                  copy index to esptable
+              endfor
+          endfor
+      endfor
+      for field as espfield
+          for root.dfl
+              for dfl.table as dfltable where name = esptable.name
+                  for dfltable.field as dflfield where name = espfield.name
+                      espfield.realname = dflfield.realname?
+                      espfield.type     = dflfield.type?
+                      espfield.size     = dflfield.size?
+                      if esl.unicode ?= 1 & espfield.size ?> 4000
+                          espfield.size = 4000
+                      endif
+                  endfor
+              endfor
+          endfor
+          update_table ()
+      endfor
+  endfor
+endfunction
+
+endif included

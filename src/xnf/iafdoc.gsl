@@ -1,0 +1,17 @@
+#   Quick and dirty, just generates gurudoc docs for the iAF languages
+#
+
+include "mod_xnf.gsl"
+
+xnf_load ("pfl.xnf")
+xnf_doc ("pfl.txt")
+delete root-> xnf
+
+xnf_load ("ofl.xnf")
+xnf_doc ("ofl.txt")
+delete root-> xnf
+
+xnf_load ("dfl.xnf")
+xnf_doc ("dfl.txt")
+delete root-> xnf
+

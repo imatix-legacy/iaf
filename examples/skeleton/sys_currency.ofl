@@ -1,0 +1,6 @@
+<object name = "currency">
+    <require>
+        <field name = "name" />
+    </require>            
+</object>
+

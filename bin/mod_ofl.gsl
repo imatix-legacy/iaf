@@ -1,0 +1,23 @@
+------------------------------------------------------------------------
+-
+-   mod_ofl - OFL processing module
+-
+-   Written: 1999/12/24  Pieter Hintjens <ph@imatix.com>
+-   Revised: 2000/02/26  Pieter Hintjens <ph@imatix.com>
+-
+-   Assumptions:
+-       - no group fields in lookup tables, currently not expanded
+------------------------------------------------------------------------
+/* todo:
+    - rule 'use workflow' on table when object -> use rule code to implement a
+    -   set of actions: new object, update state, update history.
+    - 'is available' as view on object?  Implement views consisting of
+    -   calculated data
+    - create: entry in workflow state and history tables
+*/
+if !defined (mod_ofl_included)
+    mod_ofl_included = 1
+    include "mod_dfl.gsl"
+    include "oflload.gsl"
+    include "oflobj.gsl"
+endif included

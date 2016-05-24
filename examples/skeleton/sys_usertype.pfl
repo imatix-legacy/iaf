@@ -1,0 +1,53 @@
+<screen object = "usertype" style = "list"   item = "User Type" query = "byname" >
+   <invoke macro = "usertype_pass_data" />
+</screen>
+
+<screen object = "usertype" style = "select" item = "User Type" query = "byname" />
+
+<screen object = "usertype" style = "create" item = "User Type" name = "usertype_create" >
+    <invoke macro = "usertype_pass_data" />
+    <invoke macro = "usertype_validate"  />
+</screen>
+
+<screen object = "usertype" style = "detail" item = "User Type" name = "usertype_detail" query = "byname">
+    <invoke macro = "usertype_pass_data" />
+    <page name = "detail">
+        <form>
+          <layout>
+              <action name = "users"   text = "Users"   label = "Users"   />
+              <action name = "modules" text = "Modules" label = "Has access to modules" /> 
+          </layout>
+        </form>
+        <handler action = "users"  >
+            chain_to "user_list_by_usertype"
+        </handler>
+        <handler action = "modules">
+            chain_to "userrole_list"
+        </handler>
+    </page>
+</screen>
+
+<macro name = "usertype_pass_data" >
+<handler event = "on_global" >
+    Session ("usertype_id_adm")   = fld_usertype_id
+    Session ("usertype_name_adm") = fld_usertype_name
+</handler>
+</macro>
+
+<macro name = "usertype_validate">
+  <handler event = "on_accept">
+    <!-- Do not use a query limit of 1, else the current item gets
+         squashed if anything is found. -->
+    <query name = "byname" control = "eq" >
+    <found>
+    pxml.item_first_child
+    found_id = Cint (pxml.item_child_value ("id", 0))
+    if found_id &lt;&gt; fld_usertype_id then
+        cur_message = "A user type with this name already exists"
+        exception_raised = TRUE
+    end if
+    </found>
+    </query>
+  </handler>
+</macro>
+

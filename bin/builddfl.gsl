@@ -1,0 +1,57 @@
+#
+#   builddfl.gsl
+#
+#   Loads DFL file and generates SQL code for database, and HTML
+#   documentation for the database model.  Saves the exploded DFL tree as
+#   testout.dfl.
+#
+#   Written: 2000/08/01  iMatix Corporation
+#   Revised: 2001/08/15  iMatix Corporation
+#
+#   Arguments to script:
+#
+#   -dfl:       name of DFL file, without extension
+#   -database:  odbc (=Access), mssql (=SQLServer), none (no SQL)
+#   -doc:       if 1, generate HTML documentation
+
+include "mod_dfl.gsl"
+dfl_load ("$(dfl).dfl")
+
+#   Load incremental rebuild list if any
+for root.dfl
+    if exists ("rebuild.dfl")
+        xml to root as build_table from "rebuild.dfl"
+        for table
+            if count (root.build_table, count.name = table.name)
+                table.build = 1
+            else
+                table.build = 0
+            endif
+        endfor
+    else
+        for table
+            table.build = 1
+        endfor
+    endif
+endfor
+
+database ?= "odbc"
+if database = "odbc" | database = "mssql" | database = "mysql"
+    set_sql_target    (database)
+    if unicode ?= 1
+        file_name = "$(dfl)crtu.sql"
+    else
+        file_name = "$(dfl)crt.sql"
+    endif
+    sql_create_tables  ("$(file_name)")
+    sql_reindex_tables ("$(dfl)index.sql")
+elsif database <> "none"
+    abort "Supported database types are: odbc, mssql"
+endif
+
+if doc ?= 1
+    generate_html ()
+endif
+
+save root-> dfl as "testout.dfl"
+

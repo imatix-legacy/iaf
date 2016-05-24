@@ -1,0 +1,608 @@
+<xnf name = "DFL" >
+A DFL (Database Framework Language) file describes the database format
+and other low level data elements of an iAF application.  It includes
+the tables in the database, the fields on those tables, the indexes on
+the tables, and the relationships between the tables.  It also describes
+static lookup information (such as available languages) which do not
+get stored in the database, but are available to the iAF application.
+
+The DFL table and field definitions use abstract data types, which are
+then mapped to the appropriate type for the database being used by the
+iAF generation scripts, to increase portability of iAF applications
+between databases.  The physical field types depend both on the type
+of data being stored (textual, numeric, etc) and the size of data to
+be stored.  DFL files are processed by the mod_dfl.gsl module, usually
+using the the builddfl.gsl front end script.
+
+<entity name = "dfl" tag = "dfl" >
+  The 'dfl' element contains the domain definitions and table defintions that
+  describe the data access layer of an iAF application.  The included
+  domain and table definitions include the fields, indexes, and
+  relationships between the fields.  The body of the DFL item can
+  contain a longer (plain text) description of the database (its contents, and
+  purpose) for use in generating documentation.
+    <allow entity = "dfl-clean-ids"  occurs = "0/1" />
+    <allow entity = "include"        occurs = "0+"  />
+    <allow entity = "inherit"        occurs = "0+"  />
+    <allow entity = "domain"         occurs = "0+"  />
+    <allow entity = "table"          occurs = "1+"  />
+    <attr name = "name" required = "1" >
+      The short name of the iAF application to which this DFL file belongs.
+      This is used to ensure that the right DFL file is being processed
+      when OFL and PFL files refer to the DFL file.
+    </attr>
+    <attr name = "description" required = "0" >
+      A one-line description of the iAF application to which this DFL file
+      belongs, for the benefit of someone looking at the DFL file, or
+      documentation generated from the DFL file.  If not specified, the
+      'dfl' "name" will be used as the description.
+    </attr>
+    <attr name = "written" required = "0" >
+      The date on which the DFL was written, in YYYYMMDD format.  This
+      is used with the "revised" attribute to identify the version of
+      the DFL file.
+    </attr>
+    <attr name = "revised" required = "0" >
+      The date on which the DFL was last revised, in YYYYMMDD format.  This
+      is used with the "written" attribute to identify the version of
+      the DFL file.
+    </attr>
+    <attr name = "author" required = "0" >
+      The name, and preferably email address, of the person who wrote
+      the DFL file.  The recommended format is 
+      "Full Name &lt;email@address&gt;".
+    </attr>
+    <attr name = "script" required = "0" >
+      The default GSL script to process this DFL file.  Typically DFL
+      files are processed with the builddfl.gsl script (which requires a
+      different calling syntax) but a front end GSL script can be
+      written if desired.
+    </attr>
+    <attr name = "realname" required = "0" >
+      The real (physical) name of the database, to be used when
+      connecting to the database.  The default value is the "name"
+      attribute (described above), but this attribute is provided in
+      case you need to override that assumption.
+    </attr>
+    <attr name = "prefix" required = "0" >
+      The prefix used for the iAF application database tables to
+      distinguish them from any other tables which might be in the
+      database.  If not specified there will be no prefix.  Use of a
+      prefix is encouraged to avoid table namespace conflicts with SQL
+      statements in particular.
+    </attr>
+    <attr name = "userid" required = "0" >
+      If specified, it is used with the "password" attribute to specify
+      the default credentials to connect to the database during
+      development.
+    </attr>
+    <attr name = "password" required = "0" >
+      If specified, it is used with the "userid" attribute to specify
+      the default credentials to connect to the database during
+      development.
+    </attr>
+</entity>
+
+<entity name = "dfl-clean-ids" tag = "rule" >
+  The clean ids 'rule' element tells that the iAF processing scripts
+  that the primary keys of the database tables follow the rules that it
+  expects, ie that there is a primary key called "id" on each table
+  (and that the values for that field should be automatically generated).
+  It also tells the iAF scripts that foreign keys will contain the name
+  of the other table and the suffix "id".  It is used only directly under 
+  the 'dfl' element.  If the "clean ids" rule does not apply, then
+  a "primary" index must be specified to declare the primary key, and the
+  fields used for foreign keys must be specified with each foreign key
+  reference.  Use of the "clean ids" rule is strongly recommended when
+  designing a new database for iAF; but if iAF is used against an
+  existing database it may not apply, hence the ability to explicitly
+  specify primary keys and foreign keys.
+  <attr name = "name" required = "1" >
+    The name of the type of 'rule' being specified.  The name is used to
+    hook the processing of the rule into the appropriate other parts of
+    the iAF application.
+    <restrict value = "clean ids" >
+       the primary and foreign keys follow the iAF default rules
+    </restrict>
+  </attr>
+</entity>
+
+<entity name = "include" tag = "include" >
+  The 'include' element permits textual-inclusion from another file.
+  The specified file (in XML format) is loaded and inserted into the XML
+  tree in place of the 'include' element.  The specified file may
+  contain a "forest" of XML trees, such that there is more than one top
+  level element in the XML file.  All of the XML trees in the specified
+  file will be loaded and placed into the current XML tree in place of
+  the 'include' element.  The 'include' element makes it possible to
+  split the DFL definitions across multiple text files for easier
+  editing, and also to allow reuse of common definitions.  However
+  because a straight textual-inclusion is performed, care must be taken
+  to ensure that the result of the inclusion will still give a valid DFL
+  file; if more selective inclusion is required the 'inherit' element
+  may be more appropriate to inherit domains from another file.
+  <attr name = "filename" required = "1" >
+    The name of the XML-format file to be included in place of the
+    'include' element.
+  </attr>
+</entity>
+
+<entity name = "inherit" tag = "inherit" >
+  The 'inherit' element permits reference to a base set of domains which
+  should be used if the domains are not already defined in the DFL file.
+  The specified file (in DFL format, as a single XML tree with a 'dfl'
+  element at the top level) is processed looking for domains
+  which are in the specfified file but not already in DFL being
+  processed.  When a new domain is found, it is copied from the
+  specified DFL into the tree of DFL file being processed.  Domains that
+  already exist in the DFL file being processed are skipped.  The
+  'inherit' element is used for building larger iAF applications based on
+  common DFL definitions and on smaller iAF applications.  Unlike the
+  'include' element only 'domain' elements will be copied from the
+  specified file, and the specified file must be a full DFL file.
+  <attr name = "filename" required = "1" >
+    The name of the DFL-format file to read additional domains from.
+  </attr>
+</entity>
+
+<entity name = "domain" tag = "domain" >
+  The 'domain' element defines a default set of properties that can be
+  applied to a 'field' element when it is defined on a table.  The 
+  definition can include data type definitions, component sub-fields 
+  (such as a start and end date for a daterange), and values that are 
+  acceptable (and how they should be displayed).  It can also include 
+  rules for determining what is shown, and how it is formatted.  
+  The 'domain' element allows specifying common properties of fields in 
+  a single place, which can then be inherieted; it acts like a base class, 
+  helping to normalise the data definitions, so that many properties can 
+  be specified in a single place allowing convenient modification.
+  Domains can also be used to "group" fields together (such as a start
+  and end date), which can then be referenced with a single field
+  definition in other tables.  "group" domains can include links to
+  other tables, for example for extra things to display, and these links
+  will be inherited by all 'table' elements that contain 'field'
+  elements that reference the 'domain'.
+  <allow entity = "domain-field" occurs = "0+" />
+  <allow entity = "rule"         occurs = "0+" /> 
+  <allow entity = "value"        occurs = "0+" />
+  <allow entity = "link"         occurs = "0+" />
+  <attr name = "name" required = "1" >
+    The name of the 'domain', so that it can be referred to in other 
+    definitions.
+  </attr>
+  <attr name = "type" required = "1" >
+    The type of domain that is being specified.  
+    <restrict value = "boolean"  >a true or false field</restrict>
+    <restrict value = "date"     >a date field</restrict>
+    <restrict value = "group"    >a grouping of other fields</restrict>
+    <restrict value = "numeric"  >a numeric field</restrict>
+    <restrict value = "textual"  >a text field</restrict>
+    <restrict value = "time"     >a time field</restrict>
+    <restrict value = "timestamp">a date and time stamp</restrict>
+  </attr>
+  <attr name = "size" required = "0" >
+    The default storage and display size for any fields which inherit 
+    from this 'domain'.  The field can override the default display size 
+    if required.
+  </attr>
+  <attr name = "default" required = "0" >
+    The default value to use for any fields which inherit from this 'domain'.
+    The field can override the default value if required.
+  </attr>
+  <attr name = "decs"    required = "0" >
+    The number of decimals to show when displaying the field which
+    inherits from this 'domain'.  This is relevant only to numeric
+    domains (and fields).  If not specified for a numeric field the
+    default is to display the natural number of decimal places needed to
+    represent the number.
+  </attr>
+</entity>
+
+<entity name = "domain-field" tag = "field" cdata="1">
+  The domain 'field' element (used only on "group" 'domain' elements) 
+  specifies a field which should be part of the group.  The fields 
+  within a 'domain' group are used whenever a field references that
+  'domain', which provides a convenient way to refer to a set of fields,
+  such as a start date and end date.  A label for the field can also be
+  supplied in the body of the field, as well as rules to apply to the
+  field.  A default label will be constructed from the main field name
+  and the group field name if no explicit label is supplied.
+  <allow entity = "rule" occurs = "0+" />
+  <attr name = "name" required = "1" >
+    The name of the field within the 'domain' group.  This name will be
+    prefixed by the name of the main field which references the 'domain'.
+  </attr>
+  <attr name = "domain" required = "0" >
+    The name of the 'domain' to inherit properties from.  If not
+    specified, then all of the required field properties must be specified
+    directly.  (Use of domains to normalise the data definitions 
+    is strongly recommended.)  The properties from the associated
+    'domain' will be copied to the field before starting to evaluate it.
+    In the case of a group 'domain', all of the fields from the 'domain'
+    will replace the 'field', with appropriate modifications of
+    the 'field' names from the 'domain'.
+  </attr>
+  <attr name = "type"  required = "0" >
+    The type of the field.  (This can be inherited from a 'domain'.)
+    <restrict value = "boolean"  >a true or false field</restrict>
+    <restrict value = "date"     >a date field</restrict>
+    <restrict value = "group"    >a grouping of other fields</restrict>
+    <restrict value = "numeric"  >a numeric field</restrict>
+    <restrict value = "textual"  >a text field</restrict>
+    <restrict value = "time"     >a time field</restrict>
+    <restrict value = "timestamp">a date and time stamp</restrict>
+  </attr>
+  <attr name = "size" required = "0" >
+    The storage and display size of the field.  (This can be inherited
+    from a 'domain'.)
+  </attr>
+  <attr name = "default" required = "0" >
+    The default value to assign to this field, if it is not specified
+    (or when a new entry is being created).  (This can be inherited from
+    a 'domain'.)  If not specified, the default value will be NULL.
+  </attr>
+  <attr name = "required" required = "0" default = "0" >
+    If supplied and set to "1", indicates that a value must be supplied
+    for the field.
+    <restrict value = "0" >the field may be left empty</restrict>
+    <restrict value = "1" >a value must be entered into the field</restrict>
+  </attr>
+</entity>
+
+<entity name = "value" tag = "value" >
+  The 'value' element specifies a key and display label entry, to be
+  included in a 'domain' definition.  A set of 'value' elements in a
+  'domain' element enumerates the legal values for that domain.  It can
+  also be used to associate a description with a given value in a
+  particular context (for example, a problem severity level, or an
+  urgency level) rather than simply displaying numbers to users, where
+  the set of values is small and not user maintainable.
+  <attr name = "key"   required = "1" >
+    The internal name (key) of the value
+  </attr>
+  <attr name = "label" required = "1" >
+    A human readable description of the value, in the context it is
+    used, to be used when displaying that value.
+  </attr>
+</entity>
+
+<entity name = "table" tag = "table" >
+  The 'table' element defines a database table, which consists of a
+  series of fields, possibly with some indexes on them, and may also
+  specify links to other tables.  To allow the iAF automatic table
+  referencing to work all tables should be defined with an "id" primary
+  key.  If the "clean ids" rule is not in effect, then an index called
+  "primary" must be defined to identify the primary key for the table.
+  They should also preferably use foreign keys made by combining
+  the other table's name, and the suffix "id".  The table will inherit
+  any 'link' elements from any "group" 'domain' elements that are
+  referenced in the 'table'.  The body of the 'table' element can contain 
+  a longer (plain text) description of the table to be used when generating 
+  documentation.
+  <allow entity = "table-field" occurs = "1+" />
+  <allow entity = "link"        occurs = "0+" />
+  <allow entity = "index"       occurs = "0+" />
+  <attr name = "name" required = "1" >
+    The name of the table.  It will be prefixed with the "prefix"
+    attribute of the 'dfl' element, when it is created in the database,
+    to ensure it is unique.  (The iAF application handles this detail,
+    but it is worth noting if you will be looking at or modifying the
+    database directly for, eg, ad hoc reporting.)
+  </attr>
+  <attr name = "description" required = "0" >
+    A human readable description of the table, used as the default
+    description for OFL objects based on this table, which in turn is
+    used for describing the table in screens.  If not specified, the
+    table name will be used as the description.
+  </attr>
+  <attr name = "realname"    required = "0" >
+    The real (physical) name of the table.  The default is the database
+    prefix (specified in the 'dfl' element) followed by the "name"
+    attribute of the 'table'.  However if your (existing) database does
+    not follow these rules, you can override the real name of the table
+    here.
+  </attr>
+  <attr name = "prefix"      required = "0" >
+    A prefix string for the name of the fields in this table.  By
+    default it will be the same prefix as the 'dfl' element has, but if
+    you are matching an existing database you can specify a different
+    prefix.  The prefix is used to ensure that fields which would
+    otherwise conflict with the SQL syntax have unique names, and is
+    normally handled internally by iAF.
+  </attr>
+</entity>
+
+<entity name = "table-field" tag = "field" cdata = "1" >
+  The table 'field' element specifies a field of a database table, and
+  its properties.  Additional properties including display features, and
+  actions to take at various times, can be specified by 'rule' elements
+  on the 'field'.  The 'field' element can inherit properties from an
+  associated 'domain', which provides a useful way to apply the same
+  properties to all fields of the same type.  Any 'link' elements in the
+  'domain' elements referenced will be copied to the 'table' element
+  containing the 'field'.  The 'field' can override any of the default 
+  properties inherited from the 'domain' by specifying them itself, but there 
+  is no way to remove the properties completely.  The body of the field 
+  may contain a description of the field to be displayed when the field is 
+  displayed; if there is no description supplied a default one will be 
+  filled in based on the field name.
+  <allow entity = "rule" occurs = "0+" />
+  <attr name = "name" required = "1" >
+    The name of the 'field' in the database 'table'.
+  </attr>
+  <attr name = "domain" required = "0" >
+    The name of the 'domain' to inherit properties from.  If not
+    specified, then all of the required field properties must be specified
+    directly.  (Use of domains to normalise the data definitions 
+    is strongly recommended.)  The properties from the associated
+    'domain' will be copied to the field before starting to evaluate it.
+    In the case of a group 'domain', all of the fields from the 'domain'
+    will replace the 'field', with appropriate modifications of
+    the 'field' names from the 'domain'.
+  </attr>
+  <attr name = "realname" required = "0" >
+    The real (physical) name of the field.  The default value is the
+    prefix (specified in the 'table' element or the 'dfl' element)
+    followed by the "name" attribute of the 'field'.  Normally this
+    attribute is not specified, but its value can be overridden if
+    necessary to match an existing table.
+  </attr>
+  <attr name = "type"  required = "0" >
+    The type of the field.  This can be inherited from a 'domain', and
+    must be specified if it is not specified in the 'domain', or a
+    'domain' is not referenced.
+    <restrict value = "boolean"  >a true or false field</restrict>
+    <restrict value = "date"     >a date field</restrict>
+    <restrict value = "group"    >a grouping of other fields</restrict>
+    <restrict value = "numeric"  >a numeric field</restrict>
+    <restrict value = "textual"  >a text field</restrict>
+    <restrict value = "time"     >a time field</restrict>
+    <restrict value = "timestamp">a date and time stamp</restrict>
+  </attr>
+  <attr name = "size" required = "0" >
+    The storage and display size of the field.  This can be inherited
+    from a 'domain'.  The "size" attribute must be specified for "textual"
+    and "numeric" field types.
+  </attr>
+  <attr name = "default" required = "0" >
+    The default value to assign to this field, if it is not specified
+    (or when a new entry is being created).  (This can be inherited from
+    a 'domain'.)  If not specified, the default value will be NULL.
+  </attr>
+  <attr name = "required" required = "0" default = "0" >
+    If supplied and set to "1", indicates that a value must be supplied
+    for the field.
+    <restrict value = "0" >the field may be left empty</restrict>
+    <restrict value = "1" >a value must be entered into the field</restrict>
+  </attr>
+  <attr name = "decs"    required = "0" >
+    The number of decimals to show when displaying the field.  This is 
+    relevant only to numeric domains (and fields).  If not specified for 
+    a numeric field the default is to display the natural number of decimal 
+    places needed to represent the number.
+  </attr>
+</entity>
+
+<entity name = "rule" tag = "rule" >
+  Rules can be used to specify display properties and database actions
+  for fields both directly and indirectly via domains.  The rule name
+  acts to hook the rule into the other processing in iAF and should be
+  considered to specify the "type" of rule.  Rules are most commonly
+  used to specify display properties (where the rule name is "show"),
+  and multiple display properties may be specified for a single field by
+  having giving multiple rules. 
+  <attr name = "name" required = "1" >
+    The name of the type of 'rule' being specified.  The name is used to
+    hook the processing of the rule into the appropriate other parts of
+    the iAF application.
+    <restrict value = "show"      >a rule affecting what is displayed</restrict>
+    <restrict value = "ignore"    >ignore the thing specified by the when attribute</restrict>
+    <restrict value = "recordid"  >record the ID at the time specified by the when attribute (only valid if when is "insert")</restrict>
+    <restrict value = "set"       >set the field at the time specified by the when attribute (when may be "insert", "update" or "delete")</restrict>
+    <restrict value = "userid"    >add or update a userid on the record at the time specified by the when attribute (when may be "insert", "update" or "delete")</restrict>
+    <restrict value = "timestamp" >add or update a timestamp on the record at the time specified by the when attribute (when may be "insert", "update", or "delete"</restrict>
+    <restrict value = "soft delete">perform soft deletetions using the field specified by the what attribute</restrict>
+  </attr>
+  <attr name = "when" required = "1" >
+    Specifies when the rule should be applied.
+    <restrict value = "all"    >any time the field is touched ("show" rules only)</restrict>
+    <restrict value = "*"      >any time the field is touched ("show" rules only</restrict>
+    <restrict value = "create" >when creating a new record ("show" rules only)</restrict>
+    <restrict value = "detail" >when processing a detail screen ("show" rules only)</restrict>
+    <restrict value = "delete" >when the record is deleted (not valid for "show" rules)</restrict>
+    <restrict value = "insert" >when the record is inserted (not valid for "show" rules)</restrict>
+    <restrict value = "layout" >when laying out pages ("show" rules only)</restrict>
+    <restrict value = "object" >when processing via an OFL object</restrict>
+    <restrict value = "summary">when processing a summary screen ("show" rules only)</restrict>
+    <restrict value = "update" >when the record is updated (not valid for "show" rules)</restrict>
+  </attr>
+  <attr name = "what" required = "0" >
+    A parameter for the rule definition.  It is required for "show" and
+    "soft delete" rules.  For "show" rules, it specifies what should be
+    shown, or what aspect of the thing shown should be controlled, in
+    combination with the "value" attribute.  For
+    "soft delete" rules it specifies the name of the database field that
+    should be used to indicate whether the object is active or not.  The
+    list of values here is for "show" rules only.
+    <restrict value = "hidden" >
+      The field specified is hidden from the user
+    </restrict>
+    <restrict value = "html" >
+      The field contains HTML data, and must be encoded with HTML entities 
+      before it can be shown (as source) in the browser
+    </restrict>
+    <restrict value = "password" >
+      The field contains a password and shouldn't echo its value to the screen
+    </restrict>
+    <restrict value = "attachment" >
+      The field contains the name of a file attachment
+    </restrict>
+    <restrict value = "startyear"  >
+      The field is a date with a specific year range, and this is the
+      offset from the current year to the start year of the range
+      (eg, "-10" or "+5).  The offset is specified in the "value" attribute, 
+      or will be assumed to be "-20" if left empty.
+    </restrict>
+    <restrict value = "endyear" >
+      The field is a date with a specified year range, and this is the
+      offset from the current year to the end year of the range (eg,
+      "-10" or "+5").  The offset is specified in the "value" attribute,
+      or will be assumed to be "+10" if left empty.
+    </restrict>
+    <restrict value = "starthour" >
+      The field is a time with a specific hour range, and this is the
+      starting hour of the range (specified in a 24 hour clock value).
+    </restrict>
+    <restrict value = "endhour" >
+      The field is a time with a specific hour range, and this is the
+      starting hour of the range (specified in a 24 hour clock value).
+    </restrict>
+    <restrict value = "interval" >
+      The field is a time with a minute interval greater than one.
+    </restrict>
+    <restrict value = "true" >
+      The field is a boolean type, and the "value" attribute specifies
+      what should be shown if the field is true.
+    </restrict>
+    <restrict value = "false" >
+      The field is a boolean type, and the "value" attribute specifies
+      what should be shown if the field is false.
+    </restrict>
+    <restrict value = "showsize" >
+      The field is a textual field or a numeric field, and this
+      specifies how many characters should be displayed for the field on
+      screen.  The default value is the fields size in the database.
+    </restrict>
+    <restrict value = "rows" >
+      The field is a textbox field, and the "value" attribute specifies
+      how many rows should be displayed for the field on the screen.
+    </restrict>
+    <restrict value = "cols" >
+      The field is a textbox field, and the "value" attribute specifies
+      how many columns should be displayed for the field on the screen.
+    </restrict>
+    <restrict value = "label" >
+      The "value" attribute contains the label to use when displaying
+      this field.  The default is the field name.
+    </restrict>
+    <restrict value = "select" >
+      The "value" attribute defines the style of multi-value selection
+      list.  The appropriate values are "dropdown" (pull down selection
+      list), "radio" (radio buttons displayed horizontally), and 
+      "radio down" (radio buttons displayed vertically).  
+    </restrict>
+    <restrict value = "case" >
+      The "value" attribute specifies what case conversion should happen 
+      with the field on display to the user, and prior to storing it into 
+      the database.  The valid values are "upper" and "lower".  If this
+      rule is not specified the field is displayed and stored untouched.
+    </restrict>
+    <restrict value = "blank" >
+      The value defines what should happen if this numeric field is
+      blank.  The value "1" (the default) means the field is shown as
+      blank if it contains 0 (zero).  The value "false" means that the
+      field is now shown blank.
+    </restrict>
+    <restrict value = "join" >
+      Specifies whether the field should be shown on the same line as the
+      previous field.  If the value is "1" (the default when the rule is
+      specified) then this field will be shown on the same line as the
+      previous one.  If the value is "0" then it will have its own new
+      line (the default in detail screens unless the domain specifies
+      otherwise). 
+    </restrict>
+  </attr>
+  <attr name = "value" required = "0" >
+    A parameter for the rule definition.  It is required for "show" and
+    "set" rules.  For "set" rules it specifies the value that should be
+    stored set.  For "show" rules it is used in combination with the
+    "what" attribute, and specifies the size, range or type of things to
+    display.
+  </attr>
+</entity>
+
+<entity name = "link" tag = "link" >
+  The 'link' element describes the relationship between two tables, and
+  is used to generate database integrity constraints (where the database
+  supports them), for integrity checking within the iAF application, and 
+  for locating related display fields (such as a name corresponding to
+  a given ID).  By default iAF makes assumptions about the names of the
+  fields which are involved in the link, in particular it assumes that
+  each 'table' will have an "id" field which is its primary key, and
+  unless some other field is specified will assume that the foreign key
+  field on the referring table is named by concatenating the name of the
+  other table with the word "id".  For instance that the foreign key
+  referring to a 'table' "project", which has a primary key "id", will
+  be "projectid".  The 'link' can include a 'field' element to override
+  this default assumption of fields: the 'field' element specifies which
+  field in the current table should be considered the foreign key.
+  <allow entity = "link-field" occurs = "0+" />
+  <attr name = "name" required = "0" >
+    The name of this link, for use in generating documentation.
+  </attr>
+  <attr name = "type" required = "1" >
+    The type of relationship. 
+    <restrict value = "childof" >this table is a child of the parent table, and a user working with the parent is allowed to ask to work with the list of children attached to the parent</restrict>
+    <restrict value = "reference">a reference to another record that contains related information to display (ie, to decode a key value)</restrict>
+    <restrict value = "multiplex">used for join tables that specify a many to many relationship to indicate the master tables being joined</restrict>
+  </attr>
+  <attr name = "table" required = "1" >
+    The name of the table to which the present table is related.
+  </attr>
+</entity>
+
+<entity name = "link-field" tag = "field" >
+  The link 'field' element specifies a field of the current table which
+  is the foreign key to the table that is being linked to.
+  <attr name = "name" required = "1" >
+    The name of the field in the database 'table' which should be
+    considered to be the foreign key field referencing the "id" field of
+    the table being linked to.
+  </attr>
+  <attr name = "target" required = "0" >
+    Specifies the name of the field in the 'table' referred to by the
+    link that should match the "name" foreign key field.  If "clean ids"
+    are being used the default value is "id" for most types of links.
+  </attr>
+</entity>
+
+<entity name = "index" tag = "index" >
+  The 'index' element specifies the fields that should be indexed
+  together on the table.  Multiple indexes can be specified for
+  combinations of fields which are often used together, and it is
+  recommended that indexes be specified for all commonly used 
+  non primary key searches.  The index will be created on the database
+  with a name based on the table name and the index name (to ensure
+  uniqueness of the name), and will consist of the fields that are
+  listed, indexed in the order they are listed.  The body of the 'index'
+  element can contain a (plain text) description of the index and its
+  purpose for use in documentation.  When the "clean ids" rule is in
+  effect, a primary index will always be defined on the table
+  automatically.
+  <allow entity = "index-field" occurs = "1+" />
+  <attr name = "name" required = "1" >
+    The name of the index.  The name of the index in the database will
+    be made unique by prefixing the index name with the name of the
+    table.  The index name must be unique within the table.
+  </attr>
+  <attr name = "unique" required = "0" default = "0" >
+    If specified and set to "1" this tells the database that the index
+    is a unique index so that each entry can occur in the index only once.
+  </attr>
+</entity>
+
+<entity name = "index-field" tag = "field" >
+  The index 'field' element specifies a field of the current table which
+  should be included in the index.  The fields are indexed in the order
+  they are listed within the 'index' element.
+  <attr name = "name" required = "1" >
+    The name of the field in the database 'table' which should be
+    put into the index. 
+  </attr>
+  <attr name = "order" required = "0" default = "ascending" >
+    If specified and set to "descending", then this field will be sorted
+    in descending order in the index.
+  </attr>
+</entity>
+
+</xnf>

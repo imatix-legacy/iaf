@@ -1,0 +1,2900 @@
+#
+#   pflasp.gsl - Generate presentation layer in ASP
+#
+
+include "pflfield.gsl"      #   Field management
+include "pflcode.gsl"       #   Generated from pfl.xnf - generate code
+
+------------------------------------------------------------------------
+    function generate_screens
+-
+-   Generates ASP screens for the application.
+-
+------------------------------------------------------------------------
+
+for root.ofl
+for root.pfl
+
+    #   We'll do just one screen if match is specified
+    generated_screens = 0
+    for screen where !defined (match) | substr (name,0,,length (match)) = match
+        if screen.build
+            generate_asp_screen ()
+            generated_screens += 1
+        endif
+    endfor
+
+echo "Number of screens generated: " + generated_screens
+endfor pfl
+endfor ofl
+endfunction
+
+
+/*************************   GENERATE ASP SCREEN  **************************/
+
+.macro generate_asp_screen ()
+.if defined (screen.skin)
+.   echo "Generating $(screen.name).spf..."
+.   output "$(screen.name).spf"
+.else
+.   echo "Generating $(screen.name).asp..."
+.   output "$(screen.name).asp"
+.endif
+<%@ LANGUAGE="VBSCRIPT" %>
+<%
+'   $(pfl.description?:)
+'
+'   Generated: $(date)
+'   Constructed using the iMatix Internet Application Framework (iAF).
+'   Copyright (c) 1999-$(substr ("$(date)",0,3,)) iMatix Corporation
+'   http://www.imatix.com, webapp@imatix.com
+'
+.-  Generate constants for lookup values
+.for screen.view
+.   for ofl.object      where name = view.object
+.   for view as objview where name = view.name
+.       generate_table_constants ()
+.       for objview-> table.field
+.           generate_table_constants ()
+.       endfor
+.   endfor
+.   endfor
+.endfor
+.for screen.enum
+.   if count (root-> dfl.domain, count.name = enum.domain) = 0
+.       echo "Enumerated domain '$(domain)' not found in DFL"
+.   endif
+.   for root-> dfl.domain where name = enum.domain
+.       for value by key
+.           varname = domain.name + "_" + (value.name? value.label)
+.           if type = "textual"
+Private Const $(VARNAME:C)   = "$(key)"
+.           else
+Private Const $(VARNAME:C)   = $(key)
+.           endif
+.       endfor
+.   endfor
+.endfor
+%>
+<!--#include file="library.asp"-->
+.for use where object <> ""
+<!--#include file="$(object).asp"-->
+.endfor
+<%
+.if main ?= 1
+if Request.QueryString ("op") = "I" _
+or Request.QueryString ("op") = "" then
+    Session ("showhints")           = 1
+    Session ("loggedin")            = 0
+    Session ("cur_session")         = 1
+.   for global
+.       if type ?= "numeric"
+    Session ("$(name)")             = $(initial?0)
+.       else
+    Session ("$(name)")             = "$(initial?:)"
+.       endif
+.   endfor
+    Session ("cur_stepno")          = 0
+    Session ("$(screen.name)_parent") = "default"
+.if debug_mode
+    Session ("cur_debug")           = 0
+.endif
+elseif Session ("$(name)_page") = "" then
+    ' Session timed out
+    Session.Abandon
+    response_redirect "default.asp"
+end if
+.else
+'   Security check: if session incorrectly opened, kill it
+'   If program was not called correctly, kill session
+if Session ("cur_userid") = 0 _
+or Session ("cur_session") <> 1 _
+or Session (Session ("$(screen.name)_parent") & "_called") <> "$(screen.name)" then
+    Session.Abandon
+    response_redirect "default.asp"
+end if
+.endif
+
+set APDB     = Session ("obj_apdb")
+set pXML     = Server.CreateObject ("scl.XMLstore")
+set SYMBOLS  = Server.CreateObject ("scl.Symbol")
+set pString  = Server.CreateObject ("scl.String")
+set pDate    = Server.CreateObject ("scl.Date")
+
+'if session ("profile_mode") = 1 then
+'    begin_time = pDate.clock
+'end if
+
+Response.Expires = 0
+Response.Buffer = FALSE
+.if debug_mode
+debug_text  = ""
+debug_shown = 0
+.endif
+
+.if screen.has_attachments ?= 1
+Set Upload = Server.CreateObject("scl.upload")
+.   if defined (screen.file_filter)
+upload.allowed_files = "$(screen.file_filter:)"
+.   endif
+have_attachments = 1
+.   request_form = "Upload.Form"
+.else
+.   request_form = "Request.Form"
+have_attachments = 0
+.endif
+
+'   Get program and session context
+
+cur_program         = "$(screen.name)"
+.for global
+$(name)             = Session ("$(name)")
+.endfor
+cur_stepno          = Session ("cur_stepno")       ' Session step
+cur_message         = Session ("cur_message")      ' Error message
+cur_called          = Session ("$(name)_called")   ' Last program called
+cur_page            = Session ("$(name)_page")     ' Current page
+cur_hideback        = Session ("$(name)_hideback") ' Hide back button
+.if screen.has_attachments ?= 1
+cur_cryptkey        = "cryptkey"
+.endif
+.if count (screen.query) & screen.alpha ?= 1
+cur_alpha           = Session ("$(name)_alpha")    ' Alpha lookup index
+.endif
+.if count (screen.query) & screen.filter ?= 1
+cur_filtertext      = Session ("$(name)_filtertext")  ' Filter value
+cur_filterwhat      = Session ("$(name)_filterwhat")  ' Filter method
+.endif
+.for var
+.   session_id = item (screen) + "_" + count (screen.var) + "_" + index (var)
+.   if defined (occurs)
+if IsEmpty (Session ("$(session_id)")) then
+    Dim $(name)         ($(occurs))
+else
+    $(name)         = Session ("$(session_id)")
+end if
+.   else
+$(name)             = Session ("$(session_id)")
+.   endif
+.endfor
+.for use where object <> ""
+.   session_id = item (screen) + "_" + count (screen.var) + "_r" + index (use)
+$(object)_revised   = Session ("$(session_id)")
+.endfor
+.generate_event_handler ("on_loadcontext")
+cur_error           = ""       ' Field to mark as error, or
+cur_cursor          = ""       ' Field on which to place cursor
+
+cur_object          = ""       ' Last OAL access
+cur_action          = ""       ' Screen action
+cur_argval          = ""       ' Screen action argument
+redirect_to         = ""       ' Redirect to ASP
+exception_raised    = FALSE    ' No errors during processing
+.#   Restore query on screen's principal object
+.if count (screen.query)
+.  for screen.query where query.object = screen-> use.object
+pxml.value          = Session ("$(screen.name)_$(query.object)_oal")
+.  endfor
+query_count         = Cint (pxml.attr ("count", 0))
+query_limit         = Cint (pxml.attr ("limit", 0))
+query_more          = Cint (pxml.attr ("more",  0))
+query_index         = 0        ' Current query index
+.endif
+.if defined (screen.sidebar_left)
+show_sidebars       = 1
+.endif
+.generate_event_handler ("on_global")
+
+'   Handle program operation
+select case Request.QueryString ("op")
+    case "I"
+        initialise_the_program
+    case "P"
+        process_screen_action
+    case "R"
+        return_from_call
+    case "T"
+        return_from_callstack
+    case else
+        initialise_the_program
+end select
+
+if redirect_to <> "" then
+    save_session_context
+    save_program_context
+    redirect_allowing_debug redirect_to
+end if    
+
+sub redirect_allowing_debug (target)
+.if debug_mode
+    if debug_text <> "" then
+        response.write "<h3>Refreshing the debug window during redirect</h3>"
+        response.Write "<p><a href=""" & target & """>Continue with application...</a>"
+        debug_shown = 1
+    else
+        response_redirect target
+    end if
+.else
+    response_redirect target
+.endif
+end sub
+
+sub save_session_context
+.for global
+    Session ("$(name)")            = $(name)
+.endfor
+    Session ("cur_message")        = cur_message 
+end sub
+
+sub save_program_context
+    Session ("$(name)_called")     = cur_called
+    Session ("$(name)_page")       = cur_page
+    Session ("$(name)_hideback")   = cur_hideback
+.if count (screen.query) & screen.alpha ?= 1
+    Session ("$(name)_alpha")      = cur_alpha
+.endif
+.if count (screen.query) & screen.filter ?= 1
+    Session ("$(name)_filtertext")  = cur_filtertext
+    Session ("$(name)_filterwhat")  = cur_filterwhat
+.endif
+.for var
+.   session_id = item (screen) + "_" + count (screen.var) + "_" + index (var)
+    Session ("$(session_id)")      = $(name)
+.endfor
+.for use where object <> ""
+.   session_id = item (screen) + "_" + count (screen.var) + "_r" + index (use)
+    Session ("$(session_id)")      = $(object)_revised
+.endfor
+.generate_event_handler ("on_savecontext")
+end sub
+
+.for use where object <> ""
+sub oal_$(object) (operation)
+    pxml.item_root
+    pxml.attr ("do")   = operation
+    pxml.attr ("user") = cur_userid
+.   if debug_mode
+    if Session ("cur_debug") = 1 then pxml.attr ("trace") = 1
+.   endif
+    reply = oa_do_$(object) (pxml.value)
+    pxml.value = reply
+    if pxml.attr ("done") = "ok" then
+        exception_raised = FALSE
+        if operation = "create" or operation = "update" or operation = "delete" then
+            Session ("db_changed") = 1
+        end if
+    else
+        if left (pxml.attr ("message"), 23) = "Invalid timestamp value" then
+            cur_message = "Another user was just working on this - any changes you made will not be saved"
+        else        
+            cur_message = "Error from $(object) (" & pxml.attr ("cause") & "): " & pxml.attr ("message")
+        end if
+        exception_raised = TRUE
+    end if
+    if exception_raised then
+.   if debug_mode
+        debug_info "ERROR - " & cur_message
+.   endif
+        cur_object = "$(object)"
+.   if count (handler, count.event ?= "on_oalerror")
+        on_oalerror_handler
+.   endif
+    end if
+end sub
+
+.endfor
+.if count (handler, count.event ?= "on_oalerror")
+sub on_oalerror_handler 
+.generate_event_handler ("on_oalerror")
+end sub
+
+.endif
+sub return_to_parent
+.if count (handler, count.event ?= "on_exit")
+    on_exit_handler
+.endif
+    save_session_context
+    redirect_allowing_debug Session ("$(screen.name)_parent") & ".asp?op=R"
+end sub
+
+sub return_to (program)
+    if program <> cur_program then
+.if count (handler, count.event ?= "on_exit")
+        on_exit_handler
+.endif
+        save_session_context
+        redirect_allowing_debug program & ".asp?op=T"
+    end if
+end sub
+
+.if count (handler, count.event ?= "on_exit")
+sub on_exit_handler
+.generate_event_handler ("on_exit")
+end sub
+
+.endif
+sub return_to_login
+.if count (handler, count.event ?= "on_exit")
+    on_exit_handler
+.endif
+    redirect_allowing_debug "default.asp"
+end sub
+
+Sub chain_to (target)
+.   generate_event_handler ("on_chainto")
+    Session (target & "_parent") = cur_program
+    redirect_to = target & ".asp?op=I"
+    cur_called  = target
+End Sub
+
+.if debug_mode
+sub debug_header (object, method, options)
+    if Session ("cur_debug") = 1 then
+        debug_text = debug_text + "<h2>" & method & " on " & object
+        if options <> "" then
+            debug_text = debug_text & " -- " & options
+        end if
+        debug_text = debug_text & "</h2>"
+    end if
+end sub
+
+sub debug_info (options)
+    if Session ("cur_debug") = 1 then
+        debug_text = debug_text + "<li>" & left (options, 255)
+    end if
+end sub
+
+.endif
+.for value_set
+function lookup_$(name) (key)
+    select case CStr (key)
+.for value by key
+        case "$(key:)" 
+            lookup_$(value_set.name) = "$(label:)"
+.endfor
+        case else
+            lookup_$(value_set.name) = key
+    end select
+end function
+
+.endfor
+.for screen.enum where count (screen.value_set, count.name = enum.domain) = 0
+.   for root-> dfl.domain where name = enum.domain
+function lookup_$(name) (key)
+    select case CStr (key)
+.       for value by key
+        case "$(key:)" 
+            lookup_$(enum.domain) = "$(label:)"
+.       endfor
+        case else
+            lookup_$(enum.domain) = key
+    end select
+end function
+
+.   endfor
+.endfor
+'------------------------   INITIALISE THE PROGRAM  ------------------------'
+
+sub initialise_the_program
+    Session ("db_changed") = 0
+    cur_page               = "$(screen.initial?screen-> page.name)"
+.for var where !defined (occurs)
+.   if type = "textual" | type = "textbox"
+    $(name)                = "$(value?:)"
+.   else
+    $(name)                = $(value?0:)
+.   endif
+.endfor
+.generate_event_handler ("on_init")
+.for screen.page
+.   generate_event_handler ("on_initpage")
+.endfor
+.if count (screen.query) & screen.alpha ?= 1
+    if isempty (cur_alpha) then
+        cur_alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    end if
+.endif
+.if count (screen.query) & screen.filter ?= 1
+    cur_filtertext         = "" 
+    cur_filterwhat         = ""
+.endif
+end sub
+
+'------------------------   PROCESS SCREEN ACTION  -------------------------'
+
+sub process_screen_action
+    cur_message = ""
+.if screen.has_attachments ?= 1
+    Upload.data       '   Get form value and uploaded files data
+.endif
+    cur_action  = $(request_form:) ("accode")
+    cur_argval  = $(request_form:) ("argval")
+.generate_event_handler ("on_action")
+
+    '   These actions are handled on a per-screen basis
+    select case cur_action
+.if main?0 = 0
+        case "RETURN"
+            if cur_argval = "" then
+                return_to_parent
+            else
+                return_to cur_argval
+            end if
+.endif
+.if screen.has_attachments ?= 1
+        case "DOWNLOAD"
+            upload.download cur_argval, Session ("docdir"), cur_cryptkey
+            Response.End
+.endif
+        case "CHAIN"
+            get_data_from_form 0
+            chain_to cur_argval
+        case "HINTS"
+            Session ("showhints") = cur_argval
+.if debug_mode
+        case "DEBUG"
+            Session ("cur_debug") = cur_argval
+.endif
+    end select
+
+    use_screen_action = 0       '   Assume we find action at page level
+.if count (screen.page) > 1
+    select case cur_page
+.   for screen.page
+.       if count (screen.page, count-> form.mode = "input") > 1
+.           get_data_from_form = "get_data_from_$(page.name:c)"
+.       else
+.           get_data_from_form = "get_data_from_form"
+.       endif
+        case "$(page.name)"
+            select case cur_action
+.       if count (handler, count.event ?= "on_click")
+                case "CLICK"
+.           if page-> form.mode = "input"
+                    $(get_data_from_form) 0
+                    if not exception_raised then
+                        $(page.name)_on_click_handler
+                    end if
+.           else
+                    $(page.name)_on_click_handler
+.           endif
+.       endif
+.       if count (handler, count.event ?= "on_select")
+                case "SELECT"
+.           if page-> form.mode = "input"
+                    $(get_data_from_form) 0
+                    if not exception_raised then
+                        $(page.name:c)_on_select_handler
+                    end if
+.           else
+                    $(page.name:c)_on_select_handler
+.           endif
+.       endif
+.       if count (handler, count.event ?= "on_goback")
+                case "GOBACK"
+.           if page-> form.mode = "input"
+                    $(get_data_from_form) 0
+                    if not exception_raised then
+                        $(page.name:c)_on_goback_handler
+                    end if
+.           else
+                    $(page.name:c)_on_goback_handler
+.           endif
+.       endif
+.       for handler where defined (action)
+                case "DO_$(ACTION:C)"
+.           if page-> form.mode = "input" & getdata = 1
+                    $(get_data_from_form) $(fields?0)
+                    if not exception_raised then
+                        $(page.name:c)_do_$(action)
+                    end if
+.           else
+                    $(page.name:c)_do_$(action)
+.           endif
+.       endfor
+.       for screen.page
+.           for form where count (index)
+.               screen.has_index = 1
+.           endfor
+.       endfor
+.       if screen.has_index?0
+                case "INDEX"
+.           if page-> form.mode = "input"
+                    $(get_data_from_form) 1
+                    if not exception_raised then
+                        cur_page = cur_argval
+                    end if
+.           else
+                    cur_page = cur_argval
+.           endif
+.       endif
+                case else
+                    use_screen_action = 1
+            end select
+.   endfor
+    end select
+.else
+.   for screen.page
+    select case cur_action
+.       if count (handler, count.event ?= "on_click")
+        case "CLICK"
+.           if page-> form.mode = "input"
+            get_data_from_form 0
+            if not exception_raised then
+                $(page.name)_on_click_handler
+            end if
+.           else
+            $(page.name)_on_click_handler
+.           endif
+.       endif
+.       if count (handler, count.event ?= "on_select")
+        case "SELECT"
+.           if page-> form.mode = "input"
+            get_data_from_form 0
+            if not exception_raised then
+                $(page.name:c)_on_select_handler
+            end if
+.           else
+            $(page.name:c)_on_select_handler
+.           endif
+.       endif
+.       if count (handler, count.event ?= "on_goback")
+        case "GOBACK"
+            $(page.name:c)_on_goback_handler
+.       endif
+.       for handler where defined (action)
+        case "DO_$(ACTION:C)"
+.           if page-> form.mode = "input" & getdata = 1
+            get_data_from_form $(fields?0)
+            if not exception_raised then
+                $(page.name:c)_do_$(action)
+            end if
+.           else
+            $(page.name:c)_do_$(action)
+.           endif
+.       endfor
+        case else
+            use_screen_action = 1
+    end select
+.   endfor
+.endif
+    if use_screen_action then
+        select case cur_action
+            case "GOBACK"
+                return_to_parent
+.if count (screen.lookup) > 0
+            case "LOOKUP"
+                get_data_from_form 0
+                if not exception_raised then
+.   generate_event_handler ("on_lookup")
+                    Session ("lookup_on") = cur_argval
+                    if redirect_to = "" then
+                        select case cur_argval
+.   for screen.lookup
+                            case "$(lookup.name)"
+                                chain_to "$(lookup.select)"
+.   endfor
+                        end select
+                    end if
+                end if
+.endif
+.if count (screen.handler, count.event ?= "on_click")
+            case "CLICK"
+.   generate_event_handler ("on_click")
+.endif
+.if count (screen.query) & screen.alpha ?= 1
+            case "ALPHA"
+                $(screen-> query.name)_alpha_lookup cur_argval
+.endif
+.if count (screen.query) & screen.filter ?= 1
+            case "FILTER"
+                cur_filterwhat = cur_argval
+                cur_filtertext = $(request_form:) ("filter")
+.   generate_event_handler ("on_filter")
+.endif
+.for screen.handler where defined (action)
+            case "DO_$(ACTION:C)"
+.   if getdata = 1
+                get_data_from_form $(fields?0)
+                if not exception_raised then
+                    do_$(action)
+                end if
+.   else
+                do_$(action)
+.   endif
+.endfor
+            '   Enter on input forms generates a blank action
+            case else
+                get_data_from_form 0
+        end select
+    end if
+end sub
+
+sub get_data_from_form (check_required_fields)
+.if count (screen.page, count-> form.mode = "input") = 0
+end sub
+
+.elsif count (screen.page, count-> form.mode = "input")
+    select case cur_page
+.   for screen.page where page-> form.mode = "input"
+        case "$(page.name)"
+            get_data_from_$(page.name:c) check_required_fields
+.   endfor
+    end select
+.   generate_event_handler ("on_getdata")
+end sub
+
+.endif
+.get_number  = 0
+.get_decimal = 0
+.get_money   = 0
+.get_date    = 0
+.for screen.page where page-> form.mode = "input"
+. if count (screen.page, count-> form.mode = "input")
+sub get_data_from_$(page.name:c) (check_required_fields)
+. endif
+. for field where attr = "input" & hidden = "0"
+.   generate_get_field ()
+. endfor
+. for field 
+.   for sublist
+.       for field where attr = "input" & hidden = "0"
+.           generate_get_field ()
+.       endfor
+.   endfor
+. endfor
+. generate_event_handler ("on_getdata")
+end sub
+
+.endfor
+.if get_number
+function get_number_from_form (name, required)
+    if IsNumeric ($(request_form:) (name)) then
+        value = CLng ($(request_form:) (name))
+    else
+        if CStr ($(request_form:) (name)) = "" then
+            value = 0
+        else
+            cur_message = "Please enter a valid number"
+            cur_error   = name
+            exception_raised = TRUE
+        end if
+    end if
+    get_number_from_form = value
+end function
+
+.endif
+.if get_money
+function get_money_from_form (name, required)
+    moneystr = $(request_form:) (name)
+    point = instr (moneystr, cur_moneyfmt)
+    if point > 0 then
+        wholepart = left (moneystr, point - 1)
+        fraction  = mid  (moneystr & "0", point + 1, 2)
+    else
+        wholepart = moneystr
+        fraction  = 0
+    end if
+    '   Remove thousands separators
+    if cur_moneyfmt = "," then
+        separator = "."
+    else
+        separator = ","
+    end if
+    for position = len (wholepart) to 1 step -1
+        if mid (wholepart, position, 1) = separator then
+            wholepart = left (wholepart, position - 1) & mid (wholepart, position + 1)
+            position = position - 1
+        end if
+    Next 
+
+    if wholepart = "" then wholepart = 0
+    if fraction  = "" then fraction  = 0
+    if  IsNumeric (wholepart) and len (wholepart) < 14 _
+    and IsNumeric (fraction)  and len (fraction)  < 3 then
+        value = wholepart * 100 + fraction
+    else
+        cur_message = "Please enter a valid number"
+        cur_error   = name
+        exception_raised = TRUE
+    end if
+    get_money_from_form = value
+end function
+
+.endif
+.if get_decimal
+function get_decimal_from_form (name, required)
+    if IsNumeric ($(request_form:) (name)) then
+        value = CDbl ($(request_form:) (name))
+    else
+        if CStr ($(request_form:) (name)) = "" then
+            value = 0
+        else
+            cur_message = "Please enter a valid number"
+            cur_error   = name
+            exception_raised = TRUE
+        end if
+    end if
+    get_decimal_from_form = value
+end function
+
+.endif
+.if get_date 
+function get_date_from_form (name, required)
+    datetext = $(request_form:) (name)
+    select case cur_datefmt
+        case "ymd"
+            yy = date_field (datetext, 4)
+            mm = date_field (datetext, 2)
+            dd = date_field (datetext, 2)
+        case "mdy"
+            mm = date_field (datetext, 2)
+            dd = date_field (datetext, 2)
+            yy = date_field (datetext, 4)
+        case else
+            dd = date_field (datetext, 2)
+            mm = date_field (datetext, 2)
+            yy = date_field (datetext, 4)
+    end select
+    if yy = 0 and mm > 0 and dd > 0 then
+        yy = year (now ())
+    end if
+    if mm = 0 and dd = 0 then
+        get_date_from_form = 0
+    else
+        on error resume next
+        get_date_from_form = tvtod (dtotv (makedate (yy, mm, dd)))
+        if get_date_from_form = 0 then
+            cur_message = "Please enter a valid date"
+            cur_error   = name
+            exception_raised = TRUE
+        end if
+    end if
+end function
+
+function date_field (datetext, length)
+    datetext = trim (datetext)
+    '  Collect up to length consecutive digits, stop at non-digit
+    index = 0
+    do while index < length and isnumeric (mid (datetext, index + 1, 1))
+        index = index + 1
+    loop
+    if index = 0 then
+        date_field = 0
+    else
+        date_field = Clng (left (datetext, index))
+        datetext   = mid (datetext, index + 1)
+        if not isnumeric (left (datetext, 1)) then
+            datetext = mid (datetext, 2)
+        end if
+    end if
+end function
+
+.endif
+
+.for handler where defined (action)
+.   generate_action_handler ("do_$(action)")
+.endfor
+.for page
+.   for handler where defined (action)
+.       generate_action_handler ("$(page.name:c)_do_$(action)")
+.   endfor
+.   if count (handler, count.event ?= "on_click")
+sub $(page.name)_on_click_handler (click_field)
+.   generate_event_handler ("on_click")
+end sub
+
+.   endif
+.   if count (handler, count.event ?= "on_select")
+sub $(page.name:c)_on_select_handler
+    args = split (cur_argval & ":0", ":")
+    cur_argval   = CLng (args (0))     ' Row we clicked on
+    select_field = CStr (args (1))     ' Field we clicked on
+    $(page.name:c)_select_item
+.   generate_event_handler ("on_select")
+end sub
+
+sub $(page.name:c)_select_item
+.   if count (screen.use)
+    pxml.item_first_child
+    for line_nbr = 2 to cur_argval
+        pxml.item_next
+    next
+    $(object)_$(view)_get_item
+.   endif
+end sub
+
+.   endif
+.   if count (handler, count.event ?= "on_goback")
+sub $(page.name:c)_on_goback_handler
+.   generate_event_handler ("on_goback")
+end sub
+
+.   endif
+.endfor
+.for screen.query
+sub query_$(object)_$(name) (control, limit)
+.   if debug_mode
+    debug_header "$(object)", "Query", "name=$(name) control=" & control & " limit=" & limit
+.   endif
+    pxml.value = "<oal/>"
+    pxml.attr ("query")      = "$(name)"
+    pxml.attr ("control")    =  control
+    pxml.attr ("limit")      =  limit
+.   for query.queryarg
+    pxml.attr ("$(name)")    =  $(value:)
+.   if debug_mode
+    debug_info "argument $(name)=" & $(value:)
+.   endif
+.   endfor
+.   if screen.filter ?= 1
+    if cur_filtertext = "" then
+        pxml.attr ("filter_text")  = ""
+        pxml.attr ("filter_what")  = ""
+    else
+        pxml.attr ("filter_text")  = cur_filtertext
+        pxml.attr ("filter_what")  = cur_filterwhat
+    end if    
+.   endif
+
+    pxml.item_new         "$(object)"
+    pxml.item_set_current "$(object)"
+.   for ofl.object where name = object
+.       for object.view where view.name = query.view
+.           for view-> table.field where count (index, name = query.index)
+.               if count (query.match, count.name ?= field.name)
+.                   for query.match where name = field.name
+.                       if defined (.value)
+    fld_$(object)_$(name) = $(.value:)
+.                       endif
+    pxml.item_new "$(name)",     fld_$(object)_$(name)
+.                       if type = "textual"
+        if fld_$(object)_$(name) <> "" then
+.                       else
+        if fld_$(object)_$(name) <> 0 then
+.                       endif
+.           if debug_mode
+            debug_info "match $(name)=" & fld_$(object)_$(name)
+.           endif
+            pxml.item_set_current "$(name)"
+            pxml.attr ("match") = 1
+            pxml.item_parent
+        end if
+.                   endfor
+.               else
+    pxml.item_new "$(name)",     fld_$(object)_$(name)
+.                   if debug_mode
+    debug_info "using $(name)=" & fld_$(object)_$(name)
+.                   endif
+.               endif
+.           endfor
+.       endfor
+.   endfor
+    pxml.item_parent
+
+    oal_$(object) "query"
+    query_limit = limit
+.   if limit > 1
+    if limit > 1 then query_index = 0
+.   endif
+    if not exception_raised then
+        query_count = CInt (pxml.attr ("count", 0))
+        query_more  = CInt (pxml.attr ("more",  0))
+        Session ("$(screen.name)_$(object)_oal") = pxml.value
+        if query_count > 0 then
+.   if debug_mode
+            debug_info "OK - count=" & query_count
+.   endif
+            if limit = 1 then
+                pxml.item_first_child
+                $(object)_$(view)_get_item
+            end if
+.   if debug_mode
+        else
+            debug_info "No records found"
+.   endif
+        end if
+    else
+        query_count = 0
+    end if
+end sub
+
+.if alpha ?= 1
+sub $(name)_alpha_lookup (letter)
+.   for ofl.object        where name = query.object
+.   for query as objquery where name = query.name
+.       for object.view where view.name = query.view
+.           for view-> table.field where count (index, name = query.index)
+.               if field.type = "textual"
+    fld_$(object)_$(field.name) = letter
+.               endif
+.           endfor
+.       endfor
+.   endfor
+.   endfor
+    query_$(object)_$(name) "ge", $(limit)
+end sub
+
+.endif
+.endfor
+.for screen.view
+sub $(object)_$(name)_put_item
+    pxml.item_new         "$(object)"
+    pxml.item_set_current "$(object)"
+    pxml.attr ("revised") = $(object)_revised
+.   for ofl.object      where name = view.object
+.   for view as objview where name = view.name
+.       for objview-> table.field
+.           if debug_mode
+    debug_info "data $(name)=" & fld_$(object)_$(name)
+.           endif
+    pxml.item_new "$(name)",     fld_$(object)_$(name)
+.           for table where type = "child"
+    pxml.push_position
+        pxml.item_set_current ("$(field.name)")
+.               parent = field.name
+        for subindex = 1 to $(occurs)
+.               if indicator <> ""
+          if fld_$(object)_$(parent)_$(indicator) (subindex) > 0 then
+.               endif
+            pxml.item_new "$(table.name)"
+            pxml.item_last_child
+.               for field
+            pxml.item_new "$(name)",     fld_$(object)_$(parent)_$(name) (subindex)
+.               endfor
+            pxml.item_parent
+.               if indicator <> ""
+            end if
+.               endif
+      next
+    pxml.pop_position
+.           endfor
+.       endfor
+.   endfor
+.   endfor
+end sub
+
+sub $(object)_$(name)_get_item
+    $(object)_revised = pxml.attr ("revised")
+.   for ofl.object      where name = view.object
+.   for view as objview where name = view.name
+.       for objview-> table.field
+.           if type = "textual"
+    fld_$(object)_$(name)           = pxml.item_child_value ("$(name)", "")
+.           elsif type = "timestamp" | decs ?> 0 | size ?> 9
+    fld_$(object)_$(name)           = CDbl (pxml.item_child_value ("$(name)", 0))
+.           else
+    fld_$(object)_$(name)           = CLng (pxml.item_child_value ("$(name)", 0))
+.           endif
+.           if debug_mode
+    debug_info "data $(name)=" & fld_$(object)_$(name)
+.           endif
+.           for table where type = "lookup"
+    '   Get lookup field values on $(field.name)
+    pxml.push_position
+    pxml.item_set_current ("$(field.name)")
+    if pxml.valid then
+.               parent = field.name
+.               for field
+.                   if type = "textual"
+        fld_$(object)_$(parent)_$(field.name)\
+                                    = pxml.item_child_value ("$(name)", "")
+.                   elsif type = "timestamp" | decs ?> 0 | size ?> 9
+        fld_$(object)_$(parent)_$(field.name)\
+                                    = CDbl (pxml.item_child_value ("$(name)", 0))
+.                   else
+        fld_$(object)_$(parent)_$(field.name)\
+                                    = CLng (pxml.item_child_value ("$(name)", 0))
+.                   endif
+.               endfor
+    end if
+    pxml.pop_position
+.           endfor
+.           for table where type = "child"
+    '   Get child table values on $(field.name)
+    pxml.push_position
+    pxml.item_set_current ("$(field.name)")
+    pxml.item_set_current ("$(table.name)")
+.               parent = field.name
+    for subindex = 1 to $(occurs)
+        if pxml.valid then
+.               for field
+.                   if type = "textual"
+            fld_$(object)_$(parent)_$(field.name) (subindex)\
+                                = pxml.item_child_value ("$(name)", "")
+.                   elsif type = "timestamp" | decs ?> 0 | size ?> 9
+            fld_$(object)_$(parent)_$(field.name) (subindex)\
+                                = CDbl (pxml.item_child_value ("$(name)", 0))
+.                   else
+            fld_$(object)_$(parent)_$(field.name) (subindex)\
+                                = CLng (pxml.item_child_value ("$(name)", 0))
+.                   endif
+.               endfor
+            pxml.item_next
+        end if
+    next
+    pxml.pop_position
+.           endfor
+.       endfor
+.   endfor
+.   endfor
+.   for screen.handler where event ?= "on_fetch" \
+      & object ?= view.object & view ?= view.name
+.       generate_handler_body (1)
+.   endfor
+end sub
+
+.endfor
+.for use where object <> ""
+sub $(object)_put_key_primary
+    pxml.item_new         "$(object)"
+    pxml.item_set_current "$(object)"
+    pxml.attr ("revised") = $(object)_revised
+.   for ofl.object where name = use.object
+.       for object-> view-> table.field where count (index, name = "primary")
+    pxml.item_new "$(name)",     fld_$(object)_$(name)
+.           if debug_mode
+    debug_info "key $(name)=" & fld_$(object)_$(name)
+.           endif
+.       endfor
+.   endfor
+end sub
+
+sub $(object)_get_key_primary
+    pxml.item_first_child
+    $(object)_revised = pxml.attr ("revised")
+.   for ofl.object where name = use.object
+.       for object-> view-> table.field where count (index, name = "primary")
+.           if type = "textual"
+    fld_$(object)_$(name)       = pxml.item_child_value ("$(name)", "")
+.           elsif type = "timestamp" | decs ?> 0 | size ?> 9
+    fld_$(object)_$(name)       = CDbl (pxml.item_child_value ("$(name)", 0))
+.           else
+    fld_$(object)_$(name)       = CLng (pxml.item_child_value ("$(name)", 0))
+.           endif
+.       endfor
+.   endfor
+end sub
+
+sub $(object)_new_key_primary
+.   for ofl.object where name = use.object
+.       for object-> view-> table.field where count (index, name = "primary")
+.           if type = "textual"
+    fld_$(object)_$(name)       = ""
+.           else
+    fld_$(object)_$(name)       = 0
+.           endif
+.       endfor
+.   endfor
+end sub
+
+sub $(object)_pass_key
+.   for ofl.object where name = use.object
+.       for object-> view-> table.field where count (index, name = "primary")
+    Session ("$(name)")         = fld_$(object)_$(name)
+.       endfor
+.   endfor
+end sub
+
+sub $(object)_pass_item
+.   for ofl.object where name = use.object
+.       for view where name = "summary"
+.           for view-> table.field
+    Session ("$(name)")         = fld_$(object)_$(name)
+.           endfor
+.       endfor
+.   endfor
+end sub
+
+sub $(object)_recv_key
+.   for ofl.object where name = use.object
+.       for object-> view-> table.field where count (index, name = "primary")
+    fld_$(object)_$(name)       = Session ("$(name)")
+.       endfor
+.   endfor
+end sub
+
+sub $(object)_recv_item
+.   for ofl.object where name = use.object
+.       for view where name = "summary"
+.           for view-> table.field
+    fld_$(object)_$(name)       = Session ("$(name)")
+.           endfor
+.       endfor
+.   endfor
+end sub
+
+.endfor
+'---------------------------   RETURN FROM CALL  ---------------------------'
+
+sub return_from_call
+.if count (screen.lookup) > 0
+    if Session ("select_made") = 1 then
+        select case Session ("lookup_on")
+.   for screen.lookup
+            case "$(lookup.name)"
+.-      We always base lookups on the object "summary" view
+.-      First, get back the object key into the lookup key field
+.       for ofl.object where name = lookup.object
+.           for view where name = "summary"
+.               for view-> table.field where count (index, name = "primary")
+                $(lookup.varname) = Session ("$(name)")
+.               endfor
+.           endfor
+.       endfor
+.-      Now get back all lookup block fields
+.       for field
+                $(varname)       = Session ("$(name)")
+.       endfor
+.   endfor
+        end select
+    end if
+.endif
+.generate_event_handler ("on_return")
+.if count (screen.lookup) > 0
+    Session ("select_made") = 0
+    if redirect_to = "" then
+        Session ("lookup_on") = ""
+    end if
+.endif
+end sub
+
+sub return_from_callstack
+.if count (handler, count.event ?= "on_returnto")
+.   generate_event_handler ("on_returnto")
+.else
+    return_from_call
+.endif
+end sub
+
+'---------------------------   HTML PAGE BODIES  ---------------------------'
+.if debug_mode
+if debug_shown = 0 then
+.endif
+page_shown = 0
+%>
+<!--
+    $(pfl.description?:)
+
+    Generated: $(date)
+    Constructed using the iMatix Internet Application Framework (iAF).
+    Copyright (c) 1999-$(substr ("$(date)",0,3,)) iMatix Corporation
+    http://www.imatix.com, webapp@imatix.com
+  -->
+<!--#include file="header.asp"-->
+.reset_field_routines ()
+.for page
+.   pfl_code_page ()
+.endfor
+<% if page_shown = 0 then %>
+<p>Application error: attempt to show invalid page '<%=cur_page %>'.
+<p>Please send a copy of this page to your support desk.
+<p>You should close the browser and log in to the application again.
+<% end if %>
+<script language="JavaScript" type="text/javascript">
+//  Sets the form action and does a form submission; this can be used to attach
+//  actions to hyperlinks, images, and buttons inside or outside forms.
+//
+function formaction (action_code, check, argument_val)
+{
+    document.forms[0].accode.value = action_code;
+    document.forms[0].argval.value = argument_val;
+    if ((check && check_form (document.forms[0]))
+    ||  !check) {
+        document.forms[0].submit();
+    }
+}
+function confaction (action_code, check, argument_val, message)
+{
+    if (confirm (message))
+        formaction (action_code, check, argument_val);
+}
+function hilite (imgDocID,imgObjName)
+{
+    document.images [imgDocID].src = eval(imgObjName + ".src");
+}
+function popdoc (url)
+{
+    window.open (url, "DocumentWindow", "menubar=0,scrollbars=0,resizable=1,width=500,height=600")
+}
+.include_field_routines ()
+</script>
+<%
+.if debug_mode
+end if  ' debug_shown
+.endif
+save_session_context
+save_program_context
+set pXML     = Nothing
+set SYMBOLS  = Nothing
+set pString  = Nothing
+set pDate    = Nothing
+.if screen.has_attachments ?= 1
+Set Upload   = Nothing
+.endif
+
+.if debug_mode
+if Session ("cur_debug") = 1 and debug_text <> "" then
+    debug_text = left (replace (debug_text, "'", """"), 4095)
+%><script language="JavaScript">
+    top.debugwindow = window.open ('', 'Debug', 'menubar=0,toolbar=1,scrollbars=1,resizable=1,width=500,height=500');
+    top.debugwindow.document.open  ();
+    top.debugwindow.document.writeln ('<html><head>');
+    top.debugwindow.document.writeln ('<title>Debug Window</title>');
+    top.debugwindow.document.writeln ('<link rel="stylesheet" href="debug.css" type="text/css">');
+    top.debugwindow.document.writeln ('</head>');
+    top.debugwindow.document.writeln ('<h1>$(screen.name)</h1>');
+    top.debugwindow.document.writeln ('<%=debug_text%>');
+    top.debugwindow.document.writeln ('</html>');
+    top.debugwindow.document.close ();
+</script>
+<% end if %>
+.endif
+<!--#include file="footer.asp"-->
+.endmacro 
+
+#   Generate constants for all lookup fields with values
+function generate_table_constants
+    for table
+        for field where type = "numeric" & count (value)
+            if count (screen.enum, count.domain = field.domain) = 0
+                new enum to screen
+                    enum.domain = field.domain
+                endnew
+            endif
+        endfor
+    endfor
+endfunction
+
+.macro generate_get_field ()
+.if required ?= 1
+.   reqflag = "check_required_fields"
+.else
+.   reqflag = "0"
+.endif
+.if condition ?<> ""
+  if $(condition:) then
+.endif
+.if (occurs?0) = 0
+.   if    type = "numeric"
+.       empty = "0"
+.       if money ?= 1
+    $(varname)              = get_money_from_form ("$(name)", $(reqflag))
+.   get_money = 1
+.       else
+.           if decs ?> 0
+    $(varname)              = get_decimal_from_form ("$(name)", $(reqflag))
+.             get_decimal = 1
+.           else
+    $(varname)              = get_number_from_form ("$(name)", $(reqflag))
+.             get_number = 1
+.           endif
+.       endif
+.   elsif type = "boolean"
+.       empty = ""
+    $(varname)              = btoi ($(request_form:) ("$(name)"))
+.   elsif type = "textual" | type = "textbox"
+.       empty = "\"\""
+.        if attachment ?= 1
+        If upload.files_count > 0 then
+            file_name = upload.save ("$(name)", Session ("docdir"), "", cur_cryptkey)
+            If not IsNull (file_name) and Len (file_name) > 0 Then
+                $(varname)  = "<file name = \"\"" & trim ($(request_form:) ("$(name)")) & _
+                              "\"\" real = \"\"" & file_name & "\"\"/>"
+            End If
+        End If
+.       else
+.           if case ?= "upper"
+    $(varname)              = ucase (trim ($(request_form:) ("$(name)")))
+.           elsif case ?= "lower"
+    $(varname)              = lcase (trim ($(request_form:) ("$(name)")))
+.           else
+    $(varname)              = trim ($(request_form:) ("$(name)"))
+.           endif    
+.       endif
+.   elsif type = "date"
+.       empty = "0"
+.       if screen.datesplit = 1
+    $(varname)              = atod ($(request_form:) ("$(name)_yy"), _
+                                    $(request_form:) ("$(name)_mm"), _
+                                    $(request_form:) ("$(name)_dd"))
+.       else
+    $(varname)              = get_date_from_form ("$(name)", $(reqflag))
+.           get_date = 1
+.       endif
+.   elsif type = "time"
+.       empty = "0"
+    $(varname)              = atot ($(request_form:) ("$(name)_hh"), _
+                                    $(request_form:) ("$(name)_mm"), 0)
+.   endif
+.   if type = "date"
+    if pDate.Is_valid_date (CLng ($(varname))) = FALSE then
+        cur_message = "Please enter a valid date for $(label:)"
+        exception_raised = TRUE
+    end if
+.   elsif required ?= 1 & empty <> ""
+    if not exception_raised and $(varname) = $(empty) and check_required_fields then
+        cur_message = "Please enter a value for $(label:)"
+        cur_error   = "$(name)"
+        exception_raised = TRUE
+    end if
+.   endif
+.else
+    for index = 1 to $(occurs)
+.       if    type = "numeric"
+.           if money ?= 1
+        $(varname) (index)    = get_money_from_form ("$(name)" & index, $(reqflag))
+.           get_money = 1
+.           else
+.               if decs ?> 0
+        $(varname) (index)    = get_decimal_from_form ("$(name)" & index, $(reqflag))
+.                   get_decimal = 1
+.               else
+        $(varname) (index)    = get_number_from_form ("$(name)" & index, $(reqflag))
+.                   get_number = 1
+.               endif
+.           endif
+.       elsif type = "boolean"
+        $(varname) (index)    = btoi ($(request_form:) ("$(name)" & index))
+.       elsif type = "textual" | type = "textbox"
+.           if case ?= "upper"
+        $(varname) (index)    = ucase (trim ($(request_form:) ("$(name)" & index)))
+.           elsif case ?= "lower"
+        $(varname) (index)    = lcase (trim ($(request_form:) ("$(name)" & index)))
+.           else
+        $(varname) (index)    = trim ($(request_form:) ("$(name)" & index))
+.           endif    
+.       elsif type = "date"
+.           if screen.datesplit = 1
+        $(varname) (index)    = atod ($(request_form:) ("$(name)" & index & "_yy"), _
+                                      $(request_form:) ("$(name)" & index & "_mm"), _
+                                      $(request_form:) ("$(name)" & index & "_dd"))
+.           else
+        $(varname) (index)    = get_date_from_form ("$(name)" & index, $(reqflag))
+.               get_date = 1
+.           endif
+.       elsif type = "time"
+        $(varname) (index)    = atot ($(request_form:) ("$(name)" & index & "_hh"), _
+                                      $(request_form:) ("$(name)" & index & "_mm"), 0)
+.       endif
+    next
+.endif
+.if condition ?<> ""
+  end if
+.endif
+.endmacro
+
+
+/*************************   GENERATE PAGE START  **************************/
+
+.macro generate_page_start ()
+<%
+if cur_page = "$(name)" then
+'   Defaults for the page
+    page_title = "$(page.title?:)"
+    page_shown = 1
+    cur_stepno = cur_stepno + 1
+    Session ("cur_stepno") = cur_stepno
+.if count (field, cursor ?= 1) > 0
+    if cur_cursor = "" then
+.   for field where cursor ?= 1 & hidden = "0"
+        cur_cursor = "$(name)"
+.       last
+.   endfor
+    end if
+.endif
+.generate_event_handler ("on_showpage")
+%>
+.endmacro 
+
+
+/**************************   GENERATE PAGE END  ***************************/
+
+.macro generate_page_end ()
+.if defined (screen.skin)
+[skin page]
+.endif
+<!--  End of page     -->
+<script language="JavaScript" type="text/javascript">
+//  This function is required on all pages; it returns true if okay,
+//  and false if not okay.  The 'formaction()' function calls it if its
+//  check argument is true.
+//
+function check_form (form)
+{
+.for field where attr = "input" & hidden = "0"
+.   if required ?= 1
+.       field_is_mandatory ()
+.   endif
+.   if email ?= 1 & type = "textual"
+.       field_is_email ()
+.   elsif positive ?= 1 & type = "numeric"
+.       field_is_positive ()
+.   endif
+.endfor
+    return (true);
+}
+<% if cur_error <> "" then %>
+if (document.forms[0].<%=cur_error%>) {
+    document.forms[0].<%=cur_error%>.className = "error";
+    document.forms[0].<%=cur_error%>.focus()
+}
+<% elseif cur_cursor <> "" then %>
+if (document.forms[0].<%=cur_cursor%>) {
+    document.forms[0].<%=cur_cursor%>.focus()
+}
+<% end if %>
+</script>
+<% end if %>
+.endmacro 
+
+
+/************************   GENERATE TOOLBAR START  ************************/
+
+.macro generate_toolbar_start ()
+.if defined (screen.skin)
+[skin start title]
+<%=page_title%>
+[skin end title]
+[skin start toolbar]
+.else
+.   if visible
+<table border=0 width=100% cellspacing=0 cellpadding=0><tr valign=top>
+.       if count (page.handler, count.event ?= "on_title")
+.           for page.handler where event ?= "on_title"
+.               generate_handler_body (0)
+.           endfor
+.       else
+<td align=left  class=header><%=page_title%></td>
+<td align=right class=toolbar>
+.       endif
+.   endif
+.endif
+.   if visible
+.       if main?0 = 0
+<% if cur_hideback <> 1 then
+     create_link "^BGOBACK", "", 0, "", "&lt;Back", "Go back to previous page", "toolbar" 
+     response.write "&nbsp;"
+end if %>
+.       endif
+.       for page.handler where event ?= "on_toolbar"
+.           generate_handler_body (0)
+.       endfor
+.   endif
+.endmacro
+
+
+/***********************   GENERATE TOOLBAR ACTION  ************************/
+
+function generate_toolbar_action ()
+    if visible
+        if entity.condition ?<> ""
+            ><% if $(condition:) then %>
+        endif
+        if active
+            if shortcut = ""
+                link_name = "DO_$(NAME:C)"
+            else
+                link_name = "^$(SHORTCUT)DO_$(NAME:C)"
+            endif
+            escape_hint_apostrophes ()
+            if defined (url)
+                ><a href="javascript:popdoc('$(url:)')" class=toolbar title="$(hint:)" OnMouseOver="top.status='$(hint:)'">$(text:)</a>
+            else
+                ><% create_link "$(link_name:)", "", $(fields), "$(confirm:)", "$(text:)", "$(hint:)", "toolbar" %>
+            endif
+            >&nbsp;
+        else
+            ><font color=gray>$(text:)</font>
+        endif
+        if entity.condition ?<> ""
+            ><% end if %>
+        endif
+    endif
+endfunction
+
+function escape_hint_apostrophes ()
+    char_nbr = 0
+    while char_nbr < length (hint)
+        if substr (hint, char_nbr,,1) = "'"
+            hint = substr (hint, 0, char_nbr - 1) + "`" + substr (hint, char_nbr + 1)
+        endif
+        char_nbr += 1
+    endwhile
+endfunction
+
+
+/*************************   GENERATE TOOLBAR END  *************************/
+
+.macro generate_toolbar_end ()
+.if defined (screen.skin)
+[skin end toolbar]
+.else
+.   if visible
+</td></tr></table>
+.   endif
+.endif
+.endmacro
+
+
+/*************************   GENERATE FORM START  **************************/
+
+.macro generate_form_start ()
+.if defined (screen.skin)
+[skin start form]
+.endif
+.if screen.has_attachments ?= 1
+<form enctype="multipart/form-data" action="$(screen.name).asp?op=P" method="post">
+.else
+<form action="$(screen.name).asp?op=P" method="post">
+.endif
+<input type="hidden" name="accode" value=""> 
+<input type="hidden" name="argval" value="">
+<input type="hidden" name="stepno" value="<% = cur_stepno %>">
+<% cur_form_mode = "$(page-> form.mode)" %>
+.if !defined (screen.skin)
+<table border=0 cellpadding=0 height=100% width=100%>
+<tr>
+.   if defined (screen.sidebar_left)
+<td width=1% valign=top><img src="images/$(screen.sidebar_left:)"></td>
+<td width=1%>&nbsp;</td>
+.   endif
+<td valign=top>
+.endif
+.endmacro
+
+
+/**************************   GENERATE FORM END  ***************************/
+
+.macro generate_form_end ()
+.if !defined (screen.skin)
+.   if defined (page.hints_block)
+<% if Session ("showhints") = 1 then %>
+</td></tr></table>
+<% end if %>
+.   endif
+./* This code unstable, removed
+<% if Session ("profile_mode") = 1 then %>
+<br><font size=-1 color="red"><em>Time to display: <%=CDbl (CLng ((pDate.clock - begin_time) * 1000)) / 1000%> sec</em></font>
+<% set psys = server.createobject ("scl.sys")
+   mem_total = psys.total_memory
+   mem_free  = psys.available_memory
+   set psys = Nothing
+%>
+<br><font size=-1 color="green"><em>Memory usage: <%=(mem_total - mem_free) / 1024%> kB / <%=mem_total / 1024%> kb</em></font>
+<% end if %>
+.*/
+</td>
+.   if defined (screen.sidebar_right)
+<td width=1%>&nbsp;</td>
+<td width=1% valign=top><img src="images/$(screen.sidebar_right:)"></td>
+.   endif
+</tr></table>
+.endif
+</form>
+.if defined (screen.skin)
+[skin end form]
+.endif
+.endmacro
+
+
+/*************************   GENERATE FORM BANNER  *************************/
+
+.macro generate_form_banner ()
+.if !defined (screen.skin)
+.   if defined (entity.image)
+.       if defined (entity.width) & defined (entity.height)
+<center><img src="$(image:)" alt="$(label:)" width=$(width) height=$(height)><p></center>
+.       else
+<center><img src="$(image:)" alt="$(label:)"><p></center>
+.       endif
+.   else
+<p align=center class=hint><font size=6 color="<%=$(banner_color:)%>">
+<b>$(entity.text?:)<p>
+.   endif
+.endif
+.endmacro
+
+
+/**********************   GENERATE START FORM HINTS  ***********************/
+
+function generate_start_form_hints ()
+    if defined (screen.skin)
+        >[skin start hints]
+    else
+        ><% if Session ("showhints") = 1 then %>
+        ><table border=0 width=100%><tr>
+        ><td width=$(hintswidth)>
+        page.hints_block = 1
+    endif
+endfunction
+
+
+/**************************   GENERATE FORM HINT  **************************/
+
+function generate_form_hint ()
+    if defined (screen.skin)
+        >$(trim (entity.?""))<br>
+    else
+        ><p align=right class=hint>$(trim (entity.?""))
+    endif
+endfunction
+
+
+/***********************   GENERATE FORM HINT TEXT   ***********************/
+
+function generate_form_hint_text ()
+    if defined (screen.skin)
+        ptag = "<br>"
+    else
+        ptag = "<p align=right class=hint>"
+    endif
+    if [before] ?> 0
+        >$("<br>" * ([before] - 1))$(ptag)\
+    endif
+    if defined (entity.color)
+        ><font color=$(color)>\
+    endif
+    if defined (entity.script)
+        include entity.script
+    else
+        >$(trim (entity.?""))
+    endif
+    >$(trim (entity.?""))
+    if [after] ?> 0
+        >$("<br>" * ([after] - 1))$(ptag)
+    endif
+endfunction 
+
+
+/***********************   GENERATE END FORM HINTS  ************************/
+
+.macro generate_end_form_hints ()
+.if defined (screen.skin)
+[skin end hints]
+.else
+</td><td width=3%>&nbsp;</td><td valign=top>
+<% end if %>
+.endif
+.endmacro
+
+
+/*************************   GENERATE FORM FIELD  **************************/
+
+function generate_form_field ()
+    for rule where defined (rule.)
+        ><% $(trim (rule.)) %>
+    endfor
+    if !hidden
+        if entity.condition ?<> ""
+            ><% if $(condition:) then %>
+        endif
+        if defined (entity.label)
+            >$(entity.label:)&nbsp;
+        endif
+        if attr = "input"
+            show_field_input ()
+        else
+            show_field_output ()
+        endif
+        if entity.condition ?<> ""
+            ><% end if %>
+        endif
+    endif
+endfunction
+
+
+/******************   GENERATE START FORM LOOKUP BLOCK   *******************/
+
+function generate_start_form_lookup_block ()
+endfunction
+
+
+/**********************   GENERATE FORM LOOKUP FIELD  **********************/
+
+function generate_form_lookup_field ()
+    show_field_output ()
+endfunction
+
+
+/*******************   GENERATE END FORM LOOKUP BLOCK   ********************/
+
+function generate_end_form_lookup_block ()
+    if -1.attr = "input"
+        if condition ?<> ""
+            ><% if $(condition:) then %>
+        endif
+        icon_nbr = (icon_nbr?0) + 1
+        if -1.type = "numeric"
+        ><% if $(-1.varname) = 0 then response.write "(Click to select)" %>
+        endif
+        ><% define_icon "i$(icon_nbr)", "select"
+        >show_icon "i$(icon_nbr)", "Select", "LOOKUP", "$(-1.name)", 1, "Click to select" %>
+        if condition ?<> ""
+            ><% end if %>
+        endif
+    endif
+endfunction 
+
+/**************************   GENERATE FORM TEXT  **************************/
+
+function generate_form_text ()
+    if defined (align)
+        ptag = "<p align=$(align)"
+    else
+        ptag = "<p"
+    endif
+    if defined (entity.style)
+        ptag += " class=$(style)>"
+        if ([before]?0) = 0
+            before = 1
+        endif
+    else
+        ptag += ">"
+    endif
+    
+    if [before] ?> 0
+        >$("<br>" * ([before] - 1))$(ptag)\
+    endif
+    if defined (entity.color)
+        ><font color=$(color)>\
+    endif
+    if defined (entity.script)
+        include entity.script
+    else
+        >$(trim (entity.?""))
+    endif
+    if [after] ?> 0
+        >$("<br>" * ([after] - 1))$(ptag)
+    endif
+endfunction 
+
+
+/**************************   GENERATE FORM LINE  **************************/
+
+function generate_form_line ()
+    ><hr>
+endfunction
+
+
+/*************************   GENERATE FORM ACTION  *************************/
+
+function generate_form_action ()
+    if entity.condition ?<> ""
+        ><% if $(condition:) then %>
+    endif
+    if defined (align)
+        ptag = "<p align=$(align)>"
+    else
+        ptag = "<p>"
+    endif
+    if [before] ?> 0
+        >$("<br>" * ([before] - 1))$(ptag)\
+    endif
+    if shortcut = ""
+        link_name = "DO_$(NAME:C)"
+    else
+        link_name = "^$(SHORTCUT)DO_$(NAME:C)"
+    endif
+    escape_hint_apostrophes ()
+    if active = 0
+        ><font color=gray>$(text:)</font>\
+    elsif type = "button"
+        ><% create_button "DO_$(NAME:C)", "", $(fields), "$(confirm:)", "$(text:)", "$(hint:)" %>&nbsp;\
+    elsif type = "link"
+        if defined (url)
+        ><a href="javascript:popdoc('$(url:)')" class=$(style:) title="$(hint:)" OnMouseOver="top.status='$(hint:)'">$(text:)</a>
+        else
+        ><% create_link  "$(link_name:)", "", $(fields), "$(confirm:)", "$(text:)", "$(hint:)", "$(style:)" %>\
+        endif
+        >&nbsp;
+    elsif type = "image"
+        icon_nbr = (icon_nbr?0) + 1
+        ><% define_icon "i$(icon_nbr)", "$(image)"
+        >show_icon "i$(icon_nbr)", "$(image)", "DO_$(NAME:C)", "", 1, "$(hint:)" %>
+    else
+        echo "Unknown action type: $(type:)"
+    endif
+    if entity.condition ?<> ""
+        ><% end if %>
+    endif
+endfunction 
+
+
+/**************************   GENERATE START IF  ***************************/
+
+function generate_start_if ()
+    if script_block ?= 1
+    >if $(condition:) then 
+    >   $(trim (entity.?""))
+    else
+    ><% if $(condition:) then 
+    >   $(trim (entity.?"")) %>
+    endif
+endfunction 
+
+
+/***************************   GENERATE END IF  ****************************/
+
+function generate_end_if ()
+    if script_block ?= 1
+        >end if
+    else
+        ><% end if %>
+    endif
+endfunction 
+
+
+/************************   GENERATE START LAYOUT  *************************/
+
+function generate_start_layout ()
+    field_open  = 0
+    join_lookup = 0
+    ><table $(formattrs) width=98%>
+endfunction
+
+
+/*************************   GENERATE END LAYOUT  **************************/
+
+function generate_end_layout ()
+    if field_open = 1
+        ></td></tr>
+    endif
+    ></table>
+endfunction
+
+
+/************************   GENERATE LAYOUT FIELD  *************************/
+
+function generate_layout_field ()
+    for rule where defined (rule.)
+        ><% $(trim (rule.)) %>
+    endfor
+    if !hidden
+        layout_open_condition ()
+        if attr = "input" & required ?= 1
+            if defined (entity.label)
+                field_label = "<b>$(entity.label:)</b>"
+            else
+                field_label = ""
+            endif
+        else
+            field_label = entity.label?""
+        endif
+        if join ?= 1
+            if field_label <> ""
+                >&nbsp;$(field_label:)&nbsp;
+            endif
+        else
+            if field_open = 1
+                ></td></tr>
+            endif
+            if defined (screen.skin)
+                ><tr><td height=20 valign=top width=$(labelwidth) class=layout_label>$(field_label:)&nbsp;&nbsp;</td><td valign=top class=layout_field>
+            else
+                ><tr><td height=20 valign=top width=$(labelwidth)>$(field_label:)&nbsp;&nbsp;</td><td valign=top bgcolor="<%=$(formbg_color)%>">
+            endif
+            if defined (prefix)
+                >$(prefix:)&nbsp;
+            endif
+        endif
+        field_open = 1
+        if attr = "input"
+            show_field_input ()
+        else
+            show_field_output ()
+        endif
+        join_lookup = count (lookup)
+        layout_close_condition ()
+    endif
+endfunction
+
+function layout_open_condition ()
+    if entity.condition ?<> ""
+        ><% if $(condition:) then %>
+    endif
+    if attr = "plain" & discrete = 1
+        if type = "textual" | type = "textbox"
+            ><% if $(varname) <> "" then %>
+        else
+            ><% if $(varname) <> 0 then %>
+        endif
+    endif
+endfunction
+
+function layout_close_condition ()
+    if attr = "plain" & discrete = 1
+        ><% end if %>
+    endif
+    if entity.condition ?<> ""
+        ><% end if %>
+    endif
+endfunction
+
+
+/*****************   GENERATE START LAYOUT LOOKUP BLOCK   ******************/
+
+.macro generate_start_layout_lookup_block ()
+.endmacro
+
+
+/*********************   GENERATE LAYOUT LOOKUP FIELD  *********************/
+
+function generate_layout_lookup_field ()
+    for rule where defined (rule.)
+        ><% $(trim (rule.)) %>
+    endfor
+    if !hidden 
+        layout_open_condition ()
+        if attr = "input" & required ?= 1 
+            field_label = "<b>$(label:)</b>"
+        else
+            field_label = label
+        endif
+        if join_lookup ?= 1    #   Show fields alongside parent lookup field
+            >&nbsp;
+        elsif join ?= 1
+            if field_label <> ""
+                >&nbsp;$(field_label:)&nbsp;
+            endif
+        else
+            if field_open = 1
+                ></td></tr>
+            endif
+            if defined (screen.skin)
+                ><tr><td height=20 valign=top width=$(labelwidth) class=layout_label>$(field_label:)&nbsp;&nbsp;</td><td valign=top class=layout_field>
+            else
+                ><tr><td height=20 valign=top width=$(labelwidth)>$(field_label:)&nbsp;&nbsp;</td><td valign=top bgcolor="<%=$(formbg_color)%>">
+            endif
+        endif
+        field_open = 1
+        show_field_output ()
+        layout_close_condition ()
+    endif
+endfunction
+
+
+/******************   GENERATE END LAYOUT LOOKUP BLOCK   *******************/
+
+function generate_end_layout_lookup_block ()
+    generate_end_form_lookup_block ()
+endfunction 
+
+
+/*************************   GENERATE LAYOUT TEXT  *************************/
+
+function generate_layout_text ()
+    if join ?= 0
+        if field_open = 1
+            ></td></tr>
+        endif
+        if defined (screen.skin)
+            ><tr><td width=$(labelwidth) class=layout_label>$(entity.label?"&nbsp;":)&nbsp;&nbsp;</td><td class=layout_field>
+        else
+            ><tr><td width=$(labelwidth) class=layout_label>$(entity.label?"&nbsp;":)&nbsp;&nbsp;</td><td>
+        endif
+    endif
+    field_open = 1
+    generate_form_text ()
+endfunction
+
+
+/*************************   GENERATE LAYOUT LINE  *************************/
+
+function generate_layout_line ()
+    if join ?= 1
+        generate_form_line ()
+    else
+        if field_open = 1
+            ></td></tr>
+            field_open = 0
+        endif
+        if defined (screen.skin)
+            ><tr><td>&nbsp;</td><td class=layout_field><hr></td></tr>
+        else
+            ><tr><td colspan=99 bgcolor="<%=$(formbg_color)%>">&nbsp;</td></tr>
+        endif
+    endif
+endfunction
+
+
+/************************   GENERATE LAYOUT ACTION  ************************/
+
+function generate_layout_action ()
+    if join ?= 0
+        if field_open = 1
+            ></td></tr>
+        endif
+        if defined (screen.skin)
+            ><tr><td width=$(labelwidth) class=layout_label>$(entity.label?"&nbsp;":)&nbsp;&nbsp;</td><td>
+        else
+            ><tr><td width=$(labelwidth) >$(entity.label?"&nbsp;":)&nbsp;&nbsp;</td><td>
+        endif
+        if type = "link" & (separator?1) ?= 1
+            ><font color="gray">|
+        endif
+    endif
+    field_open = 1
+    if entity.condition ?<> ""
+        ><% if $(condition:) then %>
+    endif
+    if defined (align)
+        ptag = "<p align=$(align)>"
+    else
+        ptag = "<p>"
+    endif
+    if [before] ?> 0
+        >$("<br>" * ([before] - 1))$(ptag)\
+    endif
+    if shortcut = ""
+        link_name = "DO_$(NAME:C)"
+    else
+        link_name = "^$(SHORTCUT)DO_$(NAME:C)"
+    endif
+    escape_hint_apostrophes ()
+    if active = 0
+        ><font color=gray>$(text:)</font>\
+    elsif type = "button"
+        ><% create_button "DO_$(NAME:C)", "", $(fields), "$(confirm:)", "$(text:)", "$(hint:)" %>&nbsp;\
+    elsif type = "link"
+        if defined (url)
+        ><a href="javascript:popdoc('$(url:)')" class=$(style:) title="$(hint:)" OnMouseOver="top.status='$(hint:)'">$(text:)</a>
+        else
+        ><% create_link  "$(link_name:)", "", $(fields), "$(confirm:)", "$(text:)", "$(hint:)", "$(style:)" %>\
+        endif
+        if (separator?1) ?= 1
+            ><font color="gray">|
+        else
+            >&nbsp;
+        endif
+    elsif type = "image"
+        icon_nbr = (icon_nbr?0) + 1
+        ><% define_icon "i$(icon_nbr)", "$(image)"
+        >show_icon "i$(icon_nbr)", "$(image)", "DO_$(NAME:C)", "", 1, "$(hint:)" %>
+    else
+        echo "Unknown action type: $(type:)"
+    endif
+    if entity.condition ?<> ""
+        ><% end if %>
+    endif
+endfunction
+
+
+/***********************   GENERATE SUMMARY BLOCK   ************************/
+
+function generate_summary_block ()
+    #   First, generate summary header line
+    do_header = 1
+    columns   = 0
+    ><table $(formattrs) width=98%>
+    build_alpha_filter_row ()
+    if defined (screen.skin)
+        ><tr class=summary_label>
+    else
+        ><tr bgcolor="<%=$(thead_color)%>">
+    endif
+    pfl_code_summary_element ()
+    ></tr>
+
+    #   Now generate individual lines
+    if defined (screen.skin)
+        tr1 = 'response.write "<tr class=summary_row1>"'
+        tr2 = 'response.write "<tr class=summary_row2>"'
+    else
+        tr1 = 'response.write "<tr bgcolor=" & $(trow1_color) & ">"'
+        tr2 = 'response.write "<tr bgcolor=" & $(trow2_color) & ">"'
+    endif
+    do_header = 0
+    ><%
+    if defined (control)
+        >for index = 1 to $(control:)
+        >    if index Mod 2 = 0 Then
+        >        $(tr1)
+        >    else
+        >        $(tr2)
+        >    end if
+        for page.handler where event ?= "on_showrow"
+            generate_handler_body (0)
+        endfor
+        script_block = 1                #   For <% %> sensitive code
+        pfl_code_summary_element ()
+        script_block = 0
+        >    response.write "</tr>"
+        >next %>
+    else
+        >pxml.item_root
+        >pxml.item_first_child
+        >for index = 1 to query_count
+        >    if index Mod 2 = 0 Then
+        >        $(tr1)
+        >    else
+        >        $(tr2)
+        >    end if
+        if defined (object)
+            >    $(object)_$(view)_get_item
+        endif
+        script_block = 1                #   For <% %> sensitive code
+        pfl_code_summary_element ()
+        script_block = 0
+        >    pxml.item_next
+        >    query_index = query_index + 1
+        >    response.write "</tr>"
+        >next %>
+    endif
+    ><tr><td colspan=$(columns)></td></tr></table>
+endfunction
+
+function build_alpha_filter_row
+    if alpha ?= 1 | filter ?= 1
+        ><tr><td colspan=99><table width=100% cellspacing=0 cellpadding=0><tr>
+        if alpha ?= 1
+            ><td align=left>
+            ><% for index = 1 to len (cur_alpha)
+            >       alpha_char = mid (cur_alpha, index, 1)
+            >       create_link "ALPHA", alpha_char, 0, "", alpha_char, "Lookup [" & alpha_char & "]", "toolbar"
+            >   next
+            >%>
+            ></td>
+        endif
+        ><td align=right>
+        if filter ?= 1
+            ><input maxlength=30 size=10 name="filter" value="<%=cur_filtertext%>">
+            >&nbsp;&nbsp;
+            ><%create_link "FILTER", "START",   0, "", "Starts with", "Show entries starting with", "toolbar"%>
+            >&nbsp;|&nbsp;
+            ><%create_link "FILTER", "CONTAIN", 0, "", "Contains",    "Show entries containing",    "toolbar"%>
+        endif
+        ></td></tr></table></td></tr>
+    endif
+endfunction
+
+
+/************************   GENERATE SUMMARY FIELD  ************************/
+
+function generate_summary_field ()
+    if !hidden
+        if do_header = 1
+            get_entity_attrs ()
+            if entity.condition ?<> ""
+                ><% if $(condition:) then %>
+            endif
+            ><th valign=top height=20$(attrs)><b>$(entity.label?"&nbsp;":)</b></th>
+            if entity.condition ?<> ""
+                ><% end if %>
+            endif
+        else
+            if entity.condition ?<> ""
+                >if $(condition:) then
+            endif
+            >    response.write "<td height=20$(attrs) valign=top>"
+            columns += 1
+            for rule where defined (rule.)
+                >    $(trim (rule.))
+            endfor
+            if attr = "click"
+                >    open_link "SELECT", index & ":$(entity.name)", 0, "", "", "Click to select", "action"
+                if defined (entity.occurs)
+                    show_field_grid_output ()
+                else
+                    >    if $(varname) = "" then $(varname) = "(Empty)"
+                    show_field_list ()
+                endif
+                >    response.write "</a>"
+            elsif attr = "input"
+                if ! defined (entity.occurs) | defined (entity.object)
+                    echo "Can't show object field '$(entity.name)' as input on a summary"
+                    show_field_list ()
+                else
+                    show_field_grid_input ()
+                endif
+            else
+                if defined (control)
+                    show_field_grid_output ()
+                else
+                    show_field_list ()
+                endif
+            endif
+            >    response.write "</td>"
+            if entity.condition ?<> ""
+                >end if
+            endif
+        endif
+    else
+        #   Output rule code for hidden fields anyhow
+        if !do_header
+            for rule where defined (rule.)
+                >    $(trim (rule.))
+            endfor
+        endif
+    endif
+endfunction
+
+function get_entity_attrs
+    entity.attrs = ""
+    if entity.nowrap ?= 1
+        attrs += " nowrap"
+    endif
+    if defined (entity.align)
+        attrs += " align=$(align)"
+    else
+        attrs += " align=left"
+    endif
+    if defined (entity.width)
+        attrs += " width=$(width)"
+    endif
+endfunction
+
+
+/*****************   GENERATE START SUMMARY LOOKUP BLOCK   *****************/
+
+function generate_start_summary_lookup_block ()
+    if do_header = 1
+        get_entity_attrs ()
+        ><th height=20$(attrs)><b>$(label?"&nbsp;":)</b></th>
+    else
+        >    response.write "<td height=20$(attrs) valign=top>"
+        columns += 1
+        if attr = "click"
+            >    open_link "SELECT", index & ":$(entity.name?'')", 0, "", "", "Click to select", "action"
+        endif
+    endif
+endfunction
+
+
+/********************   GENERATE SUMMARY LOOKUP FIELD  *********************/
+
+function generate_summary_lookup_field ()
+    if do_header = 0
+        if index () > 1
+            >    if $(varname) <> "" then response.write ", &nbsp;"
+        endif
+        show_field_list ()
+    endif
+endfunction 
+
+
+/******************   GENERATE END SUMMARY LOOKUP BLOCK   ******************/
+
+function generate_end_summary_lookup_block ()
+    if do_header = 0
+        if attr = "click"
+            >    response.write "</a></td>"
+        else
+            >    response.write "</td>"
+        endif
+    endif
+endfunction
+
+
+/************************   GENERATE SUMMARY TEXT  *************************/
+
+function generate_summary_text ()
+    if do_header = 1
+        get_entity_attrs ()
+        ><th height=20$(attrs)><b>$(entity.label?"&nbsp;":)</b></th>
+    else
+        >%><td height=20$(attrs) valign=top>
+        generate_form_text ()
+        columns += 1
+        ></td><%
+    endif
+endfunction 
+
+
+/***********************   GENERATE SUMMARY ACTION  ************************/
+
+function generate_summary_action ()
+    if do_header = 1
+        get_entity_attrs ()
+        if entity.condition ?<> ""
+            ><%if $(condition:) then%>
+        endif
+        ><th height=20$(attrs) valign=top><b>$(entity.label?"&nbsp;":)</b></th>
+        if entity.condition ?<> ""
+            ><%end if%>
+        endif
+    else
+        if entity.condition ?<> ""
+            >if $(condition:) then
+        endif
+        >   response.write "<td height=20 valign=top>"
+        columns += 1
+        if active = 0
+            >    response.write "<font color=gray>$(text:)</font>"
+        elsif type = "button"
+            >    create_button "DO_$(NAME:C)", Cstr(index), $(fields), "$(confirm:)", "$(text:)", "$(hint:)"
+        elsif type = "link"
+            >    create_link   "DO_$(NAME:C)", Cstr(index), $(fields), "$(confirm:)", "$(text:)", "$(hint:)", "action"
+        elsif type = "image"
+            icon_nbr = (icon_nbr?0) + 1
+            >    define_icon "i$(icon_nbr)" & index, "$(image)"
+            >    show_icon "i$(icon_nbr)" & index, "$(image)", "DO_$(NAME:C)", Cstr(index), 1, "$(hint:)"
+        endif
+        >    response.write "</td>"
+        if entity.condition ?<> ""
+            >end if
+        endif
+    endif
+endfunction 
+
+
+/************************   GENERATE SUBLIST BLOCK  ************************/
+
+function generate_sublist_block ()
+    if field_open = 1
+        ></td></tr>
+    endif
+    ><tr><td></td><td colspan=99><table border=0>
+    if page-> form.mode = "input"
+        ><tr>
+        do_header = 1
+        pfl_code_sublist_element ()
+        ></tr>
+    endif
+    do_header = 0
+    ><%
+    >for index = 1 to $(occurs)
+    if indicator <> "" & page-> form.mode <> "input"
+    >  if fld_$(object)_$(parent)_$(indicator) (index) > 0 then
+    endif
+    >    response.write "<tr>"
+    pfl_code_sublist_element ()
+    >    response.write "</tr>"
+    if indicator <> "" & page-> form.mode <> "input"
+    >  end if
+    endif
+    >next
+    >%>
+    ></table></td></tr>
+    field_open = 0
+endfunction    
+
+
+/************************   GENERATE SUBLIST FIELD  ************************/
+
+function generate_sublist_field ()
+    if !hidden
+        if do_header = 1
+            entity.attrs = ""
+            if entity.nowrap ?= 1
+                attrs += " nowrap"
+            endif
+            if defined (entity.align)
+                attrs += " align=$(align)"
+            endif
+            if defined (entity.width) & index > 1
+                attrs += " width=$(width)"
+            endif
+            ><th height=20$(attrs)><b>$(entity.label?"&nbsp;":)</b></th>
+        else
+            >    response.write "<td valign=top height=20$(attrs?)>"
+            for rule where defined (rule.)
+                >    $(trim (rule.))
+            endfor
+            if attr = "click"
+                >    open_link "SELECT", index & ":$(entity.name)", 0, "", "", "Click to select", "action"
+                show_field_grid_output ()
+                >    response.write "</a>"
+            elsif attr = "input"
+                show_field_grid_input ()
+            else
+                show_field_grid_output ()
+            endif
+            >    response.write "</td>"
+        endif
+    else
+        #   Output rule code for hidden fields anyhow
+        if !do_header
+            for rule where defined (rule.)
+                >    $(trim (rule.))
+            endfor
+        endif
+    endif
+endfunction 
+
+
+/*****************   GENERATE START SUBLIST LOOKUP BLOCK   *****************/
+
+function generate_start_sublist_lookup_block ()
+    /*  Not implemented             */
+endfunction
+
+
+/********************   GENERATE SUBLIST LOOKUP FIELD  *********************/
+
+function generate_sublist_lookup_field ()
+    /*  Not implemented             */
+endfunction 
+
+
+/******************   GENERATE END SUBLIST LOOKUP BLOCK   ******************/
+
+function generate_end_sublist_lookup_block ()
+    /*  Not implemented             */
+endfunction
+
+
+/************************   GENERATE SUBLIST TEXT  *************************/
+
+function generate_sublist_text ()
+    generate_form_text ()       
+endfunction 
+
+
+/***********************   GENERATE SUBLIST ACTION  ************************/
+
+function generate_sublist_action ()
+    /*  Not implemented             */
+endfunction 
+
+
+/*************************   GENERATE PAGE INDEX   *************************/
+
+function generate_page_index ()
+    #   Index has button style, using three rows
+    header = "<tr height=1>\n"
+    bodies = "<tr align=center>\n"
+    footer = "<tr height=2>\n"
+    for screen.page as screenpage
+        for form where count (index)
+          for index
+            if defined (screen.skin)
+                if screenpage.name = page.name
+                    header += "<td class=tablinehigh colspan=2></td><td class=tablinelow></td>\n"
+                    footer += "<td class=tablinehigh></td><td class=tabtexthigh></td><td class=tablinelow></td>\n"
+                    bodies += "<td class=tablinehigh width=2></td><td class=tabtexthigh><b>$(index.name:)</b></td><td class=tablinelow width=2></td>\n"
+                else
+                    header += "<td class=tabtextlow colspan=2></td><td class=tablinehigh></td>\n"
+                    footer += "<td class=tablinehigh></td><td class=tablinelow colspan=2></td>\n"
+                    bodies += "<td class=tabtextlow width=2></td><td class=tabtextlow>"
+                    bodies += "<% create_link \"INDEX\", \"$(screenpage.name)\", 1, \"\", \"$(index.name:)\", \"$(title:)\", \"action\" %>"
+                    bodies += "</td><td class=tablinelow width=2></td>\n"
+                endif
+            else
+                #   Assumes a white background
+                if screenpage.name = page.name
+                    header += "<td bgcolor=#999999 colspan=2></td><td bgcolor=#666666></td>\n"
+                    footer += "<td bgcolor=#999999></td><td></td><td bgcolor=#666666></td>\n"
+                    bodies += "<td bgcolor=#999999 width=2></td><td><b>$(index.name:)</b></td><td bgcolor=#666666 width=2></td>\n"
+                else
+                    header += "<td bgcolor=#DDDDDD colspan=2></td><td bgcolor=#999999></td>\n"
+                    footer += "<td bgcolor=#999999></td><td bgcolor=#666666 colspan=2></td>\n"
+                    bodies += "<td bgcolor=#DDDDDD width=2></td><td bgcolor=#DDDDDD>"
+                    bodies += "<% create_link \"INDEX\", \"$(screenpage.name)\", 1, \"\", \"$(index.name:)\", \"$(title:)\", \"action\" %>"
+                    bodies += "</td><td bgcolor=#666666 width=2></td>\n"
+                endif
+            endif
+          endfor
+        endfor
+    endfor
+    header += "</tr>"
+    bodies += "</tr>"
+    footer += "</tr>"
+    ><table width=98% cellspacing=0 cellpadding=0>
+    >$(header:)
+    >$(bodies:)
+    >$(footer:)
+    if defined (screen.skin)
+        ><tr height=10><td class=tablinehigh></td><td colspan=99 class=tabtexthigh>&nbsp;</td></tr>
+    else
+        ><tr height=10><td bgcolor=#999999></td><td colspan=99>&nbsp;</td></tr>
+    endif
+    ></table>
+endfunction
+    
+
+/***********************   GENERATE QUERY STATEMENT  ***********************/
+/*
+    <oal do       = "query" 
+       [ query    = "queryname" ] 
+       [ control  = "first"|"last"|"next"|"previous"|"reshow"|"match" ]
+       [ limit    = "number" ]
+       [ user     = "userid" ] >
+       [ <criterionname>criterionvalue</criterionname>
+        ... ]
+    </oal>
+*/
+function generate_query_statement ()
+    if control = "first" | control = "last"
+    >    query_$(object)_$(name) "$(control)", $(limit)
+    elsif control = "gt" | control = "ge"
+        if limit > 1
+            >    pxml.item_last_child
+            >    $(object)_$(view)_get_item
+        endif
+        >    query_$(object)_$(name) "$(control)", $(limit)
+    elsif control = "lt" | control = "le"
+        if limit > 1
+            >    pxml.item_first_child
+            >    $(object)_$(view)_get_item
+        endif
+        >    query_$(object)_$(name) "$(control)", $(limit)
+    elsif control = "same"
+        if limit > 1
+            >    if query_count > 0 then
+            >        pxml.item_first_child
+            >        $(object)_$(view)_get_item
+            >    end if
+        endif
+        >    query_$(object)_$(name) "ge", $(limit)
+    elsif control = "eq"
+        >    query_$(object)_$(name) "$(control)", $(limit)
+    else
+        abort "Illegal control for query: $(control)"
+    endif
+endfunction
+
+
+/***********************   GENERATE FETCH STATEMENT  ***********************/
+/*
+    <oal do   = "fetch"
+         user = "userid"
+         view = "viewname" >
+         object data
+    </oal>
+*/
+.macro generate_fetch_statement ()
+    pxml.value = "<oal/>"
+    pxml.attr ("view") = "$(view)"
+.   if debug_mode
+    debug_header "$(object)", "Fetch", "view=$(view)"
+.   endif
+    $(object)_put_key_primary
+    oal_$(object) "fetch"
+    if not exception_raised then
+.   if debug_mode
+        debug_info "OK"
+.   endif
+        pxml.item_first_child
+        $(object)_$(view)_get_item
+    end if
+.endmacro
+
+
+/**********************   GENERATE CREATE STATEMENT  ***********************/
+/*
+    <oal do    = "create"
+         user  = "userid" >
+         object data
+    </oal>
+*/
+.macro generate_create_statement ()
+.if count (screen.handler, count.event ?= "on_create" | count.event ?= "on_accept")
+.   for screen.handler where event ?= "on_create" | event ?= "on_accept"
+    if not exception_raised then
+.       generate_handler_body (1)
+    end if
+.   endfor
+.endif
+    if not exception_raised then
+        pxml.value = "<oal/>"
+.   if debug_mode
+        debug_header "$(object)", "Create", ""
+.   endif
+        $(object)_create_put_item
+        oal_$(object) "create"
+        if not exception_raised then
+            $(object)_get_key_primary
+            $(object)_pass_key
+.   if debug_mode
+            debug_info "OK"
+.   endif
+        end if
+    end if
+.endmacro
+
+
+/**********************   GENERATE UPDATE STATEMENT  ***********************/
+/*
+    <oal do      = "update"
+         revised = "timestamp"
+         user    = "userid"
+         view    = "viewname">
+         object data
+    </oal>
+*/
+.macro generate_update_statement ()
+.if count (screen.handler, count.event ?= "on_update" | count.event ?= "on_accept")
+.   for screen.handler where event ?= "on_update" | event ?= "on_accept"
+    if not exception_raised then
+.       generate_handler_body (1)
+    end if
+.   endfor
+.endif
+    if not exception_raised then
+        pxml.value = "<oal/>"
+        pxml.attr ("view") = "$(view)"
+.   if debug_mode
+        debug_header "$(object)", "Update", "view=$(view)"
+.   endif
+        $(object)_$(view)_put_item
+        oal_$(object) "update"
+        if not exception_raised then
+            pxml.item_first_child
+            $(object)_revised = pxml.attr ("revised")
+.   if debug_mode
+            debug_info "OK"
+.   endif
+        end if
+    end if
+.endmacro
+
+
+/**********************   GENERATE DELETE STATEMENT  ***********************/
+/*
+    <oal do   = "delete"
+         user = "userid" >
+         object data
+    </oal>
+*/
+.macro generate_delete_statement ()
+.if count (screen.handler, count.event ?= "on_delete")
+.   for screen.handler where event ?= "on_delete"
+    if not exception_raised then
+.       generate_handler_body (1)
+    end if
+.   endfor
+.endif
+    if not exception_raised then
+.   if debug_mode
+        debug_header "$(object)", "Delete", ""
+.   endif
+        pxml.value = "<oal/>"
+        $(object)_put_key_primary
+        oal_$(object) "delete"
+        if not exception_raised then
+.   if debug_mode
+            debug_info "OK"
+.   endif
+        end if
+    end if
+.endmacro
+
+
+/**********************   GENERATE IMPORT STATEMENT  ***********************/
+
+.macro generate_import_statement ()
+    record_count = 0
+    error_count = 0
+
+.   if debug_mode
+    debug_header "$(object)", "Import", ""
+.   endif
+.   if purge ?= 1
+    '   TODO: this must be implemented to a back-end operation
+    apdb.execute ("delete from $(root-> dfl.prefix)$(object)")
+.   endif
+    set data = Server.CreateObject ("scl.XMLStore")
+    data.load (server.mappath (".") & "\\$(object).xml")
+    data.item_first_child
+    do while (data.valid)
+        record_count = record_count + 1
+        pxml.value = "<oal/>"
+        pxml.item_new "$(object)"
+        pxml.item_first_child
+.   for ofl.object where name = object
+.   for view where name = "create"
+.   for view-> table.field
+.       if field.type = "textual"
+        pxml.item_new "$(name)", data.attr ("$(name)", "")
+.       else
+        pxml.item_new "$(name)", data.attr ("$(name)", 0)
+.       endif
+.   endfor
+.   endfor
+.   endfor
+        pxml.value = pstring.htmldecode (pxml.value)
+        oal_$(object) "create"
+        if exception_raised then
+            error_count = error_count + 1
+        end if
+        data.item_next
+    loop
+    data.free
+.   if debug_mode
+    debug_info "OK - loaded=" & record_count & " errors=" & error_count
+.   endif
+    cur_message = record_count & " records loaded, " & error_count & " duplicates"
+.endmacro
+
+
+/***********************   GENERATE STEP STATEMENT  ************************/
+
+.macro generate_step_statement ()
+    $(trim (entity.?""))
+.endmacro
+
+
+/*********************   GENERATE START IF STATEMENT  **********************/
+
+.macro generate_start_if_statement ()
+    if $(condition:) then
+        $(trim (entity.?""))
+.endmacro
+
+
+/**********************   GENERATE END IF STATEMENT  ***********************/
+
+.macro generate_end_if_statement ()
+    end if
+.endmacro
+
+
+/********************   GENERATE START SAVE STATEMENT  *********************/
+
+.macro generate_start_save_statement ()
+    set sxml = pxml
+    set pxml = Server.CreateObject ("scl.xmlstore")
+    saved_query_count = query_count
+    saved_query_limit = query_limit
+    saved_query_more  = query_more
+    $(trim (entity.?""))
+.endmacro
+
+
+/*********************   GENERATE END SAVE STATEMENT  **********************/
+
+.macro generate_end_save_statement ()
+    set pxml = sxml
+    set sxml = Nothing
+    query_count = saved_query_count
+    query_limit = saved_query_limit
+    query_more  = saved_query_more
+.endmacro
+
+
+/*********************   GENERATE START OK STATEMENT  **********************/
+
+.macro generate_start_ok_statement ()
+    if not exception_raised then
+        $(trim (entity.?""))
+.endmacro
+
+
+/**********************   GENERATE END OK STATEMENT  ***********************/
+
+.macro generate_end_ok_statement ()
+    end if
+.endmacro
+
+
+/********************   GENERATE START ERROR STATEMENT  ********************/
+
+.macro generate_start_error_statement ()
+    if exception_raised then
+        exception_raised = FALSE
+        $(trim (entity.?""))
+.endmacro
+
+
+/*********************   GENERATE END ERROR STATEMENT  *********************/
+
+.macro generate_end_error_statement ()
+    end if
+.endmacro
+
+
+/*******************   GENERATE START FOUND STATEMENT   ********************/
+
+.macro generate_start_found_statement ()
+    if query_count > 0 and not exception_raised then
+        $(trim (entity.?""))
+.endmacro
+
+
+/********************   GENERATE END FOUND STATEMENT   *********************/
+
+.macro generate_end_found_statement ()
+    end if
+.endmacro
+
+
+/********************   GENERATE START EACH STATEMENT   ********************/
+
+.macro generate_start_each_statement ()
+    if query_count > 0 and not exception_raised then
+        pxml.item_first_child
+        for item_nbr = 1 to query_count
+            $(object)_$(view)_get_item
+            pxml.item_next
+            $(trim (entity.?""))
+.endmacro
+
+
+/*********************   GENERATE END EACH STATEMENT   *********************/
+
+.macro generate_end_each_statement ()
+        next
+    end if
+.endmacro
+
+
+/******************   GENERATE START MISSING STATEMENT   *******************/
+
+.macro generate_start_missing_statement ()
+    if exception_raised and pxml.attr ("cause") = "nf" then
+        exception_raised = FALSE
+        cur_message = ""
+        $(trim (entity.?""))
+.endmacro
+
+
+/*******************   GENERATE END MISSING STATEMENT   ********************/
+
+.macro generate_end_missing_statement ()
+    end if
+.endmacro
+
+
+/*******************   GENERATE START EMPTY STATEMENT   ********************/
+
+.macro generate_start_empty_statement ()
+    if query_count = 0 and not exception_raised then
+        $(trim (entity.?""))
+.endmacro
+
+
+/********************   GENERATE END EMPTY STATEMENT   *********************/
+
+.macro generate_end_empty_statement ()
+    end if
+.endmacro
+
+
+/***********************   GENERATE ACTION HANDLER  ************************/
+
+function generate_action_handler (subname)
+    >sub $(subname)
+    if defined (source)
+        literal from source
+    endif
+    if handler. ?<> ""
+        >    $(trim (handler.?""))
+    endif
+    pfl_code_handler_statement ()
+    >end sub
+    >
+endfunction
+
+
+/************************   GENERATE EVENT HANDLER  ************************/
+
+function generate_event_handler (event_name)
+    #   We allow multiple handlers for the same event
+    for handler where event ?= event_name
+        generate_handler_body (1)
+    endfor
+endfunction
+
+function generate_handler_body (comment)
+    if comment
+    >   '   Handler for $(event)
+    endif
+    if defined (source)
+        >%><!--#include file="$(source)"--><%
+    endif
+    if handler. ?<> ""
+        >    $(trim (handler.?""))
+    endif
+    pfl_code_handler_statement ()
+endfunction

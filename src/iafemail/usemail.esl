@@ -1,0 +1,35 @@
+<esl
+    name        = "usemail"
+    description = "UltraSource Email Daemon"
+    author      = "Pascal Antonnaux &lt;pascal@imatix.com&gt;"
+    unicode     = "0"
+    version     = "2.02"
+    dfl         = "us12">
+    <queue>
+        <table name = "emailqueue">
+            <field name = "id"         role = "id"        />
+            <field name = "sendat"     role = "sendat"    />
+            <field name = "emaillogid" role = "logid"     />
+            <field name = "revisedts"  />
+        </table>
+    </queue>
+    <log>
+        <table name = "emaillog">
+            <field name = "id"         role = "id"        />
+            <field name = "customerid" />
+            <field name = "usergroupid"/>
+            <field name = "orderid"    />
+            <field name = "context"    />
+            <field name = "sender"     role = "senderid"  />
+            <field name = "recipients" role = "recipients"/>
+            <field name = "subject"    role = "subject"   />
+            <field name = "fromaddr"   role = "sender"    />
+            <field name = "replyaddr"  role = "reply"     />
+            <field name = "status"     role = "status"    />
+            <field name = "sentat"     role = "sendat"    />
+            <field name = "createdts"  />
+            <field name = "body"       role = "body"      />
+            <field name = "message"    role = "message"   />
+        </table> 
+    </log>
+</esl>

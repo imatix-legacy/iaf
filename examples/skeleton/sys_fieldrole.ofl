@@ -1,0 +1,19 @@
+<object name = "fieldrole" >
+    <view name = "summary">
+        <field name = "formid"      />
+        <field name = "fieldid"      >
+          <table name = "field"      >
+              <field name = "id"    />
+              <field name = "label" />
+          </table>
+        </field>
+        <field name = "role"        />
+    </view>
+
+    <query name = "byrole" index = "byrole" view = "detail"  />
+    <require>
+        <field name = "formid"      />
+        <field name = "fieldid"     />
+        <field name = "role"        />
+    </require>        
+</object>

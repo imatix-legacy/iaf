@@ -1,0 +1,160 @@
+<xnf name = "WFL" >
+A WFL (Workflow Framework Language) file describes a workflow, which is
+a set of steps that an object (such as an order) goes through from being
+initially created, until it is completed resolved.  A work flow consists
+of states that the object can be in (such as "waiting for budget
+approval", "calling for tenders", and so on), the things that can be done
+when the object is in that state ("approve budget", "record tender
+received", "cancel order") which are called "events", and the people (by
+which roles they play) that are able to perform those actions.  The
+workflow is modeled as a Finite State Machine (FSM), which ensures that
+the object is always in a known state, and it's always clear what can be
+done in that state, by whom, and which state the object is in after an
+action has been taken.  To simplify the workflow description, base
+classes can be defined for states, which specifies a group of events
+(actions) that should be available in any state which is part of that
+class.  The workflow starts processing in the "start" state, with an
+"ok" event: this is triggered automatically by the workflow processing.
+Workflows are processed by the workflow.gsl script.
+
+<entity name = "workflow" tag = "workflow" >
+  The 'workflow' element contains the states, classes, and methods which
+  make up the workflow.  
+    <allow entity = "class"  occurs = "0+" />
+    <allow entity = "state"  occurs = "1+" />
+    <allow entity = "method" occurs = "0+" />
+    <attr name = "name" required = "1" >
+      The short name of the workflow.  This should generally be the 
+      same as the object which is being managed by the workflow (eg
+      "order" if you are managing "order" objects).
+    </attr>
+    <attr name = "script" required = "0" >
+      The GSL script to use process the WFL file.  Generally this should
+      be "workflow.gsl".  The script can be overridden on the GSL
+      command line, or specified there if it is not specified with this
+      attribute.  Specifying the "script" attribute here means you can
+      run "gslgen example.wfl" and have it processed automatically.
+    </attr>
+</entity>
+
+<entity name = "class" tag = "class" >
+  The 'class' element specifies a default set of events which can then
+  be included by reference into a 'state' using the "class" attribute of
+  the 'state' element.  The 'class' element is used to help normalise
+  the WFL file, to ensure that a given set of events, roles and actions
+  are specified in only one place, making it easier to maintain the WFL
+  file.  The use of 'class' elements to specify all common sets of
+  events that can apply in more than one 'state' (eg, states which have
+  some commonality) is strongly recommended.
+  <allow entity = "event" occurs = "1+" />
+  <attr name = "name" required = "1" >
+    The name of the 'class', so that it can be referenced by the "class"
+    attribute of the 'state' element.
+  </attr>
+</entity>
+
+<entity name = "state" tag = "state" cdata = "1" >
+  The 'state' element describes a given point in the workflow (a
+  "state") that the object being managed by the workflow can be in.
+  States can be part of a class (specified by the "class" attribute,
+  and referencing a 'class' element), which specifies a base set of
+  events (things that can be done) which apply to that state.  In
+  addition the state can specify extra events that are specific to that
+  state.  The events include both roles (who can perform the event), and
+  actions (bits of program code to run when that event is triggered).
+  The events included from the class (if any), and the events specified
+  directly for the state describe everything that can be done on the
+  object while it is in that state.  Generally after the steps for an
+  event have been followed, the object will be moved to a new state;
+  this is described as part of the event.  The body of the state
+  contains a description of the state (and its purpose) which can be
+  used in documentation.
+  <allow entity = "event" occurs = "0+" />
+  <attr name = "name" required = "1" >
+    The name of the 'state' so that it can be referenced by events as
+    the "nextstate".
+  </attr>
+  <attr name = "class" required = "0" >
+    The name of a 'class' which contains a base set of events that apply
+    in this state.  If not specified, then only the events explicitly
+    listed in the 'state' will be available when the object in this state.
+  </attr>
+</entity>
+
+<entity name = "event" tag = "event" >
+  The 'event' element specifies something that can be done while the
+  object is in the state which the the event is contained in (directly,
+  or by reference through a 'class' element).  Events are identified by
+  name (to the end user), and can be associated with a 'method' element
+  that specifies a "hint" to show the end user.  The same event name can
+  be used in multiple states, although it is recommended that if all
+  details of the event (including roles, actions and the next state)
+  are the same, that the event be specified in a 'class' instead of
+  separately in two states.  Within the event are a list of roles (which
+  describe who is allowed to trigger the event), and a list of actions
+  which the program should take when the event is triggered.  If no
+  roles are listed, then no user can trigger the event, ie the event is
+  an internal one navigated only by the program code triggered by some
+  external thing happening (eg, an email arriving).
+  <allow entity = "role"   occurs = "0+" />
+  <allow entity = "action" occurs = "0+" />
+  <attr name = "name" required = "1" >
+    The name of the 'event', so that it can be referred to from outside
+    the workflow.  The name "ok" is special, and is used on the "start"
+    'state' to enter the workflow processing.
+  </attr>
+  <attr name = "nextstate" required = "1" >
+    The name of the 'state' that the object will be in after the actions
+    for the event have been processed.  
+  </attr>
+</entity>
+
+<entity name = "role" tag = "role" >
+  The 'role' element names a role that can trigger an event.  The role
+  names are related to roles defined in the application outside the
+  workflow, and users are associated with roles outside the workflow.
+  <attr name = "name" required = "1" >
+    The name of the role that is allowed to trigger the event.
+  </attr>
+</entity>
+
+<entity name = "action" tag = "action" >
+  The 'action' element identifies a section of code (in the program that
+  is using the workflow) which should be invoked when the event is
+  triggered.  Multiple 'action' elements can be specified, and the
+  sections of code will be invoked in the order they are specified.
+  Each action corresponds to a subroutine (or function) in the target
+  language.  These subroutines have to be written separately; they are
+  not automatically generated.  Those subroutines can be simple wrappers
+  around automatically generated functionality where appropriate, but
+  the full power of the target language is available where needed.
+  <attr name = "name" required = "1" >
+    The name of the section of code to be invoked.  By convention "-"
+    symbols are used between the words in the name, and the workflow
+    processing script translates this to the appropriate symbols for the
+    target language.
+  </attr>
+  <attr name = "argument" required = "0" >
+    An optional string parameter to pass to the section of code being
+    invoked.  This can identify a subaction to take (for instance when
+    sending email, it can identify the type of email message to send
+    out).
+  </attr>
+</entity>
+
+<entity name = "method" tag = "method" >
+  The 'method' element associates a hint with an 'event' name.  These
+  hitns are used when displaying the list of things that a user can do
+  with the object.
+  <attr name = "name" required = "1" >
+    The 'event' name which is to be associated with this hint text.
+  </attr>
+  <attr name = "hint" required = "1" >
+    A short description of the processing invoked when the 'event'
+    is triggered to display for the user when they are offered the
+    opportunity to trigger the event.  For instance an event of "email"
+    might have a hint of "Send email notification".
+  </attr>
+</entity>
+
+</xnf>

@@ -1,0 +1,36 @@
+<table name = "prefdef" description = "User-interface Preference" >
+ Defines the set of preferences that the user-interface layer supports.
+    <field name = "id"          domain = "recordid" >Record id</field>
+    <field name = "name"        domain = "shortname">Internal name
+        <rule name = "show" when = "all"    what = "case"     value = "upper" />
+        <rule name = "show" when = "all"    what = "required" value = "1" />
+    </field>
+    <field name = "prompt"      domain = "longname" >Preference name</field>
+    <field name = "textbox"     domain = "boolean"  >Show as textbox?</field>
+    <field name = "iscolor"     domain = "boolean"  >Defines a color?</field>
+    <field name = "default"     domain = "longtext" >Default value
+        <rule name = "show" when = "layout" what = "rows" value = "10" />
+        <rule name = "show" when = "all"    what = "html" value = "1" />
+    </field>
+    <field name = "hints"       domain = "longtext" >User guidelines
+        <rule name = "show" when = "layout" what = "rows" value = "5" />
+        <rule name = "show" when = "all"    what = "html" value = "1" />
+    </field>
+    <field                      domain = "audit"   />
+    <index name = "byname">
+        <field name = "name" />
+    </index>
+</table>  
+
+<table name = "prefval" description = "Preference Value" >
+ Allows tweaking of user-interface options such as colors, logos, and
+ fonts.
+    <field name = "id"          domain = "recordid" >Record id</field>
+    <field name = "prefdefname" domain = "shortname">Preference name</field>
+    <field name = "value"       domain = "longtext" >Preference value</field>
+    <field                      domain = "audit"   />
+    <index name = "byname">
+        <field name = "prefdefname" />
+    </index>
+</table>
+

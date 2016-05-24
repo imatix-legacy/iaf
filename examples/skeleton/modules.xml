@@ -1,0 +1,15 @@
+<data>
+  <module
+      name     = "System Administration"
+      homepage = "sys_welcome">
+      <modulerole
+          shortname   = "SYSADMIN"
+          longname    = "System Administrator"
+          description = "The system administrator sets-up system parameters"/>
+      <modulerole
+          shortname   = "ADMIN"
+          longname    = "Administrator"
+          description = "The administrator manages user profiles and security"/>
+  </module>
+</data>
+

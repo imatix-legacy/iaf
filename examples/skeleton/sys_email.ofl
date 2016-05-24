@@ -1,0 +1,32 @@
+<object name = "emaildef">
+    <view name = "summary">
+        <field name = "context"     />
+        <field name = "name"        />
+        <field name = "subject"     />
+        <field name = "body"        />
+        <field name = "hints"       />
+    </view>
+</object>
+
+<object name = "emaillog">
+    <view name = "summary">
+        <field name = "recipients"  />
+        <field name = "subject"     />
+        <field name = "status"      />
+        <field name = "sentat"      />
+    </view>
+    <query name = "bydate" index = "bydate" view = "detail" />
+</object>
+
+<object name = "emailqueue">
+    <view name = "summary">
+        <field name = "sendat"      />
+        <field name = "emaillogid"   >
+            <table name = "emaillog">
+                <field name = "recipients"  />
+                <field name = "subject"     />
+                <field name = "body"        />
+            </table>
+        </field>
+    </view>
+</object>

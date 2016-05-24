@@ -1,0 +1,20 @@
+<object name = "modulerole">
+    <view name = "create" >
+       <field name = "moduleid" >
+          <table name = "module" >
+            <field name = "name"   />
+          </table>
+       </field>
+       <field name = "shortname"   />
+       <field name = "longname"    />
+       <field name = "description" />
+    </view>
+
+    <query name = "bymodule" index = "bymodule" view = "detail"  />
+          
+    <require>
+        <field name = "shortname" />
+        <field name = "longname"  />
+    </require>
+</object>
+

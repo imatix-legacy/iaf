@@ -1,0 +1,43 @@
+/*  This GSL script builds the Color Chooser table      */
+ 
+><!-- Color chooser page
+>     Generator: GSLgen
+>     Author:    iMatix Corporation
+>  -->
+><center>
+><P>These are the browser-safe colors:<p><tt>
+
+0.units = 0
+0.red   = 0
+0.green = 0
+0.blue  = 0
+0.color = 0
+
+while red < 256
+    green = 0
+    while green < 256
+        blue = 0
+        while blue < 256
+            color = "#$(red%02X)$(green%02X)$(blue%02X)"
+
+.template
+<a href="javascript:formaction('DO_CLICK',0,'$(color)')" title="$(color)"
+   style="{text-decoration:none;color=white;background:$(color)}" OnMouseOver="top.status='$(color)'">
+<% if Session ("color") = "$(color)" then %>&nbsp;*&nbsp;</a>
+<% else %>&nbsp;&nbsp;&nbsp;</a>
+<% end if %>
+.endtemplate
+
+            units += 1
+            if units = 12
+                ><br>
+                units = 0
+            endif
+            blue += 51
+        endwhile
+        green += 51
+    endwhile
+    red += 51
+endwhile
+
+></tt>

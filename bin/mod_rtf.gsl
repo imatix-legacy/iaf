@@ -1,0 +1,214 @@
+----------------------------------------------------------------------------
+-
+-  Name:       mod_rtf.gsl
+-  Title:      Library for RTF processing.
+-
+-  Written:    2000/01/05  Pascal Antonnaux <pascal@imatix.com>
+-  Revised:
+-
+----------------------------------------------------------------------------
+
+RTF_FILE_EXTENSION = ".rtf"
+PLAIN = "\\par\\pard\\plain"
+NORMAL = "\\widctlpar\\f16\\fs20"
+H1 = "\\s1\\sb240\\sa60\\keepn\\widctlpar\\b\\f16\\fs28\\kerning28"
+H2 = "\\s2\\sb240\\sa60\\keepn\\widctlpar\\outlinelevel1\\b\\i\\f16"
+H3 = "\\s3\\sb240\\sa60\\keepn\\widctlpar\\f16"
+H4 = "\\s4\\sb240\\sa60\\keepn\\widctlpar\\b\\f16"
+H5 = "\\s5\\sb240\\sa60\\widctlpar\\f16\\fs22"
+H6 = "\\s6\\sb240\\sa60\\widctlpar\\i\\f16\\fs22"
+H7 = "\\s7\\sb240\\sa60\\widctlpar\\f16\\fs20"
+H8 = "\\s8\\sb240\\sa60\\widctlpar\\i\\f16\\fs20"
+H9 = "\\s9\\sb240\\sa60\\widctlpar\\b\\i\\f16\\fs18"
+
+function int (value)
+    if value <> 0
+        posn = 0
+        len  = length (value)
+        while posn < len
+            if substr (value, posn, , 1) = "."
+                dot = posn
+                posn = len
+            endif
+            posn = posn + 1
+        endwhile
+        int_result = substr (value, 0, dot - 1,)
+    else
+        int_result = "0"
+    endif
+endfunction
+
+-===========================================================================
+-    Start a document
+-===========================================================================
+.macro RTF_START_DOCUMENT (TITLE, AUTHOR, KEYWORD, DOCCOMM)
+{\\rtf1\\ansi\\ansicpg1252\\uc1 \\deff0\\deflang1033\\deflangfe1036
+{\\fonttbl
+{\\f0\\froman\\fcharset0\\fprq2{\\*\\panose 02020603050405020304}Times New Roman;}
+{\\f1\\fswiss\\fcharset0\\fprq2{\\*\\panose 020b0604020202020204}Arial;}
+{\\f16\\fnil\\fcharset0\\fprq2{\\*\\panose 00000600000000020000}Optima;}
+{\\f114\\fnil\\fcharset238\\fprq2 Optima CE;}
+{\\f118\\fnil\\fcharset162\\fprq2 Optima Tur;}}
+{\\colortbl;
+\\red0\\green0\\blue0;\\red0\\green0\\blue255;
+\\red0\\green255\\blue255;\\red0\\green255\\blue0;
+\\red255\\green0\\blue255;\\red255\\green0\\blue0;\\red255\\green255\\blue0;
+\\red255\\green255\\blue255;\\red0\\green0\\blue128;\\red0\\green128\\blue128;
+\\red0\\green128\\blue0;\\red128\\green0\\blue128;\\red128\\green0\\blue0;
+\\red128\\green128\\blue0;
+\\red128\\green128\\blue128;
+\\red192\\green192\\blue192;}
+{\\stylesheet{\\widctlpar\\adjustright \\fs20\\lang1036\\cgrid Normal;}
+{\\s1\\sb240\\sa60\\keepn\\widctlpar\\adjustright \\b\\f1\\fs28\\lang1036
+\\kerning28\\cgrid \\sbasedon0 \\snext0 heading 1;}
+{\\s2\\sb240\\sa60\\keepn\\widctlpar\\adjustright \\b\\i\\f1\\lang1036\\cgrid \\sbasedon0 \\snext0 heading 2;}
+{\\s3\\sb240\\sa120\\keep\\keepn\\widctlpar\\tx2268\\outlinelevel2
+\\adjustright \\b\\f16\\lang2057\\cgrid \\sbasedon1 
+\\snext0 heading 3;}{\\*\\cs10 \\additive Default Paragraph Font;}
+{\\s15\\qj\\li720\\sa120\\keep\\keepn\\widctlpar\\tx2268\\adjustright 
+\\f16\\fs22\\lang2057\\cgrid \\sbasedon0 \\snext0 Normal keep;}}
+{\\info{\\title $(TITLE?:)}{\\author $(AUTHOR:)}{\\keyword $(KEYWORD:)}
+{\\doccomm $(DOCCOMM:)}{\\*\\company iMatix Corporation}
+{\\nofcharsws0}{\\vern113}}
+\\paperw11906\\paperh16838\\margl1417\\margr1417\\margt1417\\margb1417 
+\\deftab708\\widowctrl\\ftnbj\\aenddoc\\hyphhotz425\\formshade\\viewkind4\\viewscale130
+\\pgbrdrhead\\pgbrdrfoot \\fet0\\sectd 
+\\linex0\\headery709\\footery709\\colsx709\\endnhere
+.endmacro
+
+-===========================================================================
+-    Define title value and level
+-        LEVEL = Level of title (H0->H9)
+-        TITLE = Title value
+-===========================================================================
+.macro RTF_SET_TITLE (LEVEL, TITLE)
+\\pard\\plain $($(LEVEL:):) $(TITLE:)\\par\\pard\\plain$(NORMAL:)
+.endmacro
+
+-===========================================================================
+-    Add index entry
+-===========================================================================
+.macro RTF_ADD_INDEX (INDEX)
+{\\v {\\xe {$(INDEX:)}}}
+.endmacro
+
+-===========================================================================
+-    Table definition
+-===========================================================================
+.macro RTF_BEGIN_TABLE (POSITION)
+.pos = POSITION * 1440 / 25.4
+.int (pos)
+\\pard\\plain\\trowd\\trgaph70\\trleft$(int_result){
+\\trbrdrt\\brdrs\\brdrw15\\brdrcf1 
+\\trbrdrl\\brdrs\\brdrw15\\brdrcf1 
+\\trbrdrb\\brdrs\\brdrw15\\brdrcf1 
+\\trbrdrr\\brdrs\\brdrw15\\brdrcf1 
+\\trbrdrh\\brdrs\\brdrw15\\brdrcf1 
+\\trbrdrv\\brdrs\\brdrw15\\brdrcf1 
+.endmacro
+
+.macro RTF_END_TABLE
+\\pard}
+.endmacro
+
+.macro RTF_BEGIN_ROW
+\\pard\\keepn\\plain{
+.endmacro
+
+.macro RTF_END_ROW
+\\pard\\keepn\\plain\\intbl\\row }
+.endmacro
+
+.macro RTF_BEGIN_CELL
+\\pard\\plain\\intbl\\keepn$(NORMAL:)\\li1\\fs18{
+.endmacro
+
+.macro RTF_END_CELL
+\\cell}
+.endmacro
+
+-===========================================================================
+-    Set table column definition
+-        Position (in mm)
+-        SHADOW = trame (Y/N)
+-===========================================================================
+.macro RTF_DEFINE_COLUMN (POSITION, BORDER)
+.pos = POSITION * 1440 / 25.4
+.int (pos)
+.posn = 0
+.len  = length (BORDER)
+.while posn < len
+.   if substr (BORDER, posn, , 1) = "R"
+\\clbrdrr\\brdrs\\brdrw15\\brdrcf1 
+.   elsif substr (BORDER, posn, , 1) = "L"
+\\clbrdrl\\brdrs\\brdrw15\\brdrcf1 
+.   elsif substr (BORDER, posn, , 1) = "T"
+\\clbrdrt\\brdrs\\brdrw15\\brdrcf1 
+.   elsif substr (BORDER, posn, , 1) = "B"
+\\clbrdrb\\brdrs\\brdrw15\\brdrcf1 
+.   elsif substr (BORDER, posn, , 1) = "S"
+\\clshdng1000
+.   endif
+.posn = posn + 1
+.endwhile
+\\cellx$(int_result)
+.endmacro
+
+.macro RTF_START_COLUMN_DEFINITION (POSITION)
+.pos = POSITION * 1440 / 25.4
+.int (pos)
+\\trowd\\trgaph70\\trleft$(int_result)
+\\trbrdrt\\brdrs\\brdrw15\\brdrcf1 
+\\trbrdrl\\brdrs\\brdrw15\\brdrcf1 
+\\trbrdrb\\brdrs\\brdrw15\\brdrcf1 
+\\trbrdrr\\brdrs\\brdrw15\\brdrcf1 
+\\trbrdrh\\brdrs\\brdrw15\\brdrcf1 
+\\trbrdrv\\brdrs\\brdrw15\\brdrcf1 
+.endmacro
+
+-===========================================================================
+-    End a document
+-===========================================================================
+.macro RTF_END_DOCUMENT
+}
+.endmacro
+
+.macro RTF_BEGIN_BOLD
+{\\b
+.endmacro
+
+.macro RTF_END_BOLD
+}
+.endmacro
+.macro RTF_BEGIN_ITALIC
+{\\i
+.endmacro
+
+.macro RTF_END_ITALIC
+}
+.endmacro
+
+.macro RTF_BEGIN_UNDERLINE
+{\\u
+.endmacro
+
+.macro RTF_END_UNDERLINE
+}
+.endmacro
+
+.macro RTF_BEGIN_PAR
+{\\pard$(NORMAL:)
+.endmacro
+
+.macro RTF_END_PAR
+\\par}
+.endmacro
+
+.macro RTF_NEW_LINE
+\\par
+.endmacro
+
+.macro RTF_NEW_PAGE
+\\page
+.endmacro
+

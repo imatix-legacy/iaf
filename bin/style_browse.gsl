@@ -1,0 +1,35 @@
+/*  BROWSE
+ *
+ *  This style implements a 'look at' detail screen.  It requires that
+ *  the query and view used have the same name, e.g. 'detail'.
+ */ 
+function style_browse ()
+    screen.view  ?= "detail"
+    screen.query ?= screen.view
+
+    xml '
+<style>
+<use object = "$(object)" />
+<handler event  = "on_init">
+    $(object)_recv_key
+    <fetch view = "$(view)" />
+</handler>
+
+<page title = "$(item:) Details" name = "detail" view = "$(view)">
+<form>
+  <hints>
+  <hint>These are the properties for the $(item) you selected.</hint>
+  </hints>
+  <layout>
+    <field name = "*" />
+    <action name = "cancel" text = "Ok" />
+  </layout>
+</form>
+<handler action = "cancel">
+    return_to_parent
+</handler>
+</page>
+</style>
+'
+endfunction
+

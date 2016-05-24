@@ -1,0 +1,248 @@
+/*   
+    Standard screen styles
+  
+    These styles are implemented as GSL functions.  Each style implements a
+    set of pages, actions, hints, and other PFL components.  
+  
+    Each style function creates a 'style' child of the current screen.  A
+    general function, resolve_style(), loads the style on top of the screen,
+    and then deletes the style child item.
+
+    If the style contains multiple pages, the screen may contain either zero
+    pages, or one of each page, with the correct name.  If the style contains
+    a single page, the screen can optionally contain a single unnamed page or
+    a page with the correct name.  The style pages are copied to the screen.
+
+    In each page where no fields are specified, all the object view fields
+    are copied into the screen.  The screen can contain actions, text, etc.
+
+    Styles can be static, or highly intelligent.  Each style is defined by
+    a function called 'style_xxx' where xxx is the style name.  See the style
+    functions for specific style explanations.
+
+    Screen attributes:
+        object              - object used
+        item                - external (displayed) name for object
+        create              - create program, if any
+        detail              - detail program, if any
+        view                - object view used
+        query               - object query used, defaults to view
+        restrict_create     - VBScript condition must be true to allow New
+        restrict_delete     - VBScript condition must be true to allow Delete
+        restrict_modify     - VBScript condition must be true to allow Modify
+        restrict_all        - VBScript condition must be true to allow All
+*/  
+
+function resolve_screen_style ()
+    if defined (object)
+        screen.name ?= "$(object)_$(style)"
+        screen.item ?= "$(Object)"
+    endif
+
+    if !macro ("style_$(style)")
+        include "style_$(style).gsl"
+    endif
+    if macro ("style_$(style)")
+        style_$(style) ()
+    else
+        abort "Screen '$(screen.name)' refers to unknown style '$(style)'"
+    endif
+
+    #   Copy elements from screen to style
+    for screen-> style.use where count (screen.use, count.object = use.object) = 0
+        copy use to screen
+    endfor
+
+    for screen-> style.var where count (screen.var, count.name = var.name) = 0
+        copy var to screen
+    endfor
+
+    for screen-> style.handler where defined (action) 
+        if count (screen.handler, count.action ?= handler.action) = 0
+            copy handler to screen
+        endif
+    endfor
+
+    for screen-> style.handler where defined (event)
+        if count (screen.handler, count.event ?= handler.event) = 0
+            copy handler to screen
+        else
+             #   If event handler exists, extend with style unless 'replace' set in screen handler
+            if count (screen.handler, count.event ?= handler.event & count.replace ?= 1) = 0
+                for screen.handler as scrhandler where event ?= handler.event
+                    copy handler after scrhandler
+                    last
+                endfor
+            endif
+        endif
+    endfor
+
+    #   Screen pages called "*" are mapped to all required style pages
+    for screen.page where name = "*"
+        for screen-> style.page as stylepage
+            if count (screen.page, name = stylepage.name) = 0
+                copy page before page
+                for screen.page where name = "*"
+                    name = stylepage.name
+                    last
+                endfor
+            else
+                for screen.page as screenpage where name = stylepage.name
+                if count (form) = 0
+                    xml to screenpage "<form><layout/></form>"
+                endif
+                for form
+                    for . as target_entity
+                        for page.form
+                            for . as form_entity
+                                if name (target_entity) = "hints"
+                                    copy form_entity after  target_entity
+                                else
+                                    copy form_entity before target_entity
+                                endif
+                            endfor
+                        endfor
+                        last
+                    endfor
+                endfor
+                endfor
+            endif
+        endfor
+        delete page
+    endfor
+
+    if count (screen.page, !defined (count.name))
+        if count (screen.page) = 1 & count (screen-> style.page) = 1
+            screen-> page.name ?= screen-> style-> page.name?"unnamed"
+        else
+            echo "$(screen.name): pages must be named. Valid pages for this style are:"
+            for screen-> style.page
+                echo page.name
+            endfor
+            abort "- aborting"
+        endif
+    endif
+
+    for screen-> style.page
+        resolve_style_page ()
+    endfor
+
+    #   Squash screen hints if not wanted
+    if (screen.hints?1) = 0
+        for page
+            for form
+                for hints
+                    delete hints
+                endfor
+            endfor
+        endfor
+    endif
+    
+    delete screen-> style
+    #save . as "$(screen.name).sty"
+endfunction
+
+function resolve_style_page ()
+    if count (page.toolbar) = 0
+        for page. as child where item () = 1
+            xml before child "<toolbar/>"
+        endfor
+    endif
+    page.name ?= "unnamed"
+    if count (screen.page, count.name = page.name) = 0
+        copy page to screen
+    else
+        for screen.page as screenpage where name = page.name
+            for page.handler
+                if count (screenpage.handler, count.action ?= handler.action | count.event ?= handler.event) = 0
+                    copy handler to screenpage
+                endif
+            endfor
+            if count (screenpage.toolbar) = 0
+                if count (screenpage.)
+                    for screenpage. as child where item () = 1
+                        copy page-> toolbar before child
+                    endfor
+                else
+                    copy page-> toolbar to screenpage
+                endif
+            else
+                for page-> toolbar.action where count (screenpage-> toolbar.action, count.name = action.name) = 0
+                    copy action to screenpage-> toolbar
+                endfor
+            endif
+
+            screenpage.view  ?= page.view?
+            screenpage.title ?= page.title?
+            if count (screenpage.form) = 0
+                copy page-> form to screenpage
+            else
+                screenpage-> form.mode ?= page-> form.mode?
+                #   If screen contains layout/summary, extend it, else copy style block
+                #   If screen contains hints, merge with style hints
+                #   If screen attr hints = "0", don't add hints
+                #   If layout/summary is replace = "1", replaces block from style
+                #   If layout/summary is append = "0", is copied right after hints
+
+                for page-> form. as form_element
+                    if name () = "layout" & count (screenpage-> form.layout, count.replace ?= 1)
+                        #   Replace style layout with one from PFL
+                        
+                    elsif name () = "summary" & count (screenpage-> form.summary, count.replace ?= 1)
+                        #   Replace style layout with one from PFL
+
+                    elsif name () = "layout" & count (screenpage-> form.layout, (count.append?1) = 1)
+                        for screenpage-> form.layout where (append?1) = 1
+                            #   Count number of fields and actions in original screen form
+                            nbr_fields  = count (layout.field)
+                            nbr_actions = count (layout.action, (count.type?"link") <> "image")
+                            for form_element. as child
+                                if    name () = "field" & nbr_fields > 0
+                                    for layout.field where item () = nbr_fields
+                                        copy child after field
+                                    endfor
+                                elsif name () = "field" & nbr_actions > 0
+                                    for layout.action where item () = 1
+                                        copy child before action
+                                    endfor
+                                elsif name () = "action" & nbr_actions > 0
+                                    for layout.action where item () = nbr_actions
+                                        if !defined (action.label)
+                                            child.join = "1"
+                                        endif
+                                        copy child after action
+                                        nbr_actions += 1
+                                    endfor
+                                elsif name () = "text" & nbr_actions > 0
+                                    for layout.action where item () = 1
+                                        copy child before action
+                                    endfor
+                                else
+                                    copy child to layout
+                                endif
+                            endfor
+                        endfor
+
+                    elsif name () = "summary" & count (screenpage-> form.summary, (count.append?1) = 1)
+                        for screenpage-> form.summary where (append?1) = 1
+                            for form_element. as child
+                                copy child to summary
+                            endfor
+                        endfor
+
+                    elsif name () = "hints" 
+                        if count (screenpage-> form.hints) = 0
+                            for screenpage-> form. as child where item () = 1
+                                copy form_element before child
+                            endfor
+                        endif
+
+                    else
+                        copy form_element to screenpage-> form
+                    endif
+                endfor
+            endif
+        endfor
+    endif
+endfunction
+

@@ -1,0 +1,18 @@
+<object name = "prefdef">
+    <view name = "summary">
+        <field name = "prompt"   />
+        <field name = "name"     />
+        <field name = "default"  />
+        <field name = "hints"    />
+    </view>
+    <require>
+        <field name = "prompt"  />
+        <field name = "name"    />
+    </require>    
+    <query name = "byname" view = "summary" />
+</object>
+
+<object name = "prefval" >
+    <query name = "byname" view = "summary" />
+</object>
+

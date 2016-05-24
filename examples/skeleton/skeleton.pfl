@@ -1,0 +1,28 @@
+<pfl
+    name        = "skeleton"
+    ofl         = "skeleton.ofl"
+    description = "iAF Skeleton Application"
+    author      = "iMatix Corporation"
+    >
+
+<!--  sys : system module  -->
+<include filename = "sys_admin.pfl"         />
+<include filename = "sys_currency.pfl"      />
+<include filename = "sys_dbload.pfl"        />
+<include filename = "sys_defaults.pfl"      />
+<include filename = "sys_email.pfl"         />
+<include filename = "sys_form.pfl"          />
+<include filename = "sys_field.pfl"         />
+<include filename = "sys_fieldvalue.pfl"    />
+<include filename = "sys_fieldrule.pfl"     />
+<include filename = "sys_help.pfl"          />
+<include filename = "sys_language.pfl"      />
+<include filename = "sys_login.pfl"         />
+<include filename = "sys_module.pfl"        />
+<include filename = "sys_modulerole.pfl"    />
+<include filename = "sys_prefs.pfl"         />
+<include filename = "sys_user.pfl"          />
+<include filename = "sys_userrole.pfl"      />
+<include filename = "sys_usertype.pfl"      />
+<include filename = "sys_welcome.pfl"       />
+</pfl>

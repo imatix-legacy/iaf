@@ -1,0 +1,15 @@
+#
+#   buildxnf.gsl - Load XNF file and generate parser / coder for language
+#
+#   Written: 2000/08/01  iMatix Corporation
+#   Revised: 2000/09/30  iMatix Corporation
+#
+#   Arguments to script:
+#
+#   -xnf:       name of XNF file, without extension
+
+include "mod_xnf.gsl"
+xnf_load     ("$(xnf).xnf")
+xnf_doc      ("$(xnf).txt")
+xnf_produce  ("$(xnf)parse.gsl", "parse", 1, 1)
+xnf_produce  ("$(xnf)code.gsl",  "code",  0, 0)

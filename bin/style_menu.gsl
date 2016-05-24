@@ -1,0 +1,78 @@
+/*  MENU
+ *
+ *  This style implements a menu screen that does not access any data.
+ *  Explodes a set of screen 'choice' items, each with a 'text' attribute
+ *  that provides the menu option, and a body that provides the menu rule
+ *  code.  Menu choices must be enclosed by page and form items.
+ */ 
+function style_menu ()
+    for page
+        page.handlers = 0
+        for form
+            xml to form '
+                <text script = "shadedbox.gsl" what = "top" title = "$(title?"Menu":)" />
+                <text script = "shadedbox.gsl" what = "left" />
+                <text before = "1"/>'
+            style_menu_items ()
+            xml to form '
+                <text before = "1"/>
+                <action name = "cancel" text = "Done" />
+                <text script = "shadedbox.gsl" what = "right"  />
+                <text script = "shadedbox.gsl" what = "bottom" />'
+            if count (page.handler,   count.action ?= "cancel") = 0 \
+            &  count (screen.handler, count.action ?= "cancel") = 0
+                xml to page '
+                    <handler action = "cancel">return_to_parent</handler>'
+            endif
+        endfor
+    endfor
+    xml '<style><page><toolbar/><form/></page></style>'
+endfunction
+
+function style_menu_items ()
+    for . as choice
+        if name () = "choice"
+            if defined (choice.)
+                page.handlers += 1
+                choice.hint ?= "Click to select"
+                if defined (choice.confirm)
+                    confirmtext = 'confirm = "$(confirm:)" '
+                else
+                    confirmtext = ""
+                endif
+                if defined (choice.condition)
+                    xml to form '
+                        <if condition = "$(condition:)">
+                        <text>&lt;li&gt;</text>
+                        <action name = "menu$(page.handlers)" text = "$(choice.text:)"
+                                hint = "$(choice.hint:)" style = "menu" $(confirmtext:)/>
+                        </if>'
+                else
+                    xml to form '
+                        <text>&lt;li&gt;</text>
+                        <action name = "menu$(page.handlers)" text = "$(choice.text:)"
+                                hint = "$(choice.hint:)" style = "menu" $(confirmtext:)/>'
+                endif
+                xml to page '
+                    <handler action = "menu$(page.handlers)">$(choice.:)</handler>'
+            else
+                xml to form '
+                    <text>&lt;li&gt;&lt;font color=gray&gt; $(choice.text:)&lt;/font&gt;</text>'
+            endif
+            delete choice
+        elsif name () = "menu"
+            xml to form '
+                <text>&lt;li&gt;$(choice.text:)&lt;ul&gt;</text>'
+            style_menu_items ()
+            xml to form '
+                <text>&lt;/ul&gt;</text>'
+            delete choice
+        elsif name () = "break"
+            xml to form '<text before = "1" />'
+            delete choice
+        elsif name () = "line"
+            xml to form '<line/>'
+            delete choice
+        endif
+    endfor
+endfunction

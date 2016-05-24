@@ -1,0 +1,118 @@
+----------------------------------------------------------------------------
+-  Name:       mod_html.gsl
+-  Title:      Library for HTML processing.
+-  Written:    2000/01/05  Pascal Antonnaux <pascal@imatix.com>
+-  Revised:    2000/02/02  Pieter Hintjens
+----------------------------------------------------------------------------
+
+HTML_FILE_EXTENSION = ".htm"
+
+-===========================================================================
+-    Start a document
+-===========================================================================
+.macro HTML_START_DOCUMENT (TITLE, AUTHOR, KEYWORD, DOCCOMM)
+<html><head><title>$(title:)</title></head>
+<!-- Author:  $(AUTHOR:) -->
+<!-- Keyword: $(KEYWORD:) -->
+<body>
+.endmacro
+
+-===========================================================================
+-    End a document
+-===========================================================================
+.macro HTML_END_DOCUMENT
+</body></html>
+.endmacro
+
+-===========================================================================
+-    Define title value and level
+-        LEVEL = Level of title (H0->H9)
+-        TITLE = Title value
+-===========================================================================
+.macro HTML_SET_TITLE (LEVEL, TITLE)
+<$(LEVEL:)> $(TITLE:)</$(LEVEL:)>
+.endmacro
+
+-===========================================================================
+-    Add index entry
+-===========================================================================
+.macro HTML_ADD_INDEX (INDEX)
+.endmacro
+
+-===========================================================================
+-    Table definition
+-===========================================================================
+.macro HTML_BEGIN_TABLE (POSITION)
+<table size=90% BORDER=1 cellpadding=0 cellwidth=0>
+.endmacro
+
+.macro HTML_END_TABLE
+</table>
+.endmacro
+
+.macro HTML_BEGIN_ROW
+<tr>
+.endmacro
+
+.macro HTML_END_ROW
+</tr>
+.endmacro
+
+.macro HTML_BEGIN_CELL
+<td>
+.endmacro
+
+.macro HTML_END_CELL
+</td>
+.endmacro
+
+-===========================================================================
+-    Set table column definition
+-        Position (in mm)
+-        SHADOW = trame (Y/N)
+-===========================================================================
+.macro HTML_DEFINE_COLUMN (POSITION, BORDER)
+.endmacro
+
+.macro HTML_START_COLUMN_DEFINITION (POSITION)
+.endmacro
+
+.macro HTML_BEGIN_BOLD
+<b>
+.endmacro
+
+.macro HTML_END_BOLD
+</b>
+.endmacro
+
+.macro HTML_BEGIN_ITALIC
+<i>
+.endmacro
+
+.macro HTML_END_ITALIC
+</i>
+.endmacro
+
+.macro HTML_BEGIN_UNDERLINE
+<u>
+.endmacro
+
+.macro HTML_END_UNDERLINE
+</u>
+.endmacro
+
+.macro HTML_BEGIN_PAR
+<p>
+.endmacro
+
+.macro HTML_END_PAR
+.endmacro
+
+.macro HTML_NEW_LINE
+<br>
+.endmacro
+
+.macro HTML_NEW_PAGE
+<hr>
+.endmacro
+

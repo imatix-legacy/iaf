@@ -1,0 +1,375 @@
+#
+#   mod_xnf.gsl - XML Normal Form module
+#
+#   The XML Normal Form is an XML implementation of the Backus Normal Form
+#   (BNF, also called Backus-Naur Form) syntax used to represent formal
+#   languages.  XNF is a formal language representation in an XML format
+#   that can be parsed by GSL scripts and other XML processors. This design
+#   of XNF implements just a basic form of BNF.
+#
+#   mod_xnf provides a number of functions to work with XNF files:
+#
+#   xnf_load ()     - loads and validates an XNF file
+#   xnf_doc ()      - generates documentation from an XNF tree
+#   xnf_produce ()  - produce parser for specified grammar
+
+echo "THIS MODULE IS DEPRECATED - USE VERSION FROM BASE/BOOM!"
+------------------------------------------------------------------------
+function xnf_load (xnffile)
+------------------------------------------------------------------------
+
+if ! exists (xnffile)
+    abort "$(xnffile) not found"
+else
+    xml from xnffile
+endif
+
+echo "Loading and processing $(xnffile)..."
+for root.xnf
+
+#   Include everything from <include> files
+for [include]
+    xml to xnf from filename
+    for xnf.xnf
+        abort "$(filename) is not a valid include file"
+    endfor
+endfor
+
+if count (entity) = 0
+    abort "No entities defined in XNF file"
+endif
+
+for xnf.entity 
+    entity.processed = 0
+endfor
+
+#   We check the root entity using a recursive function
+for xnf.entity where item () = 1
+    xnf_check_entity ()
+endfor
+
+for xnf.entity 
+    if processed = 0
+        echo "Entity not referenced: $(entity.name:)"
+    endif
+endfor
+echo count (xnf.entity) + " entities in XNF file"
+
+endfor
+endfunction
+
+function xnf_check_entity ()
+    entity.processed = 1
+    if count (xnf.entity, count.name = entity.name) > 1
+        abort "Entity $(entity.name:) is not unique in XNF"
+    endif
+
+    #   Inherit structure from class if necessary
+    if defined (entity.class)
+        if count (xnf.class, name = entity.class) = 0
+            abort "Entity $(entity.name:) refers to undefined class '$(class:)'"
+        endif
+        for xnf.class where name = entity.class
+            for . as class_child
+                copy class_child to entity
+            endfor
+            entity.       ?= class.?
+            entity.tag    ?= class.tag?
+            entity.cdata  ?= class.cdata?
+            entity.sameas ?= class.sameas?
+        endfor
+    endif
+    
+    if count (body) > 1
+        abort "Multiple 'body' parts in $(entity.name:)"
+    elsif count (body) = 1 & count (allow) > 0
+        abort "In $(entity.name:), use either body or allow items"
+    endif
+    
+    for body
+        if count (xnf.entity, count.name = body.entity) = 0
+            abort "$(entity.name:) refers to unknown entity '$(body.entity)'"
+        endif
+        for xnf.entity where entity.name = body.entity \
+        &   entity.processed = 0
+            xnf_check_entity ()
+        endfor
+    endfor
+    
+    for allow
+        if count (xnf.entity, count.name = allow.entity) = 0
+            abort "$(entity.name:) refers to unknown entity '$(allow.entity)'"
+        endif
+        for xnf.entity where entity.name = allow.entity \
+        &   entity.processed = 0
+            xnf_check_entity ()
+        endfor
+    endfor
+
+    for attr
+        if !defined (entity.tag)
+            abort "$(entity.name:) has attributes but no 'tag' definition"
+        endif
+        if count (entity.attr, count.name = attr.name) = 0
+            abort "$(entity.name:) has duplicated attribute '$(attr.name)'"
+        endif
+    endfor
+endfunction
+
+
+------------------------------------------------------------------------
+function xnf_doc (outfile)
+------------------------------------------------------------------------
+echo "$(root-> xnf.name:) documentation in $(outfile)..."
+output outfile
+for root.xnf
+    >The $(xnf.NAME) Grammar
+    >
+    >$(justify (xnf.?"", 72, ""))
+    >
+    for xnf.entity
+        xnf_doc_entity ()
+    endfor
+endfor
+close
+endfunction
+
+function xnf_doc_entity ()
+>The '$(entity.name)' Item
+>
+>$(justify (entity.?"", 72, ""))
+>
+    margin = " " * length (entity.name) + "         "
+    if defined (entity.tag)
+        >    $(entity.name:) :== <$(tag:)>
+    else
+        >    $(entity.name:) :== 
+    endif
+
+    for body
+        for xnf.entity where entity.name = body.entity
+            >$(margin)$(entity.name:)
+        endfor
+    endfor
+    for allow
+        allow.occurs ?= "0+"
+        for xnf.entity where entity.name = allow.entity
+            if index () < count (entity.allow)
+                eoln = "|"
+            else
+                eoln = ""
+            endif
+            if    occurs = "1"
+                >$(margin)  $(entity.name:) $(eoln)
+            elsif occurs = "1+"
+                >$(margin){ $(entity.name:) }...$(eoln)
+            elsif occurs = "0+"
+                >$(margin)[ $(entity.name:) ]...$(eoln)
+            elsif occurs = "0/1"
+                >$(margin)[ $(entity.name:) ]$(eoln)
+            endif
+        endfor
+    endfor
+    if defined (entity.tag)
+        >$(margin)</$(tag)>
+    endif
+    >
+
+    if count (attr)
+        if count (attr) = 1 & entity-> attr.required ?= 1
+            >The $(entity.name) item has this single required attribute:
+        elsif count (attr) = 1
+            >The $(entity.name) item has this single optional attribute:
+        elsif count (attr) > 1
+            >The $(entity.name) item can have these attributes:
+        endif
+        >
+        for attr
+            >The '$(attr.name)' Attribute
+            text = trim (attr.?"") + " "            
+            if required ?= 1
+                text += "The $(attr.name:) attribute is required. "
+            else
+                text += "The $(attr.name:) attribute is optional. "
+            endif
+            if defined (default)
+                text += "Its default value is \"$(default:)\". "
+            endif
+            if count (restrict)
+                text += "It can take one of the following values: "
+                for restrict
+                    text += "\"$(value:)\""
+                    if defined (restrict.)
+                        text += " (" + restrict. + ")"
+                    endif
+                    if count (attr.restrict) = item ()
+                        text += "."
+                    else
+                        text += ", "
+                    endif
+                endfor
+            endif
+            >$(justify (text, 72, ""):)
+            >
+        endfor
+    endif
+endfunction
+
+
+------------------------------------------------------------------------
+function xnf_produce (outfile, rule, check, inherit)
+-
+-   The rule specifies a keyword that indicates what terms in the XNF
+-   file contain rule code.  For instance, if the rule is "parse", all
+-   entity rules with name = "parse" are copied to the produced parser.
+-
+-   If the check flag is 1, the XML tree is checked against the grammar
+-   to detect missing, duplicate, or unknown items.  If 0, the tree is
+-   assumed to be correct, i.e. checked by a previous pass.
+-
+-   The inherit flag should be 1 or 0.  If 0, all entities are parsed
+-   in strict order, but are always in a scope called 'entity', and
+-   inheritance from parent entities is impossible.  If 1, entities are
+-   given meaningful scope names, but are parsed in bunches, so the
+-   intermixed order of entity types in a list will be lost.  However,
+-   parent entities will have the expected scope names and attributes
+-   can be inherited as required.
+------------------------------------------------------------------------
+echo "$(root-> xnf.name:) '$(rule)' routine in $(outfile)..."
+output outfile
+for root.xnf
+    >#  '$(Rule)' engine for $(xnf.name:)
+    >#  Generated $(date), $(time)
+    >#
+    for xnf.entity 
+        xnf_produce_entity (rule)
+    endfor
+    for xnf.function where when = rule
+        >$(function.)
+    endfor
+
+    #   If the XNF file defines or needs an error handler, output it
+    if count (xnf.errorhandler, count.when = rule)
+        for xnf.errorhandler where when = rule
+            >$(errorhandler.)
+        endfor
+    else
+        if check
+            >
+            >function xnf_$(rule)_error (message)
+            >    echo (message)
+            >endfunction
+        endif
+    endif
+endfor
+close
+endfunction
+
+function xnf_produce_entity (rule)
+    >
+    >function $(rule)_$(entity.name:c) (tag)
+    if trace ?= 1
+        >    echo "$(rule)_$(entity.name:c)   :" + (name?"-")
+    endif
+
+    #   Output code before sub-entities
+    for rule where name = rule & (when?"before") = "before"
+        if defined (rule.)
+        >    $(trim (rule.))
+        endif
+    endfor
+
+    #   If we have 'disconnect' set on any of the rules, we don't generate
+    #   the code to process the entity body directly.  Disconnecting the body
+    #   allows us to generate code for the children at a different time.
+    if count (rule, name = "$(rule)" & disconnect ?= 1)
+        #   Don't process entity body (child entities)
+        
+    elsif count (body)
+        #   Pass control to body functions if necessary
+        for body
+            >    $(rule)_$(body.entity:c) ('$(tag?"")')
+        endfor
+
+    elsif count (allow)
+        if check
+            for allow
+                for xnf.entity where entity.name = allow.entity & defined (tag)
+                    if (allow.occurs ?= "1" | allow.occurs ?= "1+")
+                        >    if count ($(entity.tag)) < 1
+                        >        xnf_$(rule)_error ("<$(entity.tag)> required in \$(tag?'?')")
+                        >    endif
+                    endif
+                    if (allow.occurs ?= "1" | allow.occurs ?= "0/1")
+                        >    if count ($(entity.tag)) > 1
+                        >        xnf_$(rule)_error ("more than one <$(entity.tag)> defined in \$(tag?'?')")
+                        >    endif
+                    endif
+                endfor
+            endfor
+        endif
+        
+        verb = "if   "
+        if inherit
+            if check
+                >    #    Check that all entities are valid here
+                >    for . as entity
+                for allow
+                    for xnf.entity where name = allow.entity
+                        if !defined (entity.tag)
+                            abort "Entity $(name) must have a tag"
+                        endif
+                        >        $(verb) name () = "$(entity.tag)"
+                    endfor
+                    verb = "elsif"
+                endfor
+                >        else
+                >            xnf_$(rule)_error ("<\$(name ())> not allowed in \$(tag?'?')")
+                >        endif
+                >    endfor
+                >
+            endif
+            >    #    Process each set of entities separately
+            for allow
+                for xnf.entity where name = allow.entity
+                    >    for [$(tag)]
+                    >        $(rule)_$(entity.name:c) ('$(tag?"")')
+                    >    endfor
+                endfor
+            endfor
+        else
+            >    #    Process all entities using 'entity' scope name 
+            >    for . as entity
+            for allow
+                for xnf.entity where name = allow.entity
+            >        $(verb) name () = "$(entity.tag)"
+            >            $(rule)_$(entity.name:c) ('$(tag?"")')
+                endfor
+                verb = "elsif"
+            endfor
+            if check
+                >        else
+                >            xnf_$(rule)_error ("<\$(name ())> not allowed in \$(tag?'?')")
+            endif
+            >        endif
+            >    endfor
+        endif
+
+    else
+        #   No body and no allow - check entity does not have any children
+        if check
+            >    for .
+            >        xnf_$(rule)_error ("<\$(name ())> not allowed in \$(tag?'?')")
+            >    endfor
+        endif
+    endif
+
+    #   Output code after sub-entities
+    for rule where name = rule & (when?"before") = "after"
+        if defined (rule.)
+        >    $(trim (rule.))
+        endif
+    endfor
+    >endfunction
+endfunction
+

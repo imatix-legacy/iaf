@@ -1,0 +1,52 @@
+<!--
+    Load principal XML files into database, create admin user and usertype Administrator
+
+  -->
+
+<screen name = "dbload">
+<use object  = "currency"    />
+<use object  = "emaildef"    />
+<use object  = "prefdef"     />
+<use object  = "language"    />
+<use object  = "user"        />
+<use object  = "usertype"    />
+<enum domain = "userstatus"  />
+
+<page><form></form></page>
+
+<handler event   = "on_init">
+    reload_modules
+    fld_usertype_name = "Administrator"
+    <create object = "usertype" />
+
+    <step>
+    fld_userrole_usertypeid   = 1
+    fld_userrole_moduleid     = 1
+    fld_userrole_moduleroleid = 1
+    </step>
+    <create object            = "userrole"    />
+
+    <step>
+    set Security = Server.CreateObject ("scl.Security")
+    fld_user_login            = "admin"
+    fld_user_password         = Security.hash ("admin")
+    fld_user_status           = USERSTATUS_ACTIVE
+    fld_user_showhints        = 1
+    fld_user_surname          = "Administrator"
+    fld_user_forename         = "Default"
+    fld_user_usertypeid       = 1
+    set Security   = Nothing
+    </step>
+    <create object = "user"        />
+
+    <import object = "currency"  purge = "1" />
+    <import object = "emaildef"  purge = "1" />
+    <import object = "prefdef"   purge = "1" />
+    <import object = "language"  purge = "1" />
+    <step>
+    return_to_parent
+    </step>
+</handler>
+
+<invoke macro = "reload_modules" />
+</screen>

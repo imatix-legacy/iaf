@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<config description = "UltraSource Unicode Email Daemon configuration">
+    <main
+        run          = "0"
+        schedule     = "1"
+        service_name = "usemailu"
+        service_text = "UltraSource Unicode Email Daemon"
+        debug        = "1"
+        trace_file   = "usemailu.log"
+    />
+    <email
+        sender = "pascal@imatix.com"
+        server = "127.0.0.1"
+        cc     = ""
+        bcc    = "Mutsumi.Fukui@manpowerinc.com"
+        to     = ""
+    />
+    <!--email
+        sender = "pascal@imatix.com"
+        server = "mail.imatix.net"
+        cc     = ""
+        bcc    = "pascal@imatix.com"
+    /-->
+    <database
+        dsn      = "apdb"
+        user     = "sa"
+        password = ""
+    />
+</config>

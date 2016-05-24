@@ -1,0 +1,7 @@
+*.exe
+*.ncb
+*.ilk
+*.opt
+*.plg
+Release
+Debug

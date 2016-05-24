@@ -1,0 +1,192 @@
+<!--  PREFDEF  -->
+
+<screen object = "prefdef" style = "list"   item = "Preference Definition" hints = "0" />
+<screen object = "prefdef" style = "create" item = "Preference Definition" />
+<screen object = "prefdef" style = "detail" item = "Preference Definition" />
+
+<!--  PREFVAL  -->
+
+<screen object = "prefdef"
+        style  = "list"
+        item   = "Preference Value"
+        name   = "prefval_list"
+        view   = "byname"
+        detail = "prefval_detail" >
+
+<use object = "prefdef" />
+<use object = "prefval" />
+
+<handler event = "on_fetch" >
+    <step>
+    xml_save = pxml.value
+    fld_prefval_prefdefname = fld_prefdef_name
+    </step>
+    <query name = "byname" object = "prefval" limit = "1" control = "eq" >
+    <empty>
+    fld_prefval_value = "(default) " & fld_prefdef_default
+    fld_prefval_id    = 0
+    </empty>
+    </query>
+    <step>
+    '   We need to restore our position in the prefdef XML
+    '   Note that query_index is only set for queries where limit &gt; 1
+    pxml.value = xml_save
+    pxml.item_first_child
+    for counter = 1 to query_index
+        pxml.item_next
+    next
+    </step>
+</handler>
+
+<page view = "summary">
+<form>
+<summary>
+    <field name = "prompt" object = "prefdef" label = "Preference" />
+    <field name = "value"  object = "prefval" view = "detail" />
+</summary></form>
+<handler event = "on_select" replace = "1" >
+    prefdef_pass_key
+    Session ("prefval_id") = fld_prefval_id
+    chain_to "prefval_detail"
+</handler>
+</page>
+</screen>
+
+<!--  Create/update preference setting -->
+<screen name = "prefval_detail" >
+
+<use object = "prefdef" />
+<use object = "prefval" />
+<var name = "fld_textboxvalue" />
+<var name = "fld_textvalue"    />
+
+<handler event = "on_init" >
+    prefdef_recv_key
+    fld_prefval_id = Session ("prefval_id")
+    <fetch object = "prefdef" view = "detail" />
+    <step>
+    <if condition = "fld_prefval_id &gt; 0">
+        <fetch object = "prefval" view = "detail" />
+    </if>
+    <if condition = "fld_prefval_id = 0">
+        fld_prefval_value       = fld_prefdef_default
+        fld_prefval_prefdefname = fld_prefdef_name
+    </if>
+    </step>
+</handler>
+
+<page title = "Preference Setting" name = "detail" view = "detail" >
+<form mode = "input">
+  <hints>
+  <hint>You can change the default value for the preference.</hint>
+  <hint>You can also click on 'Reset' to reset the preference to its default value.</hint>
+  </hints>
+  <text>&lt;table&gt;&lt;tr&gt;&lt;td&gt;</text>
+  <field name = "prompt" object = "prefdef" attr = "plain" />
+  <text>:</text>
+  <if condition = "fld_prefdef_textbox = 1" >
+      <text before = "1" />
+      <field name = "textboxvalue" label = "" type = "textbox" rows = "8" >
+      <rule>
+      fld_textboxvalue = fld_prefval_value
+      </rule>
+      </field>
+  </if>
+  <if condition = "fld_prefdef_textbox = 0" >
+      <field name = "textvalue" label = "" >
+      <rule>
+      fld_textvalue = fld_prefval_value
+      </rule>
+      </field>
+      <if condition = "fld_prefdef_iscolor = 1" >
+      <text>&lt;/td&gt;&lt;td&gt;&lt;table border=1&gt;&lt;tr&gt;
+      &lt;td bgcolor=&lt;%=fld_prefval_value%&gt;&gt;&amp;nbsp;</text>
+      <action name = "color" text = "Select" hint = "Select color" type = "link" />
+      <text>&amp;nbsp;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</text>
+      </if>
+  </if>
+  <text>&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</text>
+  <text before = "1" />
+  <field name = "hints"   object = "prefdef" attr = "plain" />
+  <if condition = "fld_prefval_id = 0">
+      <text before = "1">The above setting is a default value.  Default values are
+      taken from the preference defaults. To fix the preference setting
+      for this company, so that the global default no longer applies, click 'Apply'.
+      If you are happy to use the default value, click 'Cancel'.
+      </text>
+  </if>
+  <text before = "1" />
+  <action name = "apply"  fields = "1"  hint = "Apply preference" />
+  <action name = "cancel" getdata = "0" join = "1" />
+  <action name = "reset"  toolbar = "1" join = "1" hint = "Set to default value" />
+</form>
+
+<handler event = "on_getdata" >
+    if fld_prefdef_textbox = 1 then
+        fld_prefval_value = fld_textboxvalue
+    else
+        fld_prefval_value = fld_textvalue
+    end if
+</handler>
+
+<handler action = "apply">
+    <if condition = "fld_prefval_id &gt; 0">
+    <update object = "prefval"/>
+    </if>
+    <if condition = "fld_prefval_id = 0">
+    <create object = "prefval"/>
+    </if>
+    <step>
+    Session (fld_prefval_prefdefname) = fld_prefval_value
+    return_to_parent
+    </step>
+</handler>
+
+<handler action = "color">
+    Session ("color") = fld_prefval_value
+    chain_to "color_chooser"
+</handler>
+
+<handler action = "cancel" >
+    return_to_parent
+</handler>
+
+<handler action = "reset" >
+    <delete object = "prefval" >
+    <ok>return_to_parent</ok>
+    </delete>
+</handler>
+
+</page>
+<handler event = "on_return">
+    fld_prefval_value = Session ("color")
+</handler>
+</screen>
+
+
+<screen name = "color_chooser">
+<page name = "chooser" title = "Browser-Safe Color chooser" >
+<form>
+  <hints>
+  <hint>This grid shows the full set of so-called 'browser-safe' colors.
+  These are the colors that are guaranteed to show correctly on all PCs.
+  </hint>
+  <hint>Technically speaking, these colors plus the 16 standard Windows
+  colors form a palette that even a 256-color display can show.</hint>
+  <hint>If you are uncertain of the capabilities of your users' PCs,
+  stick to these colors.  If you are certain that all your users have
+  modern PCs, you can use the full range of colors (not shown here).
+  </hint>
+  <hint>To select a color, click on it.  Hover the mouse over a color
+  to see its hex code.
+  </hint>
+  <hint>Netscape browsers will not show this table correctly.</hint>
+  </hints>
+  <text script = "colorbox.gsl" />
+</form>
+<handler event = "on_click" >
+    Session ("color") = click_field
+    return_to_parent
+</handler>
+</page>
+</screen>

@@ -1,0 +1,52 @@
+<table name = "user" description = "Application User" >
+    <field name = "id"          domain = "recordid"  >Record id</field>
+    <field name = "login"       domain = "shortname" >Login name</field>
+    <field name = "password"    domain = "shortname" >Hashed password
+        <rule name = "show" when = "all" what = "hidden" value = "1" />
+    </field>
+    <field                      domain = "fullname" />
+    <field                      domain = "address"  />
+    <field                      domain = "phonefax" />
+    <field name = "usertypeid"  domain = "id"        >User type</field>
+    <field name = "language"    domain = "language"  >Preferred language</field>
+    <field name = "datefmt"     domain = "datefmt"   >Preferred date format</field>
+    <field name = "moneyfmt"    domain = "moneyfmt"  >Default currency format</field>
+    <field name = "email"       domain = "email"     >E-mail address</field>
+    <field name = "lastlogin"   domain = "timestamp" >Last login
+        <rule name = "timestamp" when = "insert" />
+    </field>
+    <field name = "status"      domain = "userstatus">Current status</field>
+    <field name = "moduleid"    domain = "id"        >Last used module</field>
+    <field name = "showhints"   domain = "boolean"   >Screen shows hints?</field>
+    <field name = "timeslogin"  domain = "int"       >Total logins</field>
+    <field name = "failures"    domain = "int"       >Failed logins</field>
+    <field                      domain = "audit"    />
+
+    <index name = "bylogin" >
+        <field name = "login"      />
+    </index>
+    <index name = "byname">
+        <field name = "surname"    />
+        <field name = "forename"   />
+    </index>
+    <index name = "byusertype">
+        <field name = "usertypeid" />
+        <field name = "surname"    />
+        <field name = "forename"   />
+    </index>
+    <index name = "bymodule">
+        <field name = "moduleid"   />
+    </index>
+
+    <link type = "reference" table = "usertype"/>
+    <link type = "reference" table = "module"  />
+    <link type = "reference" table = "language"><field name = "language" /></link>
+</table>
+
+<domain name = "userstatus" type = "numeric" size = "2" default = "1" >
+    <rule name = "show" when = "all" what = "select" value = "radio" />
+    <value key = "1"  label = "Active"              />
+    <value key = "2"  label = "Disabled"            />
+    <value key = "3"  label = "Invited"             />
+</domain>
+

@@ -1,0 +1,55 @@
+/*  CREATE_DYN
+ *
+ *  This style implements a 'create' detail screen with a form component.
+ *  It requires that the detail query and view used have the same name, e.g.
+ *  'detail'.
+ */
+function style_create_dyn ()
+    screen.view   ?= "detail"
+    screen.initial = "create"
+    xml '
+<style>
+<use object = "$(object)" />
+<var name   = "form_data" />
+<var name   = "form_id"   />
+<handler event = "on_global" source = "sub_formio.asp" />
+<handler event = "on_init">
+    form_fetch Session ("form_parent_name"), Session ("form_parent_id"), Session ("form_object_name"), ""
+    form_data = ""
+    form_id   = Session ("form_id")
+</handler>
+<handler event = "on_return">
+    Session ("form_id") = form_id
+</handler>
+
+<page title = "Create New $(item:)" name = "create" view = "create">
+<form mode = "input">
+  <hints>
+  <hint>To create a new $(item), enter the values indicated and click Ok.</hint>
+  <hint>After you have created the $(item), you can easily edit it as necessary.</hint>
+  <hint>Required fields are shown in bold text - you must supply these.</hint>
+  </hints>
+  <layout>
+    <field name = "*" />
+    <text join = "1">&lt;% form_display "input", cur_userid, "" %&gt;</text>
+    <action name = "create" toolbar = "1" text = "Ok" fields = "1" hint = "Create a new $(item)" />
+    <action name = "cancel" join = "1" />
+  </layout>
+</form>
+<handler event = "on_getdata">
+    form_accept check_required_fields
+</handler>
+<handler action = "create">
+    fld_$(object)_formdata = form_data
+    <create>
+        <ok>return_to_parent</ok>
+    </create>
+</handler>
+<handler action = "cancel" getdata = "0">
+    return_to_parent
+</handler>
+</page>
+</style>
+'
+endfunction
+

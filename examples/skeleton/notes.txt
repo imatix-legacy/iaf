@@ -1,0 +1,7 @@
+Move to admin menus:
+
+Check use of _adm in sys_user.pfl etc
+
+Make fully independent dynform system
+    - abstract notion of filtered fields?
+    - who can see what fields

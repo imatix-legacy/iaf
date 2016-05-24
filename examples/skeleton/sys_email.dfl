@@ -1,0 +1,67 @@
+<table name = "emaildef" description = "E-mail Context Definitions" >
+ Defines the global set of e-mail contexts, with their default values.
+ The list of e-mail contexts is determined by the application.
+    <field name = "context"     domain = "shortname">E-mail context
+        <rule name = "show" when = "all"    what = "case"     value = "upper" />
+        <rule name = "show" when = "all"    what = "required" value = "1" />
+    </field>
+    <field name = "name"        domain = "longname" >Descriptive name</field>
+    <field name = "subject"     domain = "longname" >Default subject</field>
+    <field name = "body"        domain = "longtext" >Default body
+        <rule name = "show" when = "layout" what = "rows" value = "14" />
+        <rule name = "show" when = "layout" what = "cols" value = "70" />
+        <rule name = "show" when = "all"    what = "html" value = "1" />
+    </field>
+    <field name = "recipients"  domain = "longtext" >Recipients list</field>
+    <field name = "hidden"      domain = "boolean"  >Sent in background?</field>
+    <field name = "locked"      domain = "boolean"  >Fixed e-mail header</field>
+    <field name = "hints"       domain = "longtext" >User guidelines</field>
+    <field                      domain = "audit"   />
+    <index name = "primary">
+        <field name = "context" />
+    </index>
+</table>  
+
+<table name = "emailqueue" description = "E-mail Queue" >
+ Holds e-mails waiting to be sent.  The contents of the e-mail are held in
+ the emaillog table.
+    <field name = "id"          domain = "recordid" >Record id</field>
+    <field name = "sendat"      domain = "timestamp">When to send</field>
+    <field name = "emaillogid"  domain = "id"       >Entry in e-mail log</field>
+    <field                      domain = "audit"   />
+    <link type = "reference" table = "emaillog"    />
+    <index name = "bydate">
+        <field name = "sendat"  />
+    </index>
+</table>
+
+<table name = "emaillog" description = "E-mail Log" >
+ Holds all sent e-mails.  E-mails are created both here and in the e-mail
+ queue (for queued mails).  When a queued mail is sent, the e-mail log is
+ updated.  Records in this table cannot be deleted or modified on-line.
+    <field name = "id"          domain = "recordid" >Record id</field>
+    <field name = "context"     domain = "shortname">Parent context</field>
+    <field name = "sender"      domain = "id"       >Sending user</field>
+    <field name = "recipients"  domain = "shortname">To</field>
+    <field name = "tolist"      domain = "longtext" >Full recipient list</field>
+    <field name = "subject"     domain = "longname" >Subject</field>
+    <field name = "body"        domain = "longtext" >Body text</field>
+    <field name = "status"      domain = "pending"  >E-mail status</field>
+    <field name = "message"     domain = "longtext" >Error message</field>
+    <field name = "sentat"      domain = "timestamp">When sent</field>
+    <field                      domain = "audit"   />
+    <link type = "childof"   table = "emaildef"  ><field name = "context"/></link>
+    <link type = "reference" table = "user"      ><field name = "sender" /></link>
+    <index name = "bydate">
+        <field name = "sentat"      order = "desc" />
+    </index>
+</table>
+
+<domain name = "pending" type = "numeric" size = "2" >
+    <value key = "1"  label = "Queued"     />
+    <value key = "2"  label = "Sent"       />
+    <value key = "3"  label = "Requeued"   />
+    <value key = "4"  label = "Failed"     />
+    <value key = "5"  label = "Cancelled"  />
+</domain>
+

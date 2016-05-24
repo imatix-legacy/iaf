@@ -1,0 +1,12 @@
+<object name = "form" >
+    <view name = "create">
+        <field name = "objectname"  hidden = "1" />
+        <field name = "parentname"  hidden = "1" />
+        <field name = "parentid"    hidden = "1" />
+        <field name = "comments"    >
+            <rule name = "show" when = "layout" what = "showsize" value = "40" />
+        </field>
+    </view>
+    <query name = "byobject" index = "byobject" view = "detail"   />
+</object>
+

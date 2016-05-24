@@ -1,0 +1,257 @@
+<screen name = "sys_admin" style = "menu" 
+    sidebar_left  = "sidebarleft_lite.gif" 
+    sidebar_right = "sidebarright_lite.gif" >
+
+<page name = "sysadmin_system" title = "System Administration">
+<form>
+    <hints>
+    <hint>These are the system administration tools.</hint>
+    <hint>Misuse of these tools can cause the application to malfunction.
+    Do not use these tools unless you know what you are doing.</hint>
+    <hint>Please choose a tool, or click 'Done' to return.</hint>
+    </hints>
+    
+    <choice text = "Outgoing E-mail Queue">
+        chain_to "emailqueue_list"
+    </choice>
+    <choice text = "E-mail History Log">
+        chain_to "emaillog_rolist"
+    </choice>
+    <line/>
+
+    <choice text = "Reload Module Definitions">
+        reload_modules
+    </choice>
+    <choice text = "Reload E-Mail Contexts">
+        reload_emaildef
+    </choice>
+    <choice text = "Reload Preferences Contexts">
+        reload_prefdef
+    </choice>
+    <choice text = "Reload Language Definitions">
+        reload_language
+    </choice>
+    <choice text = "Reload Currency Definitions">
+        reload_country
+    </choice>
+    <line/>
+
+    <choice text = "Manage Module Definitions">
+        chain_to "module_rolist"
+    </choice>
+    <choice text = "Manage E-Mail Contexts">
+        chain_to "emaildef_list"
+    </choice>
+    <choice text = "Manage Preference Contexts">
+        chain_to "prefval_list"
+    </choice>
+    <choice text = "Manage Language Definitions">
+        chain_to "language_list"
+    </choice>
+    <choice text = "Manage Currency Definitions">
+        chain_to "currency_list"
+    </choice>
+</form>
+</page>
+<invoke macro = "reload_modules" />
+
+<use object = "emaildef" />
+<use object = "prefdef"  />
+<use object = "prefval"  />
+<use object = "language" />
+<use object = "currency" />
+<handler event = "on_global">
+sub reload_emaildef
+    <import object = "emaildef" purge = "1" />
+    <step>
+end sub
+
+sub reload_prefdef
+    </step>
+    <import object = "prefdef" purge = "1" />
+    <import object = "prefval" purge = "1" />
+    <step>
+end sub
+
+sub reload_language
+    </step>
+    <import object = "language" purge = "1" />
+    <step>
+end sub
+
+sub reload_currency
+    </step>
+    <import object = "currency" purge = "1" />
+    <step>
+end sub
+</step>
+</handler>
+</screen>
+
+<macro name = "reload_modules">
+<use object = "module"      />
+<use object = "modulerole"  />
+<use object = "userrole"    />
+<handler event = "on_global" >
+sub reload_modules
+    dim tab_found_module         (100)
+    dim tab_found_modulerole     (100)
+    dim tab_module_id            (100)
+    dim tab_module_homepage_xml  (100)
+    dim tab_module_name_xml      (100)
+    dim tab_modulerole_id        (100)
+    dim tab_modulerole_module_id (100)
+    dim tab_modulerole_short_xml (100)
+    dim tab_modulerole_long_xml  (100)
+    dim tab_modulerole_desc_xml  (100)
+
+    for index = 1 to 100
+        tab_found_module          (index) = 0
+        tab_found_modulerole      (index) = 0
+        tab_module_id             (index) = 0
+        tab_module_homepage_xml   (index) = " "
+        tab_module_name_xml       (index) = " "
+        tab_modulerole_id         (index) = 0
+        tab_modulerole_module_id  (index) = 0
+        tab_modulerole_short_xml  (index) = " "
+        tab_modulerole_long_xml   (index) = " "
+        tab_modulerole_desc_xml   (index) = " "
+    next
+
+    <!-- first load xml data into tables and update the existing items and delete what doesn'n exist any more -->
+    set xml = Server.CreateObject ("scl.XMLstore")
+    xml.load Server.mappath (".") & "\modules.xml"
+    if xml.valid then
+        module_count_xml = 0
+        xml.item_root
+        xml.item_first_child
+        do while xml.valid
+            module_count_xml = module_count_xml + 1
+            tab_module_name_xml     (module_count_xml) = xml.attr ("name")
+            tab_module_homepage_xml (module_count_xml) = xml.attr ("homepage")
+            xml.item_next
+        loop
+
+        <query object = "module" name = "byname" control = "first">
+            <each>
+                flag_delete = 1
+                for index_module = 1 to module_count_xml 
+                    if fld_module_homepage = tab_module_homepage_xml (index_module) and fld_module_name = tab_module_name_xml (index_module) then
+                        flag_delete = 0
+                        tab_module_id (index_module) = fld_module_id
+                    end if
+                next
+                if flag_delete = 1 then
+                    <save>
+                    <delete object = "module"/>
+                    </save>
+                    <step>
+                end if
+                </step>
+            </each>
+        </query>
+
+        <step>
+        module_count_new_id  = 100
+        module_count_xml     = 0
+        modulerole_count_xml = 0
+        xml.item_root
+        xml.item_first_child
+        do while xml.valid
+            module_count_xml    = module_count_xml    + 1
+            module_count_new_id = module_count_new_id + 1
+            xml.item_first_child
+            do while xml.item_name = "modulerole" and xml.valid
+                modulerole_count_xml = modulerole_count_xml + 1
+                if tab_module_id (module_count_xml) = 0 then
+                    tab_module_id (module_count_xml) = module_count_new_id
+                end if
+                tab_modulerole_module_id  (modulerole_count_xml) = tab_module_id (module_count_xml)
+                tab_modulerole_short_xml  (modulerole_count_xml) = xml.attr ("shortname"   )
+                tab_modulerole_long_xml   (modulerole_count_xml) = xml.attr ("longname"    )
+                tab_modulerole_desc_xml   (modulerole_count_xml) = xml.attr ("description" )
+           
+                xml.item_next  
+            loop
+            xml.item_parent   
+            xml.item_next
+        loop
+        </step>
+        
+        <query object = "modulerole" name = "bymodule" control = "first">
+            <each>
+                 flag_delete = 1
+                 for index_modulerole = 1 to modulerole_count_xml 
+                     if fld_modulerole_shortname = tab_modulerole_short_xml (index_modulerole) and fld_modulerole_moduleid = tab_modulerole_module_id (index_modulerole) then
+                         flag_delete = 0
+                         tab_modulerole_id (index_modulerole) = fld_modulerole_id
+                         if fld_modulerole_longname &lt;&gt; tab_modulerole_long_xml (index_modulerole) or fld_modulerole_description &lt;&gt; tab_modulerole_desc_xml (index_modulerole) then
+                             fld_modulerole_longname    = tab_modulerole_long_xml (index_modulerole)
+                             fld_modulerole_description = tab_modulerole_desc_xml (index_modulerole)
+                             tab_modulerole_id (index_modulerole)  = fld_modulerole_id
+                             <save>
+                             <update object = "modulerole"/>
+                             </save>
+                         <step>
+                         end if
+                     end if
+                 next
+                 if flag_delete = 1 then
+                    </step>
+                    <save>
+                    <delete object = "modulerole"/>
+                    </save>
+                    <step>
+                 end if
+                 </step>
+            </each>
+        </query>
+
+        <step>
+        xml.free
+        set xml = Nothing
+    end if
+
+    apdb.execute "update dbmodulerole set dbactive = 0 " _
+               & "where (select count (*) from dbmodule " _
+               & "where dbmodule.dbid = dbmodulerole.dbmoduleid and dbmodule.dbactive = 1) = 0"
+                  
+    apdb.execute "update dbuserrole set dbactive = 0 " _
+               & "where (select count (*) from dbmodule " _
+               & "where dbmodule.dbid = dbuserrole.dbmoduleid and dbmodule.dbactive = 1) = 0"
+               
+    apdb.execute "update dbuserrole set dbactive = 0 " _
+               & "where (select count (*) from dbmodulerole " _
+               & "where dbmodulerole.dbid = dbuserrole.dbmoduleroleid and dbmodulerole.dbactive = 1) = 0"
+    <!-- end loading xml data into tables and deleting non existing items -->
+
+    <!-- now adding new items : module & moduleroles -->
+    for index_module = 1 to module_count_xml
+        if tab_module_id (index_module) &gt; 100 then
+            fld_module_name     = tab_module_name_xml     (index_module)
+            fld_module_homepage = tab_module_homepage_xml (index_module)
+            </step>
+            <create object = "module"/>
+            <step>
+            fld_modulerole_moduleid = fld_module_id
+        else
+            fld_modulerole_moduleid = tab_module_id (index_module)
+        end if
+        
+        for index_modulerole = 1 to modulerole_count_xml
+            if  tab_modulerole_module_id (index_modulerole) = tab_module_id (index_module) _
+            and tab_modulerole_id (index_modulerole) = 0 then
+                fld_modulerole_shortname   = tab_modulerole_short_xml (index_modulerole)
+                fld_modulerole_longname    = tab_modulerole_long_xml  (index_modulerole)
+                fld_modulerole_description = tab_modulerole_desc_xml  (index_modulerole)
+                </step>
+                <create object = "modulerole"/>
+                <step>
+            end if   
+        next
+    next
+    <!-- end adding new item -->
+end sub
+</step>
+</handler>
+</macro>

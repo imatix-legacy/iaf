@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<config description = "UltraSource Email Daemon configuration">
+    <main
+        run          = "1"
+        schedule     = "1"
+        service_name = "usemail"
+        service_text = "UltraSource Email Daemon"
+        debug        = "1"
+        trace_file   = "usemail.log"
+    />
+    <email
+        sender = "sender@mycompany.com"
+        server = "smtp.mycompany.com"
+        cc     = ""
+        bcc    = ""
+    />
+    <database
+        dsn      = "apdb"
+        user     = "sa"
+        password = ""
+    />
+</config>

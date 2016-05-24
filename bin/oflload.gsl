@@ -1,0 +1,474 @@
+#
+#   oflload.gsl - Load DFL file and de-normalise it
+#
+#   Written: 1999/12/24  Pieter Hintjens <ph@imatix.com>
+#   Revised: 2000/10/01  Pieter Hintjens <ph@imatix.com>
+#
+#-----------------------------------------------------------------------
+    function ofl_load (oflfile)
+#
+#   Loads and validates a ofl file as a child of the root scope, called
+#   "ofl".  Implicitly loads and validates the corresponding DFL
+#   file.
+#-----------------------------------------------------------------------
+
+if ! exists (oflfile)
+    abort "$(oflfile) not found"
+else
+    xml from oflfile 
+endif
+
+if count (root.dfl) = 0
+    dflfile = root-> ofl.dfl? root-> ofl.name + ".dfl" 
+    dfl_load (dflfile)
+endif
+echo "Loading and processing $(oflfile)..."
+for root.dfl
+for root.ofl
+
+#   Include everything from <include> files - we'll shoot duplicates later
+for [include]
+    xml to ofl from filename
+    for ofl.ofl
+        abort "$(filename) is not a valid include file - use <inherit>"
+    endfor
+endfor
+
+#   Inherit classes from <inherit> files
+for inherit
+    xml from filename
+    if count (ofl) = 0
+        abort "$(filename) is not a valid - inherited files must contain ofl entity"
+    endif    
+    for ofl as inheritapp
+        for class as inheritclass where count (ofl.class, count.name ?= inheritclass.name) = 0
+            copy inheritclass to ofl
+        endfor
+    endfor
+    delete inherit-> ofl
+endfor
+
+#   Validate and flesh-out objects
+for object
+    if count (ofl.object, count.name ?= object.name) > 1
+        abort "Object '$(name)' is defined more than once"
+    endif
+
+    #   To determine which class we use for the
+    #   object, we look first at the 'class' attribute for the object.  If
+    #   this is not specified, we see if the root table has a rule called
+    #   'apply' when = 'object', what = 'class'.  If this is not there, we
+    #   look for the first OFL class with the attribute default="1".
+    if ! defined (object.class)
+        for ofl.class where default ?= "1"
+            object.class = class.name
+            last
+        endfor
+    endif
+    if count (ofl.class, count.name ?= object.class) = 0
+        abort "Object '$(object.name)' class '$(object.class:)' not defined"
+    endif
+
+    #   Inherit class information
+    for ofl.class where name = object.class
+        #   Inherit views
+        for view as class_view
+            if count (object.view, count.name ?= class_view.name) = 0
+                copy class_view to object
+            endif
+            for object.view where name = class_view.name
+                view.read   ?= class_view.read?
+                view.write  ?= class_view.write?
+                view.delete ?= class_view.delete?
+            endfor
+        endfor
+        #   Inherit queries
+        for query as class_query
+            if count (object.query, count.name ?= class_query.name) = 0
+                copy class_query to object
+            endif
+        endfor
+    endfor
+
+    #   Check and process views
+    if ! defined (object.root_table)
+        object.root_table = object.name
+    endif
+    if count (dfl.table, count.name ?= root_table) = 0
+        abort "$(object.name) root table '$(root_table)' does not exist"
+    endif
+
+    for view
+        #   If view is sameas another, copy it
+        if defined (view.sameas)
+            for object.view as copyview where name ?= sameas
+                for . as child
+                    copy child to view
+                endfor
+            endfor
+        endif
+    endfor
+
+    for view
+        view.read   ?= 1
+        view.write  ?= 1
+        view.delete ?= 1
+        if ! defined (view.name)
+            abort "View in $(object.name) needs a name - consider 'detail' and 'summary'"
+        endif
+        if count (object.view, count.name ?= view.name) > 1
+            abort "View '$(name)' exists more than once in $(object.name)"
+        endif
+
+        #   Add table around view fields
+        new table to view
+            table.name = root_table
+            table.type = "root"
+            for view.field
+                move field to table
+            endfor
+            process_table_fields ()
+
+            #   Process required fields list
+            for field            
+                if count (object.require) \
+                &  count (object-> require.field, count.name ?= field.name)
+                    field.required = 1
+                endif
+            endfor
+        endnew
+    endfor
+    
+    if defined (errors)
+        abort "Errors in OFL - aborting code generation"
+    endif
+
+    #   Inherit all rules from root table to object
+    for dfl.table where name = root_table
+        object.item ?= table.description
+        for rule where when = "object"
+            define object.$(rule.name:c) = 1
+            copy rule to object
+        endfor
+    endfor
+    if child_only ?= 1
+        abort "Table $(root_table) may not be used as an object root table"
+    endif
+
+    #   Check and process queries and subselect
+    for query
+        if ! defined (query.name)
+            abort "Query must be named - suggest you use 'summary'"
+        endif
+        query.view  ?= query.name
+        query.index ?= "primary"
+        if count (object.query, count.name ?= query.name) > 1
+            abort "Query '$(name)' exists more than once in $(object.name)"
+        endif
+        if count (object.view, count.name ?= query.view) = 0
+            abort "Query '$(name)' uses an undefined view '$(view)' in $(object.name)"
+        endif
+        for dfl.table where name = root_table
+            if count (index, count.name ?= query.index) = 0
+                abort "Query '$(name)' uses an undefined index '$(index)' in $(object.name)"
+            endif
+        endfor
+        for subselect as subsel
+            for object.subselect where name = subsel.name & !defined (have_type)
+                # Process using of subselect
+                using_index = 1
+                while defined (using$(using_index))
+                    found_using = 0
+                    for object.view where name = query.view                
+                        for table where type = "root"
+                            for field where name = subselect.using$(using_index)
+                                subselect.using$(using_index)_type = field.type
+                                subselect.using$(using_index)_size ?= field.size?
+                                subselect.using$(using_index)_real = field.realname
+                                found_using = 1
+                            endfor
+                        endfor
+                    endfor
+                    if found_using = 0
+                        abort "Error in subselect '$(subselect.name)': Using '$(subselect.using$(using_index))' not found in view '$(query.view)'"
+                    endif
+                    subselect.using$(using_index)_original = subselect.using$(using_index)
+                    using_index += 1
+                endwhile                
+
+                # Process Fetch
+                for subselect.field as sfield
+                    found_fetch = 0
+                    for object.view where name = query.view                
+                        for table where type = "root"
+                            for field where name = sfield.name
+                                sfield.type  = field.type?"textual"
+                                sfield.size ?= field.size?30
+                                found_fetch = 1
+                            endfor
+                        endfor
+                    endfor
+                    if found_fetch = 0
+                        abort "Error in subselect '$(subselect.name)': Fetch '$(sfield.name)' not found in view '$(query.view)'"
+                    endif
+                endfor
+                subselect.have_type = 1
+
+                # Process Argument of subselect
+                if !defined (subselect.have_argument)
+                    for subsel.pass
+                        subselect.$(argument)          ?= query.$(argument)?
+                        subselect.$(argument)_original ?= query.$(argument)?
+                        subselect.$(argument)_type     ?= query.$(argument)_type?"numeric"
+                        subselect.$(argument)_size     ?= query.$(argument)_size?30
+                    endfor
+                    subselect.have_argument = 1
+                endif
+            endfor
+        endfor
+    endfor
+
+    # Populate inherit field value
+    for inherit
+        for field
+            field.target ?= field.source
+            for dfl.table as dbtable where name = inherit.table
+                for dbtable.field as dbfield where name = field.source
+                    field.type     ?= dbfield.type
+                    field.size     ?= dbfield.size?
+                    field.realname ?= dbfield.realname
+                    field.decs     ?= dbfield.decs?
+                endfor
+            endfor
+            for dfl.table as dbtable where name = root_table
+                for dbtable.field as dbfield where dbfield.name ?= field.target
+                    field.t_type     = dbfield.type
+                    field.t_size     = dbfield.size?
+                    field.t_realname = dbfield.realname
+                    field.t_decs     = dbfield.decs?
+                endfor
+            endfor
+            field.link_type ?= "link"
+            if !defined (field.t_realname)
+                abort "Inherited field '$(field.target)' not found in $(object.name)"
+            endif                
+            if !defined (field.realname)
+                abort "Inherited field '$(field.source)' not found in $(inherit.table)"
+            endif                
+        endfor
+        for dfl.table as dbtable where name = root_table
+            for link where table = inherit.table
+                copy link to inherit
+            endfor
+        endfor
+        for link
+            for field
+                for dfl.table as dtable where name = object.root_table
+                    for dtable.field as dfield where name = field.name
+                        field.type  = dfield.type
+                        field.size ?= dfield.size?
+                        field.decs ?= dfield.decs?
+                    endfor
+                endfor
+            endfor
+        endfor
+        for dfl.table as dbtable where name = inherit.table
+            inherit.table_realname = dbtable.realname
+        endfor
+        for dfl.table as dbtable where name = object.root_table
+            inherit.table_root_realname = dbtable.realname
+        endfor
+        inherit.have_type_link = 0
+        for field where link_type = "link"
+            inherit.have_type_link = 1
+        endfor
+        for ofl.object as obj where name = inherit.table
+            obj.have_inherit_update = 1
+        endfor
+        object.have_inherit = 1
+        
+        function_param = ""
+        for link
+          comma = ""
+          for field
+            function_param = comma + realname
+            comma = ", "
+          endfor
+        endfor
+        inherit.function_param = function_param
+
+        # check if inherit field is in the view
+        for object.view
+            have_inherit = view.have_inherit?0
+            have_this_inherit = 0
+            for view.table
+              for table.field
+                  for inherit.field as ifield where ifield.target = field.name
+                      have_inherit      = 1
+                      have_this_inherit = 1
+                  endfor
+              endfor
+            endfor
+            if have_this_inherit
+                copy inherit to view
+            endif
+            view.have_inherit = have_inherit
+        endfor
+    endfor
+endfor object
+endfor ofl
+endfor dfl
+endfunction
+
+#-----------------------------------------------------------------------
+    function process_table_fields ()
+    
+#   Local function used to expand and process view tables (recursive)
+#-----------------------------------------------------------------------
+    if count (dfl.table, count.name ?= table.name) = 0
+        abort "View requires a table called '$(table.name)'"
+    else
+        for dfl.table as dbtable where name = table.name
+            table.realname = dbtable.realname
+        endfor
+    endif
+
+    #   Construct SELECT statement for table
+    table.select = ""
+    comma = ""
+    for dfl.table as dbtable where name = table.name
+        if count (table.field) = 0
+            #   View table contains no field items - means 'use all'
+            select += "*"
+            comma = ","
+            for field as dbfield where ! defined (group)
+                if count (rule, name = "ignore" & when = "object") = 0 \
+                |  required ?= 1
+                    copy dbfield to table
+                endif
+            endfor
+        else
+            #   Ensure all DFL required fields are in view
+            for field as dbfield where dbfield.required ?= 1 by dbfield.size
+                if count (table.field, count.name ?= dbfield.name) = 0
+                    new field to table
+                        field.name = dbfield.name
+                        field.auto = 1          #   Added automatically
+                    endnew
+                endif
+            endfor
+
+            # Set field calculated flag
+            for table.field
+                if !defined (field.calculated)
+                    field.calculated = 0
+                endif
+            endfor    
+            #   Resolve group fields in table
+            for table.field as field where field.calculated = 0
+                #   It's a group if we have a table field with the same name
+                #   and the 'group' attribute set.  The table field name may
+                #   be empty, in which case we look at the domain name.
+                for dbtable.field as dbfield where \
+                ( dbfield.name ?= field.name | domain ?= field.name) \
+                & dbfield.group ?= 1
+                    for dfl.domain where name = dbfield.domain
+                        for domain.field as grpfield
+                            new field to table as newfield before field
+                                newfield.name       = (dbfield.name?"") + grpfield.name
+                                newfield.required   = field.required?
+                                newfield.calculated = 0
+                            endnew
+                        endfor
+                    endfor
+                    delete field
+                    last
+                endfor
+            endfor
+            #   Add field names to SELECT statement
+            for table.field as field where field.calculated = 0
+                for dbtable.field as dbfield where dbfield.name ?= field.name
+                    if ! defined (dbfield.realname)
+                        abort "Error: " + dbtable.name + ":" + field.name
+                    endif
+                    field.domain     = dbfield.domain?
+                    field.type       = dbfield.type?
+                    field.size       = dbfield.size?
+                    field.decs       = dbfield.decs?
+                    field.default   ?= dbfield.default?
+                    field.realname   = dbfield.realname?
+                    field.calculated = 0
+                    field.           = dbfield.?
+                    for . as child
+                        copy child to field
+                    endfor
+                endfor
+                
+                if defined (field.realname)
+                    select += comma + field.realname
+                else
+                    echo "$(object.name): '$(field.name)' does not exist in $(dbtable.name) table"
+                    root.errors = 1
+                endif
+                comma = ", "
+            endfor
+            for table.field where calculated ?= "1"
+                field.realname  = field.name
+                field.type     ?= "textual"
+                if type = "textual"
+                    field.default ?= ""
+                else
+                    field.default ?= "0"
+                endif
+            endfor
+        endif
+        #   Ensure all DFL required fields are marked by 'dbrequired'
+        for field as dbfield where dbfield.required ?= 1
+            for table.field where name ?= dbfield.name
+                field.dbrequired = 1
+            endfor
+        endfor
+    endfor
+
+    #   Indicator field tells the presentation layer whether this data instance
+    #   is filled or not.  By default (and until further work), the indicator
+    #   field is set to the first numeric field, if any.  Such a field
+    #   *must* be defined with zero as 'unspecified'.
+    for field
+        if type = "numeric"
+            table.indicator ?= field.name           #   If not already defined
+        endif
+       
+        for table as subtable
+            #   Look for reference links in parent table in dfl
+            for dfl.table as dbtable where name = table.name
+                for link where table = subtable.name & (type = "reference" | type = "childof" | type = "multiplex")
+                    subtable.type = "lookup"
+                    subtable.target = link-> field.target_realname
+                endfor
+            endfor
+
+            #   look for childof links in child table in dfl
+            for dfl.table as dbtable where name = subtable.name
+                for link where table = table.name & (type = "childof" | type = "multiplex")
+                    subtable.type    = "child"
+                    subtable.target  = link-> field.realname
+                    subtable.occurs ?= 10
+                endfor
+            endfor
+
+            if defined (subtable.type)
+                for dfl.table where name = subtable.name
+                    subtable.realname = table.realname
+                endfor
+            else
+                abort "$(subtable.name) is inaccessible from $(table.name)"
+            endif
+        endfor
+
+        for table 
+            process_table_fields ()
+        endfor
+    endfor
+endfunction
+

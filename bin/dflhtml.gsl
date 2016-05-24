@@ -1,0 +1,89 @@
+#
+#   dflhtml.gsl - generate HTML reference from DFL tree
+#
+#   Written: 2000/04/08  Pieter Hintjens <ph@imatix.com>
+#   Revised: 2001/01/04  Rob Judd <rob@imatix.com>
+#
+
+function generate_html ()
+    for root.dfl
+        echo "Creating $(name).htm..."
+        output name + ".htm"
+        generate_dfl_header  ()
+        generate_table_index ()
+        for table
+            generate_table_layout ()
+        endfor
+        generate_dfl_footer  ()
+        close
+    endfor
+endfunction
+
+.macro generate_dfl_header  ()
+<html><head><title>$(description:)</title></head>
+<style><!--
+th         {font: small    Arial,Helvetica; color:white}
+td         {font: x-small  Arial,Helvetica; color:black}
+a.index    {font: xx-small Arial,Helvetica; color:green; text-decoration:none}
+a.navig    {font: bold x-small Arial,Helvetica; color:white; text-decoration:none}
+a:hover    {color:blue; text-decoration:underline; background-color:white;}
+--></style>
+.endmacro
+
+.macro generate_table_index ()
+<a name="top">&nbsp</a>
+.for table by name
+<a class="index" href="#$(table.name)">$(table.name)</a>
+.endfor
+<hr>
+.endmacro
+
+.macro generate_table_layout ()
+.detail_color1 = "#e0eee0"
+.detail_color2 = "#ffffff"
+<table width=100% border=0 cellspacing=0 cellpadding=0>
+<a name="$(table.name)">&nbsp;</a>
+<a name="table_$(index ())">&nbsp;</a>
+<tr bgcolor=black>
+<th colspan=2 align=left>
+    &nbsp;<b>$(table.name) - $(table.description:)</b>
+</th>
+<td align=right>
+.if index () > 1
+    <a class="navig" href="#table_$(index () - 1)">&lt;&lt;</a>
+.endif
+.if index () < count (dfl.table)
+    <a class="navig" href="#table_$(index () + 1)">&gt;&gt;</a>
+.endif
+    <a class="navig" href="#top">Top</a>
+</tr>
+.color = detail_color1
+.for field where defined (field.name) & defined (field.type)
+<tr bgcolor=$(color)>
+<td width=25% >
+    &nbsp;<b>$(field.name)</b>
+</td>
+<td width=60%>
+    $(field.?:)
+</td>
+<td width=15%>
+    $(field.type?) $(field.size?)&nbsp;
+</td>
+</tr>
+.if color = detail_color1
+.   color = detail_color2
+.else
+.   color = detail_color1
+.endif
+.endfor
+</table>
+.endmacro
+
+.macro generate_dfl_footer ()
+<hr>
+.for table by name
+<a class="index" href="$(table.name)">$(table.name)</a>
+.endfor
+</body></html>
+.endmacro
+

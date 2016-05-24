@@ -1,0 +1,224 @@
+<!--    EMAILDEF        -->
+
+<screen object = "emaildef" style  = "select" item = "E-Mail Context" hints = "0" >
+<invoke macro = "emaildef_summary" />
+</screen>
+
+<screen object = "emaildef" style = "list"    item = "E-Mail Context" hints = "0" >
+<invoke macro = "emaildef_summary" />
+</screen>
+
+<macro name = "emaildef_summary" >
+  <page>
+   <form>
+    <summary>
+    <field name = "context"  />
+    <field name = "name"     />
+    <field name = "subject"  />
+    </summary>
+   </form>
+  </page>
+</macro>
+
+<screen object = "emaildef" style = "create"  item = "E-Mail Context" hints = "0" />
+<screen object = "emaildef" style = "detail" item = "E-Mail Contexts" hints = "0" />
+
+
+<!--    EMAILQUEUE       -->
+
+<screen object = "emailqueue" style = "list" hints = "0" item = "E-mail Queue" >
+<use object = "emailqueue" />
+<use object = "emaillog"   />
+<var name = "fld_recipients" />
+<var name = "fld_subject"    />
+<var name = "fld_bodysize"   />
+
+<handler event  = "on_init" replace = "1" >
+<query name = "summary">
+<empty>
+    cur_message = "E-mail queue is empty"
+    return_to_parent
+</empty>
+</query>
+</handler>
+
+<handler event = "on_fetch" >
+    fld_recipients = choptext (fld_emailqueue_emaillogid_recipients, 30)
+    fld_subject    = choptext (fld_emailqueue_emaillogid_subject,    30)
+    fld_bodysize   = len (fld_emailqueue_emaillogid_body)
+</handler>
+
+<page><form>
+<summary>
+    <field name = "id"         label = "Id" hidden = "0" />
+    <field name = "sendat"     />
+    <field name = "recipients" label = "To"          />
+    <field name = "subject"    label = "Subject"     />
+    <field name = "bodysize"   label = "Size, bytes" />
+    <action name = "purge"  label = "" hint = "Purge e-mail from queue" />
+</summary>
+</form>
+<handler action = "purge" >
+    list_select_item
+    fld_emaillog_id = fld_emailqueue_emaillogid
+    <fetch object = "emaillog" >
+    <ok>
+    fld_emaillog_status = PENDING_CANCELLED
+    <update object = "emaillog" />
+    </ok>
+    </fetch>
+    <delete object = "emailqueue" />
+    <query  object = "emailqueue" />
+</handler>
+<handler event = "on_select" replace = "1" >
+Session ("id") = fld_emailqueue_emaillogid
+chain_to "emaillog_browse"
+</handler>
+</page>
+</screen>
+
+
+<!--    EMAILLOG         -->
+
+<screen object  = "emaillog" style = "rolist"
+        hints   = "0"
+        detail  = "emaillog_browse">
+<handler event  = "on_init" replace = "1" >
+<query name = "summary" >
+<empty>
+    cur_message = "E-mail log is empty"
+    return_to_parent
+</empty>
+</query>
+</handler>
+</screen>
+
+<screen object = "emaillog" style = "browse" hints = "0" />
+
+
+<!--
+    Send email with interactive confirmation
+
+    Session ("email_recipients")    Number of recipients
+    Session ("email_address")       List of addresses to send to
+    Session ("email_sendat")        Date/time for each recipient
+    Session ("email_context")       Email context
+ -->
+
+<screen name = "email" hints = "0" >
+<use object = "emaillog"    />
+<use object = "emailqueue"  />
+<use object = "emaildef"    />
+
+<var name = "fld_addtext"   />
+
+<handler event = "on_global" >
+'   Get dispatch tables from calling program
+address    = Session ("email_address")
+sendat     = Session ("email_sendat")
+recipcount = Session ("email_recipients")
+
+sub queue_email_and_exit
+    fld_emaillog_body    = fld_emaillog_body & chr(13) & symbols.substitute (Session ("EMAILFOOTER"))
+    fld_emaillog_context = Session ("email_context")
+    fld_emaillog_sender  = cur_userid
+    fld_emaillog_status  = PENDING_QUEUED
+    fld_emaillog_message = ""
+    fld_emaillog_sentat  = 0
+
+    for index = 1 to recipcount
+        fld_emaillog_recipients = address (index)
+        <create object = "emaillog">
+          <ok>
+            Session ("emaillog_id")   = fld_emaillog_id
+            fld_emailqueue_emaillogid = fld_emaillog_id
+            fld_emailqueue_sendat     = sendat (index)
+            <create object = "emailqueue"/>
+          </ok>
+        </create>
+    <step>
+    next
+    Session ("email_sent") = 1
+    return_to_parent
+end sub
+</step>
+</handler>
+
+<handler event = "on_init">
+    set Symbols = Nothing
+    set Symbols = Session ("email_symbols")
+    Session ("email_sent") = 0
+    fld_emaildef_context = Session ("email_context")
+    fld_emaillog_tolist  = address (1)
+    for index = 2 to recipcount
+        fld_emaillog_tolist = fld_emaillog_tolist & ", " & address (index)
+    next
+
+    <fetch object = "emaildef" >
+    <ok>
+    fld_emaillog_subject = symbols.substitute (fld_emaildef_subject)
+    fld_emaillog_body    = symbols.substitute (fld_emaildef_body)
+    if fld_emaildef_hidden = 1 then
+        queue_email_and_exit
+    elseif fld_emaildef_locked = 1 then
+        cur_page = "lockedcontext"
+    else
+        cur_page = "freecontext"
+    end if
+    </ok>
+    <missing>
+    fld_emaildef_name    = Session ("email_context")
+    fld_emaillog_subject = fld_emaildef_name
+    fld_emaillog_body    = "Please enter a suitable message here"
+    cur_message          = "No context definition found for this e-mail"
+    </missing>
+    </fetch>
+</handler>
+
+<!--------------------------------------------------------------------
+    This page lets the user send an e-mail within a specified context.
+    The user can freely modify the subject and body of the e-mail.  
+ -->
+<page name = "freecontext" title = "Compose E-Mail Message" view = "detail" >
+<form mode = "input"><layout>
+<field name = "name"        object = "emaildef" label = "E-mail context" attr = "plain" />
+<field name = "tolist"      object = "emaillog" label = "To"       attr = "plain" />
+<field name = "subject"     object = "emaillog" label = "Subject"  required = "1" />
+<field name = "body"        object = "emaillog" label = "Message"  required = "1" 
+       type = "textbox" rows = "15" cols = "70" cursor = "1" />
+<action name = "send" toolbar = "1" fields = "1" />
+<action name = "cancel" join = "1" confirm = "Cancel the current operation?" />
+</layout></form>
+<handler action = "send">
+    queue_email_and_exit
+</handler>
+</page>
+
+<!--------------------------------------------------------------------
+    This page lets the user send an e-mail within a specified context.
+    The subject and initial body of the e-mail are fixed, but the user
+    can append some text to the body. 
+ -->
+<page name = "lockedcontext" title = "Compose E-Mail Message" view = "detail" >
+<form mode = "input"><layout>
+<field name = "name"        object = "emaildef" label = "E-mail context" attr = "plain" />
+<field name = "tolist"      object = "emaillog" label = "To"       attr = "plain" />
+<field name = "subject"     object = "emaillog" label = "Subject"  attr = "plain" />
+<field name = "body"        object = "emaillog" label = "Message"  attr = "plain" />
+<field name = "addtext"     object = "emaillog" label = "Additional text"
+       type = "textbox" rows = "5" cols = "70" />
+<action name = "send" toolbar = "1"/>
+<action name = "cancel" join = "1" confirm = "Cancel the current operation?" />
+</layout></form>
+<handler action = "send">
+    fld_emaillog_body = fld_emaillog_body & chr(13) & fld_addtext
+    queue_email_and_exit
+</handler>
+</page>
+
+<handler action = "cancel">
+    return_to_parent
+</handler>
+
+</screen>
+

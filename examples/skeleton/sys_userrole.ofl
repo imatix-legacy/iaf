@@ -1,0 +1,30 @@
+<object name = "userrole">
+    <view name = "create" >
+       <field name = "moduleid" >
+          <table name = "module" >
+            <field name = "name" />
+          </table>
+       </field>
+       <field name = "usertypeid" >
+          <table name = "usertype" >
+            <field name = "name" />
+          </table>
+       </field>
+       <field name = "moduleroleid" >
+          <table name = "modulerole" >
+            <field name = "shortname" />
+            <field name = "longname"  />
+          </table>
+       </field>
+    </view>
+
+    <query name = "bymodule"  index = "bymodule"  view = "summary" />
+    <query name = "byrole"    index = "byrole"    view = "summary" />
+
+   <require>
+      <field name = "moduleid"     />
+      <field name = "usertypeid"   />
+      <field name = "moduleroleid" />
+  </require>            
+</object>
+

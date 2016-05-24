@@ -1,0 +1,27 @@
+<table name = "modulerole" description = "Module Role" >
+    <field name = "id"          domain = "recordid" >Record id</field>
+    <field name = "moduleid"    domain = "id"       >Module</field>
+    <field name = "shortname"   domain = "shortname">Role abbreviation
+        <rule name = "show" when = "all" what = "case" value = "upper" />
+    </field>
+    <field name = "longname"    domain = "shortname">Role name</field>
+    <field name = "description" domain = "comments" >Description   
+        <rule name = "show" when = "all" what = "truncate" value = "0" />
+    </field>
+    <field                      domain = "audit"   />
+
+    <link type = "childof" table = "module"><field name = "moduleid" /></link>
+
+    <index name = "bymodule">
+        <field name = "moduleid"      />
+        <field name = "shortname"     />
+        <field name = "id"            />
+    </index>
+
+    <index name = "byroleshort">
+        <field name = "shortname"     />
+    </index>
+</table>
+
+
+

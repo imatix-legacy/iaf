@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<config 
+    description = "iafStep Daemon configuration">
+    <main
+        run             = "1"
+        schedule        = "10"
+        service_name    = "iafstep"
+        service_text    = "Manpower Ultrasource DataExchange Daemon"
+        debug           = "1"
+        trace_file      = "iafstep.log"
+        resend          = "1"
+    />      
+
+    <email>
+        <smtp
+            server   = "192.168.1.4"
+        />
+        <pop3
+            server   = "192.168.1.4"
+            user     = "usdx"
+            password = "TrKi@;07"
+        />
+        <!-- Alert is used to send system error report -->
+        <alert
+            to       = "systeme@manpowerinc.be"
+            sender   = "ultrasource@manpowerinc.be"
+        />
+    </email>
+
+    <directory
+            to_send      = "d:\us25\app\ja\out"
+            when_receive = "in"
+    />
+    <sender
+        name         = "usdx"
+        private_key  = "usdx_priv.cert"
+    />
+
+    <recipient name     = "usdx">
+        <transport type = "email">usdx@manpowerinc.be</transport>
+        <key>usdx_pub.cert</key>
+    </recipient>
+
+    <recipient name     = "digisheet">
+        <transport type = "email">nishi@aspex.co.jp</transport>
+        <key>digisheet_pub.cert</key>
+    </recipient>
+</config>
+

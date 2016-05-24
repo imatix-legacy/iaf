@@ -1,0 +1,6 @@
+*.htm
+*.dll
+*.ilk
+lib
+scl.ncb
+scl.opt

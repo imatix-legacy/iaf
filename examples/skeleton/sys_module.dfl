@@ -1,0 +1,12 @@
+<table name = "module" description = "Application module">
+ Application modules.
+    <field name = "id"       domain = "recordid" >Record id</field>
+    <field name = "name"     domain = "shortname">Module name</field>
+    <field name = "homepage" domain = "shortname">Welcome page</field>
+    <field                   domain = "audit"   />
+    <index name = "byname">
+        <field name = "name" />
+        <field name = "id"   />
+    </index>
+</table>
+

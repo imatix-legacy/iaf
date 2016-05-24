@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<config description = "UltraSource email daemon configuration">
+    <main
+        run          = "1"
+        schedule     = "30"
+        service_name = "usemail"
+        service_text = "UltraSource Email Daemon"
+        debug        = "1"
+        trace_file   = "usemail.log"
+    />
+    <email
+        sender = "USGL2000@na.manpower.com"
+        server = "technical.manpower.com"
+        cc     = ""
+        bcc    = ""
+    />
+    <database
+        dsn      = "usdemo"
+        user     = "ultrasource"
+        password = "ultrasource"
+    />
+</config>

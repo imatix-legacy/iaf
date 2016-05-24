@@ -1,0 +1,1467 @@
+#############################################################################
+#   oflobjc.gsl - Generate OFL object handlers from OFL file
+#                 in C using ODBC
+#
+#############################################################################
+include "dflsql.gsl"
+
+#############################################################################
+    function generate_c_objects
+#
+#   Generates object handlers for the ofl (C/ODBC).
+#
+#############################################################################
+for root.dfl
+for root.ofl
+    set_sql_target ("odbc")
+save root-> dfl as "testout.dfl"
+for object where build
+    # Sort field to place memo field at end 
+    for view
+        sort_view_field ()
+    endfor
+#   set view to update
+    for view where write = 1
+      if defined (sameas)
+        for object.view as objview where objview.name = view.sameas
+          objview.update_view = 1
+        endfor
+      else
+        view.update_view = 1
+      endif
+    endfor
+
+    object.handler ?= root_table
+    echo "Generating $(handler).c..."
+    output "$(handler).c"
+        do_handler_header   ()
+        do_handler_create   ()
+        do_handler_update   ()
+        do_handler_delete   ()
+        do_handler_fetch    ()
+        do_handler_query    ()
+#        do_handler_inherit  ()
+    close
+    echo "Generating $(handler).h..."
+    output "$(handler).h"
+        do_handler_include  ()
+    close
+endfor object
+endfor ofl
+endfor dfl
+
+endfunction
+
+function sort_view_field 
+    for table
+        for field
+            if !defined (size)
+                field.size = 30
+            endif
+         endfor
+         sort table.field by size 
+         for field
+             sort_view_field ()
+         endfor
+    endfor
+endfunction
+
+#############################################################################
+.macro do_handler_header ()
+.############################################################################
+/*  ----------------------------------------------------------------<Prolog>-
+    Name:       $(handler).c
+    Title:      Handler of object $(handler)
+
+    Application: $(ofl.name)
+    Generated:   $(date) $(time)
+    Script by:   iMatix Corporation <info@imatix.com>
+
+    The oa_do_$(name) function implements the object access layer for the
+    $(name) object.  This function accepts one argument - an OAL (object
+    access language) string, and returns an OAL string as reply.  Returns
+   "" if there was an internal error, such as a lack of available memory.
+
+    The xml string returned must be free by mem_free function.
+    ---------------------------------------------------------------</prolog>-*/
+#include "sfl.h"
+#include <sqlext.h>
+#include "$(handler).h"
+
+/*- Definiton ---------------------------------------------------------------*/
+
+#define XML_SET_CURRENT(item_name)                                            \\
+    child = xml_first_child (item);                                           \\
+    while (child) {                                                           \\
+        if (xml_item_name (child)                                             \\
+        &&  lexcmp (xml_item_name (child), item_name) == 0)                   \\
+            break;                                                            \\
+        child = xml_next_sibling (child);                                     \\
+    }
+
+/*- functions declaration ---------------------------------------------------*/
+Bool oa_create_$(object.name)   (OFLODBCCTX *ctx);
+Bool oa_update_$(object.name)   (OFLODBCCTX *ctx);
+Bool oa_fetch_$(object.name)    (OFLODBCCTX *ctx);
+Bool oa_delete_$(object.name)   (OFLODBCCTX *ctx);
+Bool oa_query_$(object.name)    (OFLODBCCTX *ctx);
+.for view where update_view ?= 1
+Bool oa_update_$(object.name)_$(view.name) (OFLODBCCTX *ctx);
+.endfor
+.for query
+Bool oa_query_$(object.name)_$(query.name) (OFLODBCCTX *ctx);
+.endfor
+
+/*- Main function -----------------------------------------------------------*/
+char *
+oa_do_$(handler) (const char *oal_message, OFLODBCCTX **context,
+                  const char *connect_string)
+{
+    char
+        buffer [500],
+        *command,
+        *feedback = NULL;
+    OFLODBCCTX
+        *ctx;
+    XML_ITEM
+        *item;
+    int
+        load_rc;
+    Bool
+        rc;
+
+    /* Set context value                                                     */
+    if (context == NULL)
+        return (NULL);
+
+    if (*context == NULL)
+      {
+        *context = oflodbc_alloc_context (oal_message, connect_string);
+        ctx = *context;
+      }
+    else
+      {
+        ctx = *context;
+        if (ctx-> oal)
+          {
+            xml_free (ctx-> oal);
+            ctx-> oal = NULL;
+          }
+        load_rc = xml_load_string (&ctx-> oal, oal_message, TRUE);
+        if (load_rc != XML_NOERROR)
+          {
+            ctx-> err_code = load_rc;
+            strcpy (ctx-> err_message, xml_error ());
+            xml_free (ctx-> oal);
+            ctx-> oal = NULL;
+          }
+       
+      }
+
+    if (ctx-> result)
+      {
+        xml_free (ctx-> result);
+        ctx-> result = NULL;
+      }
+
+    if (ctx-> connection == NULL
+    ||  ctx-> oal        == NULL)
+      {
+        sprintf (buffer, "<oal done=\\"error\\" cause = \\"oa\\" message=\\"%s\\"/>",
+                 ctx-> err_message);
+        return (mem_strdup (buffer));
+      }
+    /* Get command value                                                     */
+    item = xml_first_child (ctx-> oal);
+    if (item)
+        command = xml_get_attr (item, "do", "");
+    else
+        command = "";
+
+    if (lexcmp (command, "query") == 0)
+        rc = oa_query_$(object.name)  (ctx);
+    else
+    if (lexcmp (command, "update") == 0)
+        rc = oa_update_$(object.name) (ctx);
+    else
+    if (lexcmp (command, "fetch") == 0)
+        rc = oa_fetch_$(object.name)  (ctx);
+    else
+    if (lexcmp (command, "create") == 0)
+        rc = oa_create_$(object.name) (ctx);
+    else
+    if (lexcmp (command, "delete") == 0)
+        rc = oa_delete_$(object.name) (ctx);
+
+    if (rc == FALSE)
+      {
+        sprintf (buffer, "<oal done=\\"error\\" cause =\\"oa\\" message=\\"%s\\"/>",
+                 ctx-> err_message);
+        feedback = mem_strdup (buffer);
+      }
+    else
+    if (ctx-> result)
+      {
+        item = xml_first_child (ctx-> result);
+        if (item)
+            feedback = xml_save_string (item);
+      }
+
+    return (feedback);
+}
+
+.endmacro
+
+#############################################################################
+/*****************************************************************************
+    Create a new object.  The data provided must match the 'create' view.
+    Data that is provided in the OAL data is stored in the database.
+    Fields that are missing are stored with default values if they are
+    defined as 'required' in the OFL, otherwise they are stored with null
+    values.  Any insert rules override the provided or default values.
+    Creates principal record and any child records provided.
+*/
+.macro do_handler_create   ()
+
+/*  ---------------------- C R E A T E -----------------------------<Prolog>-
+'   Input:
+'           <oal do    = "create"
+'                user  = "userid"
+'              [ id    = "newid" ]
+'                objectdata />
+'   Output:
+'           <oal done = "ok">
+'               <object_name>primary key value </object_name></oal>
+'           <oal done    = "error"
+'                cause   = "db"|"ua"|"id"
+'                message = "error message" />
+    ---------------------------------------------------------------</prolog>-*/
+
+.fctname = "oa_create_$(object.name)"
+.if count (view, name = "create") = 0
+.   abort "No create view exists for $(object.name)"
+.endif
+.for view where name = "create"
+.   for table
+.       generate_create_object ()
+.   endfor
+.endfor
+.endmacro
+
+.-  This macro creates a table and all child tables.
+
+.macro generate_create_object ()
+.## ADD all field needed by insert rule into the view
+.  for dfl.table as dbtable where dbtable.name = table.name
+.    for dbtable.field as dbfield where count (rule, when = "insert")
+.      if count (table.field, name = dbfield.name) = 0
+.        copy dbfield to table
+.          for table.field as dfield where name = dbfield.name
+.              dfield.add4create = 1
+.              dfield.calculated = 0
+.              dfield.size       = dbfield.size?30
+.          endfor
+.      endif
+.    endfor
+.  endfor
+.  if table.type = "root"
+.    fctname = "oa_create_$(object.name)"
+.  else
+'   Create $(TABLE.NAME) record for $(object.name) field $(table.target)
+
+.    fctname = "oa_create_$(object.name)_$(view.name)_$(table.name)_$(table.target)"
+.  endif
+Bool
+$(fctname) (OFLODBCCTX *ctx)
+{
+    Bool
+        feedback = TRUE;
+    char
+       *data,
+       *item_name,
+        sql [2048];
+    XML_ITEM
+        *item,
+        *child;
+    DWORD
+        rc;
+.   for field
+.       declare_field (1)
+.   endfor
+.   for field
+.       set_default_value (1)
+.   endfor
+    /* Get value from oal message                                            */
+    item = xml_first_child (ctx-> oal);
+    if (item)
+      {
+        item = xml_first_child (item);
+        FORCHILDREN (child, item)
+          {
+            item_name = xml_item_name (child);
+            data = xml_item_child_value (child);
+            if (data)
+              {
+                if (strused (data))
+                  {
+.   for field where calculated ?= 0 & count (rule, when = "insert") = 0
+.       if index () <> 1
+                    else
+.       endif
+                    if (lexcmp (item_name, "$(field.name)") == 0)
+.        get_item_value ()
+.   endfor
+                  }
+                 mem_free (data);
+              }
+          }
+      }
+.   for field where calculated ?= 0 & count (rule, when = "insert") > 0
+.       for rule where when = "insert"
+.           if    name = "timestamp"
+    $(realname)         = gmtimestamp_now ();
+.               timestamp_$(object.name)_field      = field.realname
+.           elsif name = "userid"
+    $(realname)         = atol (xml_get_attr (item, "user", "0"));
+.           elsif name = "set" & field.type = "textual"
+    $(realname)         = "$(value)"
+.           elsif name = "set"
+    $(realname)         = $(value);
+.           elsif name = "recordid"
+.            assign_recordid = field.realname
+.            recordid_name   = field.name
+.           else
+.            abort "$(script): unknown rule '$(name)' for '$(field.name)'"
+.          endif
+.        endfor
+.   endfor
+
+   
+    sprintf (sql, "INSERT INTO $(table.realname) ("                          \\
+.   comma = ""  
+.   for field where calculated ?= 0
+                  "$(comma)$(field.realname)"                                \\
+.       comma = ", "
+.   endfor
+.   format = ""
+.   get_field_sprintf_format ("calculated ?= 0", 0)
+                  " ) VALUES ($(format))",
+.   comma = ""  
+.   for field where calculated ?= 0
+                  $(comma)$(field.realname)
+.       comma = ", "
+.   endfor
+             );
+
+    rc = SQLAllocStmt (ctx-> connection, &ctx-> statement);
+    if (rc != SQL_SUCCESS
+    &&  rc != SQL_SUCCESS_WITH_INFO)
+      {
+        oflodbc_check_error (ctx, rc);
+        feedback = FALSE;
+      }
+    if (feedback)
+      {
+        rc = SQLExecDirect (ctx-> statement, sql, SQL_NTS);
+        if (rc != SQL_SUCCESS
+        &&  rc != SQL_SUCCESS_WITH_INFO)
+          {
+            oflodbc_check_error (ctx, rc);
+            feedback = FALSE;
+          }
+        SQLFreeStmt (ctx-> statement, SQL_DROP);
+        ctx-> statement = NULL;
+      }
+
+    if (feedback)
+      {
+            xml_load_string (&ctx-> result, "<oal done = \\"ok\\"><$(table.name)></$(table.name)></oal>", FALSE);
+.           if timestamp_$(object.name)_field <> ""
+            if (ctx-> result)
+              {
+                item = xml_first_child (ctx-> result);
+                if (item)
+                    item = xml_first_child (item);
+                if (item)
+                  {
+                    sprintf (sql, "%f", $(timestamp_$(object.name)_field));
+                    xml_put_attr (item, "revised", sql);
+                  }
+              }
+.           endif            
+      }
+.   for field where type = "textual"
+    if (strused ($(field.realname)))
+        mem_free ($(field.realname));
+.   endfor
+    return (feedback);
+}
+.for table.field as tmpfield where defined (add4create)
+.  delete tmpfield
+.endfor
+.endmacro
+
+#############################################################################
+.macro do_handler_update   ()
+.#############################################################################
+
+/*  -------------------------- U P D A T E  -------------------------<Prolog>-
+   Input:
+           <oal do      = "update"
+                id      = "objectid"
+                revised = "timestamp"
+                user    = "userid"
+                view    = "viewname">
+                object data
+           </oal>
+   Output:
+           <oal done = "ok" />
+           <oal done    = "error"
+                cause   = "nf"|"nv"|"db"|"ua"|"wf"|"ro"|"ac"
+                message = "error message" />
+    ---------------------------------------------------------------</prolog>-*/
+. fctname = "oa_update_$(object.name)"
+Bool
+$(fctname) (OFLODBCCTX *ctx)
+{
+    Bool
+        feedback = FALSE;
+    XML_ITEM
+        *item;
+    char
+        *view;
+    item = xml_first_child (ctx-> oal);
+    if (item)
+        view = xml_get_attr (item, "view", "");
+
+.for view where write ?=1
+.   if index () <> 1
+    else
+.   endif
+    if (lexcmp (view, "$(view.name)") == 0)
+.     if defined (sameas)
+        feedback = oa_update_$(object.name)_$(sameas) (ctx);
+.     else
+        feedback = oa_update_$(object.name)_$(view.name) (ctx);
+.     endif
+.endfor
+    return (feedback);
+}
+
+.for view where update_view ?= 1
+.    for table
+.        generate_update_view ()
+.    endfor
+.endfor
+.endmacro
+
+.macro generate_update_view
+.## ADD all fields needed by update rule into the view
+.  for dfl.table as dbtable where dbtable.name = table.name
+.    for dbtable.field as dbfield where count (rule, when = "update")
+.      if count (table.field, name = dbfield.name) = 0
+.        copy dbfield to table
+.        for table.field as dfield where name = dbfield.name
+.            dfield.add4update = 1
+.            dfield.calculated = 0
+.            dfield.size       = dbfield.size?30
+.        endfor
+.      endif
+.    endfor
+.  endfor
+
+
+/*-- Update for view $(view.name) -------------------------------------------*/
+
+Bool
+oa_update_$(object.name)_$(view.name) (OFLODBCCTX *ctx)
+{
+    Bool
+        feedback = TRUE;
+    char
+       *data,
+       *item_name,
+        sql [2048];
+    XML_ITEM
+        *item,
+        *child;
+    DWORD
+        indicator,
+        rc;
+    double
+        old_revisedts;
+.   for field
+.       declare_field (1)
+.   endfor
+.   for field
+.       set_default_value (1)
+.   endfor
+
+.   timestamp_$(object.name)_field = ""
+.   for field where calculated ?= 0 & count (rule, when = "update") > 0
+.       for rule where when = "update" & name = "timestamp"
+.           timestamp_$(object.name)_field = field.realname
+.       endfor
+.   endfor
+
+    /* Get value from oal message                                            */
+    item = xml_first_child (ctx-> oal);
+    if (item)
+      {
+        item = xml_first_child (item);
+        FORCHILDREN (child, item)
+          {
+            item_name = xml_item_name (child);
+            data = xml_item_child_value (child);
+            if (data)
+              {
+                if (strused (data))
+                  {
+.   for field where calculated ?= 0 & count (rule, when = "update") = 0
+.       if index () <> 1
+                    else
+.       endif
+                    if (lexcmp (item_name, "$(field.name)") == 0)
+.        get_item_value ()
+.   endfor
+                  }
+                 mem_free (data);
+              }
+          }
+      }
+
+.   if timestamp_$(object.name)_field <> ""
+    old_revisedts = atof (xml_get_attr (item, "revised", "0.0"));
+    /* Get current revised timestamp                                         */
+.       format = ""
+.       get_field_sprintf_format ("count (index, name = \"primary\")", 1)
+    sprintf (sql, "SELECT $(timestamp_$(object.name)_field) FROM $(table.realname) WHERE " \\
+                  "$(format)"       
+.       for field where count (index, name = "primary")
+                  , $(field.realname)
+.       endfor
+            );
+    rc = SQLAllocStmt (ctx-> connection, &ctx-> statement);
+    if (rc != SQL_SUCCESS
+    &&  rc != SQL_SUCCESS_WITH_INFO)
+      {
+        oflodbc_check_error (ctx, rc);
+        feedback = FALSE;
+      }
+    if (feedback)
+      {
+        rc = SQLExecDirect (ctx-> statement, sql, SQL_NTS);
+        if (rc != SQL_SUCCESS
+        &&  rc != SQL_SUCCESS_WITH_INFO)
+          {
+            oflodbc_check_error (ctx, rc);
+            feedback = FALSE;
+          }
+      }
+    if (feedback)
+      {
+.        for field where count (rule, name = "timestamp" & when = "update")
+.            bind_field ()
+.        endfor
+         rc = SQLFetch (ctx-> statement);
+         if (rc != SQL_SUCCESS && rc != SQL_SUCCESS_WITH_INFO)
+           {
+             oflodbc_check_error (ctx, rc);
+             feedback = FALSE;
+           }
+         SQLFreeStmt (ctx-> statement, SQL_CLOSE);
+         rc = SQLAllocStmt (ctx-> connection, &ctx-> statement);
+      }
+    if (old_revisedts == $(timestamp_$(object.name)_field))
+      {
+.   endif
+.   for field where calculated ?= 0 & count (rule, when = "update") > 0
+.       for rule where when = "update"
+.           if    name = "timestamp"
+        $(realname)         = gmtimestamp_now ();
+.           elsif name = "userid"
+        $(realname)         = atol (xml_get_attr (item, "user", "0"));
+.           elsif name = "set" & field.type = "textual"
+        $(realname)         = "$(value)"
+.           elsif name = "set"
+        $(realname)         = $(value);
+.           else
+.            abort "$(script): unknown rule '$(name)' for '$(field.name)'"
+.          endif
+.        endfor
+.   endfor
+
+.       format = ""
+.       get_field_sprintf_format ("calculated ?= 0", 1)
+        sprintf (sql, "UPDATE $(table.realname) SET "  \\
+                      "$(format) WHERE "           \\
+.       format = ""
+.       get_field_sprintf_format ("count (index, name = \"primary\")", 1)
+                      "$(format)"
+.       for field where calculated ?= 0
+                      ,$(field.realname)
+.       endfor
+.       for field where count (index, name = "primary")
+                      ,$(field.realname)
+.       endfor
+                );
+
+        rc = SQLExecDirect (ctx-> statement, sql, SQL_NTS);
+        if (rc != SQL_SUCCESS
+        &&  rc != SQL_SUCCESS_WITH_INFO)
+          {
+            oflodbc_check_error (ctx, rc);
+            feedback = FALSE;
+          }
+        else
+          {
+            xml_load_string (&ctx-> result, "<oal done = \\"ok\\"><$(table.name)></$(table.name)></oal>", FALSE);
+.           if timestamp_$(object.name)_field <> ""
+            if (ctx-> result)
+              {
+                item = xml_first_child (ctx-> result);
+                if (item)
+                    item = xml_first_child (item);
+                if (item)
+                  {
+                    sprintf (sql, "%f", $(timestamp_$(object.name)_field));
+                    xml_put_attr (item, "revised", sql);
+                  }
+              }
+.           endif            
+          }
+.   if timestamp_$(object.name)_field <> ""
+      }
+    else
+      {
+        feedback = FALSE;
+        sprintf (ctx-> err_message, "invalid timestamp value: Record modified in database $(table.name) at %f",
+                                    $(timestamp_$(object.name)_field));
+      }
+.   endif   
+    if (ctx-> statement)
+      {
+        SQLFreeStmt (ctx-> statement, SQL_DROP);
+        ctx-> statement = NULL;
+      }
+    /* Free allocated memory for textual field                               */
+.   for field where type = "textual"
+    if (strused ($(field.realname)))
+        mem_free ($(field.realname));
+.   endfor
+    return (feedback);
+}
+.for table.field as tmpfield where defined (add4update)
+.  delete tmpfield
+.endfor
+.endmacro
+#############################################################################
+.macro do_handler_delete   ()
+.#############################################################################
+
+/*  -------------------------- D E L E T E  -------------------------<Prolog>-
+   Input:
+           <oal do   = "delete"
+                user = "userid" />
+           Object value...
+
+   Output:
+           <oal done = "ok"/>
+           <oal done    = "error"
+                cause   = "db"|"ua"|"id"|"wf"
+                message = "error message" />
+    ---------------------------------------------------------------</prolog>-*/
+. fctname = "oa_delete_$(object.name)"
+Bool
+$(fctname) (OFLODBCCTX *ctx)
+{
+    Bool
+        feedback = FALSE;
+    return (feedback);
+}
+
+.endmacro
+
+
+#############################################################################
+.macro do_handler_fetch    ()
+.#############################################################################
+
+/*  -------------------------- F E T C H ----------------------------<Prolog>-
+   Input:
+           <oal do   = "fetch"
+                user = "userid"
+                view = "viewname" >
+            Object data...
+
+   Output:
+           <oal done    = "ok"
+                id      = "objectid"
+                revised = "timestamp"
+                write   = "1"|"0"
+                delete  = "1"|"0"
+                view    = "viewname" >
+                object data
+           </oal>
+           <oal done    = "error"
+                cause   = "nf"|"nv"|"db"|"ua"|"wf"
+                message = "error message" />
+    ---------------------------------------------------------------</prolog>-*/
+. fctname = "oa_fetch_$(object.name)"
+Bool
+$(fctname) (OFLODBCCTX *ctx)
+{
+    Bool
+        feedback = FALSE;
+    return (feedback);
+}
+.endmacro
+
+#############################################################################
+.macro do_handler_query    ()
+.#############################################################################
+/*  -------------------------- Q U E R Y ----------------------------<Prolog>-
+   Input:
+           <oal do       = "query" 
+              [ query    = "queryname" ] 
+              [ control  = "first"|"last"|"gt"|"lt"|"ge"|"le"|"eq" ]
+              [ limit    = "number" ]
+              [ user     = "userid" ] 
+              [ inverted = "0"|"1"  ]  >
+              <object_name><field_name [match = "1"]>field value</field_name></object_name>
+           </oal>
+   Output:
+           <oal done    = "ok"
+                count   = "querysize"
+                view    = "viewname" 
+                write   = "0" | "1"
+                delete  = "0" | "1"
+                <object id = "objectid" revised = "timestamp" >
+                   object data
+                </object>...
+           </oal>
+           <oal done    = "error"
+                cause   = "ns"|"db"|"ua"|"tm"
+                message = "error message" />
+    ---------------------------------------------------------------</prolog>-*/
+. fctname = "oa_query_$(object.name)"
+Bool
+$(fctname) (OFLODBCCTX *ctx)
+{
+    Bool
+        feedback = FALSE;
+    XML_ITEM
+        *item;
+    char
+        *query;
+    item = xml_first_child (ctx-> oal);
+    if (item)
+        query = xml_get_attr (item, "query", "");
+
+.for query
+.   if index () <> 1
+    else
+.   endif
+    if (lexcmp (query, "$(query.name)") == 0)
+        feedback = oa_query_$(object.name)_$(query.name) (ctx);
+.endfor
+    return (feedback);
+}
+.for query
+.    generate_query ()
+.endfor
+.endmacro
+
+.macro generate_query
+.## ADD all fields needed by query into the view
+.     for object.view where name = query.view
+.       for table
+.         for dfl.table as dbtable where dbtable.name = table.name
+.           for dbtable.field as dbfield where count (rule, when = "update" & name = "timestamp")
+.             if count (table.field, name = dbfield.name) = 0
+.               copy dbfield to table
+.               for table.field as dfield where name = dbfield.name
+.                 dfield.add4query  = 1
+.                 dfield.calculated = 0
+.                 dfield.size       = dbfield.size?30
+.                 dfield.decs       = dbfield.decs?0
+.               endfor
+.             endif
+.           endfor
+.         endfor
+.         make_table_select ()
+.       endfor
+.     endfor
+
+
+/*-- Query $(query.name) --------------------------------------------------*/
+
+Bool
+oa_query_$(object.name)_$(query.name) (OFLODBCCTX *ctx)
+{
+    Bool
+        feedback = TRUE;
+    XML_ITEM
+        *result,
+        *child,
+        *item;
+    int
+        rec_count,
+        nb_field,
+        match_nb_field,
+        limit,
+        inverted;
+    Bool
+        have_empty_field,
+        invert_data;
+    char
+        sql [4096],
+        *data,
+        *control;
+.   for object.view where name = query.view
+.   for table
+    DWORD
+.   for field where calculated ?= 0 & type = "textual"
+        $(field.name)_indic,
+.   endfor        
+        rc,
+        indicator;
+.   for field where calculated ?= 0
+.       declare_field (0)
+.   endfor
+.#declare index field, if not in view
+.   for dfl.table as dfltable where dfltable.name = table.name
+.     for index where name = "$(query.index?"primary")" & count (field) > 0
+.       for index.field
+.         if count (table.field, name = field.name) = 0
+.           declare_field (0)
+.         endif
+.       endfor
+.     endfor
+.   endfor 
+.   for field
+.       set_default_value (0)
+.   endfor
+
+    item = xml_first_child (ctx-> oal);
+
+    limit    = atoi (xml_get_attr (item, "limit",    "20"));
+    inverted = atoi (xml_get_attr (item, "inverted", "0"));
+.   arg_index = 1
+.   while defined (arg$(arg_index))
+    $(arg$(arg_index)) = xml_get_attr (item, "$(arg$(arg_index))", "")
+.       arg_index += 1
+.   endwhile
+
+    /*   Set data order flag                                                 */
+    control = xml_get_attr (item, "control", "first");
+
+    if (lexcmp (control, "first") == 0
+    ||  lexcmp (control, "gt")    == 0 
+    ||  lexcmp (control, "ge")    == 0)
+        invert_data = inverted;
+    else
+        invert_data = !inverted;
+
+    nb_field         = 0;
+    match_nb_field   = 0;
+    have_empty_field = FALSE;
+
+    item = xml_first_child (item);
+.       for dfl.table as dfltable where dfltable.name = table.name
+.         for index where name = "$(query.index?"primary")" & count (field) > 0
+.           nb_field_index = count (index.field)
+.           for index.field
+    XML_SET_CURRENT ("$(field.name)")
+    if (child)
+      {
+        data = xml_item_child_value (child);
+        if (data)
+          {
+            if (atoi (xml_get_attr (child, "match", "0")) == 1)
+                match_nb_field++;
+            if  (have_empty_field == FALSE)
+                nb_field++;
+.           if field.type = "textual"
+            strcpy ($(field.realname), data);
+.           elsif decs ?> 0 | type = "timestamp"
+            $(field.realname) = atof (data);
+.           else
+            $(field.realname) = atol (data);
+.           endif
+            mem_free (data);
+          }
+        else
+            have_empty_field = TRUE;
+      }
+.           endfor
+.         endfor
+.       endfor
+
+    if (lexcmp (control, "first") == 0)
+.       query_index (">=", "<=", "false",  "first", query)
+    else
+    if (lexcmp (control, "last") == 0)
+.       query_index ("<=", ">=", "true",   "last", query)
+    else
+    if (lexcmp (control, "gt") == 0)
+.       query_index (">",  "<",  "false",  "match", query)
+    else
+    if (lexcmp (control, "lt") == 0)
+.       query_index ("<",  ">",  "true",   "match", query)
+    else
+    if (lexcmp (control, "ge") == 0)
+.       query_index (">=", "<=", "false",  "match", query)
+    else
+    if (lexcmp (control, "le") == 0)
+.       query_index ("<=", ">=", "true",   "match", query)
+    else
+    if (lexcmp (control, "eq") == 0)
+.       query_index ("=",  "=",  "false",  "match", query)
+
+
+    rc = SQLAllocStmt (ctx-> connection, &ctx-> statement);
+    if (rc != SQL_SUCCESS
+    &&  rc != SQL_SUCCESS_WITH_INFO)
+      {
+        oflodbc_check_error (ctx, rc);
+        feedback = FALSE;
+      }
+    if (feedback)
+      {
+        rc = SQLExecDirect (ctx-> statement, sql, SQL_NTS);
+        if (rc != SQL_SUCCESS
+        &&  rc != SQL_SUCCESS_WITH_INFO)
+          {
+            oflodbc_check_error (ctx, rc);
+            feedback = FALSE;
+          }
+      }
+
+    if (feedback)
+      {
+        xml_load_string (&ctx-> result, "<oal done = \\"ok\\" write = \\"$(view.write)\\" delete = \\"$(view.delete)\\" view = \\"$(view.name)\\"/>", FALSE);
+        if (ctx-> result)
+            result = xml_first_child (ctx-> result);
+        rec_count = 0;
+        do
+          {
+.            for field where calculated ?= 0 by size
+.                bind_field ()
+.            endfor
+             rc = SQLFetch (ctx-> statement);
+             if (rc == SQL_SUCCESS || rc == SQL_SUCCESS_WITH_INFO)
+               {
+.            for field where calculated ?= 0 & type = "textual"
+                 if ($(field.name)_indic < 0)
+                     $(field.name)_indic = 0;
+                 $(realname) [$(field.name)_indic] = '\\0';
+.            endfor
+
+                 if (invert_data = FALSE)
+                     item = xml_new   (result, "$(table.name)", NULL);
+                 else
+                   {
+                     child = xml_first_child (result);
+                     if (child)
+                       {
+                        item = xml_create ("$(table.name)", NULL);
+                        xml_attach_sibling (child, item);
+                       }
+                     else
+                         item = xml_new   (result, "$(table.name)", NULL);
+                   }
+.                for field where calculated ?= 0 & count (rule, when = "update" & name = "timestamp") > 0
+                 sprintf (sql, "%f", $(field.realname));
+                 xml_put_attr (item, "revised", sql);
+.                endfor
+.                for field where calculated ?= 0
+                 child = xml_new (item, "$(field.name)", NULL);
+.                    if type = "textual"
+                 if (child)
+                     xml_new (child, NULL, $(field.realname));
+.                    elsif type = "boolean"
+                 if (child)
+                   {
+                     sprintf (sql, "%d", $(field.realname));
+                     xml_new (child, NULL, sql);
+                   }
+.                    elsif type <> "date" & (decs ?<> 0  | type = "timestamp" | size ?> 9)
+                 if (child)
+                   {
+                     sprintf (sql, "%f", $(field.realname));
+                     xml_new (child, NULL, sql);
+                   }
+.                    else
+                 if (child)
+                   {
+                     sprintf (sql, "%ld", $(field.realname));
+                     xml_new (child, NULL, sql);
+                   }
+.                    endif
+.                endfor                 
+                 rec_count++;
+               }
+             else
+             if (rec_count == 0)
+               {
+                 oflodbc_check_error (ctx, rc);
+                 feedback = FALSE;
+               }
+          } while ((rc == SQL_SUCCESS || rc == SQL_SUCCESS_WITH_INFO) && rec_count <= limit);
+
+        if (result)
+          {
+             sprintf (sql, "%d", rec_count);
+             xml_put_attr (result, "count", sql);
+
+             if (rc != SQL_SUCCESS && rc != SQL_SUCCESS_WITH_INFO)
+                 xml_put_attr (result, "more", "0");
+             else
+                 xml_put_attr (result, "more", "1");
+          }
+        SQLFreeStmt (ctx-> statement, SQL_DROP);
+        ctx-> statement = NULL;
+      }
+    return (feedback);
+}
+.      for table.field as tmpfield where defined (add4query)
+.        delete tmpfield
+.      endfor
+.  endfor
+.  endfor
+.endmacro
+#############################################################################
+.macro do_handler_include    ()
+.#############################################################################
+/*  ----------------------------------------------------------------<Prolog>-
+    Name:       $(handler).h
+    Title:      Handler of object $(handler)
+
+    Application: $(ofl.name)
+    Generated:   $(date) $(time)
+    Script by:   iMatix Corporation <info@imatix.com>
+
+    The oa_do_$(name) function implements the object access layer for the
+    $(name) object.  This function accepts one argument - an OAL (object
+    access language) string, and returns an OAL string as reply.  Returns
+   "" if there was an internal error, such as a lack of available memory.
+
+    The xml string returned must be free by mem_free function.
+    ---------------------------------------------------------------</prolog>-*/
+#ifndef _$(HANDLER)_INCLUDED
+#define _$(HANDLER)_INCLUDED
+#include "oflodbc.h"
+
+/*- Definition --------------------------------------------------------------*/
+.for view where name = "create"
+.for table
+.  for field where count (value)
+
+.    for value
+#define $(HANDLER)_$(FIELD.NAME)_$(LABEL:c)  $(key)
+.    endfor
+.  endfor
+.endfor
+.endfor
+
+/*- Function declaration ----------------------------------------------------*/
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+char *oa_do_$(handler) (const char *oal_message, OFLODBCCTX **ctx,
+                        const char *connect_string);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
+
+.endmacro
+
+#############################################################################
+########################## L O C A L  M A C R O #############################
+#############################################################################
+
+.macro declare_field (pointer)
+.    if type = "numeric"
+.        if decs ?<> 0  | size ?> 9
+    double $(field.realname);
+.        else
+    long   $(field.realname);
+.        endif   
+.    elsif type = "textual"
+.        if (pointer)
+    char  *$(field.realname);
+.        else
+    char   $(field.realname) [$(size) + 1];
+.        endif
+.    elsif type = "date"
+    long   $(field.realname);
+.    elsif type = "time"
+    long   $(field.realname);
+.    elsif type = "timestamp"
+    double $(field.realname);
+.    elsif type = "boolean"
+    short  $(field.realname);
+.    else
+    char  *$(field.realname);
+.    endif
+.endmacro
+
+.macro set_default_value (pointer)
+.    if type = "numeric"
+.        if decs ?<> 0  | size ?> 9
+    $(field.realname)  = 0.0;
+.        else
+    $(field.realname)  = 0;
+.        endif   
+.    elsif type = "textual"
+.        if pointer
+    $(field.realname)  = "";
+.        else
+    *$(field.realname)  = '\\0';
+.        endif
+.    elsif type = "date"
+    $(field.realname)  = 0;
+.    elsif type = "time"
+    $(field.realname)  = 0;
+.    elsif type = "timestamp"
+    $(field.realname)  = 0.0;
+.    elsif type = "boolean"
+    $(field.realname)  = FALSE;
+.    else
+    $(field.realname)  = "";
+.    endif
+.endmacro
+
+.macro get_item_value
+.    if type = "numeric"
+.        if decs ?<> 0  | size ?> 9
+                     $(field.realname)  = atof (data);
+.        else
+                     $(field.realname)  = atol (data);
+.        endif   
+.    elsif type = "textual"
+                     $(field.realname)  = mem_strdup (data);
+.    elsif type = "date"
+                     $(field.realname)  = atol (data);
+.    elsif type = "time"
+                     $(field.realname)  = atol (data);
+.    elsif type = "timestamp"
+                     $(field.realname)  = atof (data);
+.    elsif type = "boolean"
+                     $(field.realname)  = (short)atoi (data);
+.    endif
+.endmacro
+
+function  get_field_sprintf_format (clause, add_name)
+   comma = ""
+   for field where $(clause)
+       if add_name ?= 1
+           format += comma + realname + " = "
+       else
+           format += comma
+       endif
+       if type = "numeric"
+           if decs ?<> 0 | size ?> 9
+               format += "%f"
+           else
+               format += "%ld"
+           endif   
+       elsif type = "textual"
+               format += "'%s'"
+       elsif type = "date"
+               format += "%ld"
+       elsif type = "time"
+               format += "%ld"
+       elsif type = "timestamp"
+               format += "%f"
+       elsif type = "boolean"
+               format += "%d"
+       endif
+       comma = ", "
+   endfor
+endfunction
+
+.macro  bind_field 
+        rc = SQLBindCol (ctx-> statement, $(index ()),
+.       if type = "numeric"
+.           if decs ?<> 0 | size ?> 9
+                         SQL_C_DOUBLE, &$(realname), 0, &indicator);
+.           else
+                         SQL_C_LONG, &$(realname), 0, &indicator);
+.           endif   
+.       elsif type = "textual"
+                         SQL_C_CHAR, &$(realname), $(size + 1), &$(name)_indic);
+.       elsif type = "date"
+                         SQL_C_LONG, &$(realname), 0, &indicator);
+.       elsif type = "time"
+                         SQL_C_LONG, &$(realname), 0, &indicator);
+.       elsif type = "timestamp"
+                         SQL_C_DOUBLE, &$(realname), 0, &indicator);
+.       elsif type = "boolean"
+                         SQL_C_SSHORT, &$(realname), 0, &indicator);
+.       endif
+.endmacro
+
+#############################################################################
+#    Make where clause for index key in query
+#
+function query_index (sign, invert_sign, order_invert, value_type, query)
+#############################################################################
+    delim = " "
+    for dfl.table as dfltable where dfltable.name = table.name
+      for index where name = "$(query.index?"primary")"
+        nb_field = count (index.field)
+#       Make select statement for equal sign
+        if sign = invert_sign
+>            sprintf (sql, "SELECT $(select) FROM $(table.realname) "                    \\
+            delim = " WHERE ( "
+            for field
+                get_query_field_value ("match", "")
+>                  "$(delim:)$(realname:)  =        $(value:)"                           \\
+                delim = " AND "
+            endfor
+            end_of_query_select (order_invert, 0, value_type, query)
+        elsif nb_field > 1
+>            switch (match_nb_field)
+>              {
+          match_index = 0
+          while (match_index < nb_field)
+>                case $(match_index):
+>            sprintf (sql, "SELECT $(select) FROM $(table.realname) "                    \\
+            if match_index = 0
+                delim = " WHERE (( "
+            else
+                delim = " WHERE ( "
+            endif
+#  Generate match field group            
+            for field
+              if index (field) <= match_index
+                get_query_field_value ("match", "")
+>                  "$(delim:)$(realname:)  =        $(value:)"                         \\
+                delim = " AND "
+              endif
+            endfor
+            if (match_index > 0)
+              inter_group = " AND (("
+            else
+              inter_group = " WHERE (("
+            endif
+            inter_field = "      "
+            for field
+              if index () > match_index & value_type = "match"
+                last_index = index ()
+                for index.field as pfield 
+                  if index () > match_index & index () <= last_index
+                    get_query_field_value (value_type, pfield.order?"asc")
+                    if index () < last_index
+>                  "$(inter_group:)$(inter_field:)$(realname:)  =         $(value:)  "     \\
+                    else
+                      if pfield.order ?= "desc"
+>                  "$(inter_group:)$(inter_field:)$(realname:)  $(invert_sign:) $(value:)"  \\
+                      else
+>                  "$(inter_group:)$(inter_field:)$(realname:)  $(sign:)  $(value:)"        \\
+                      endif
+                    endif
+                    inter_group = "      "
+                    inter_field = "  AND "
+                  endif
+                endfor
+                inter_group = ") OR ("
+                inter_field = "      "
+              endif
+            endfor
+            if value_type = "match"
+              if match_index > 0  
+>                  "))" \\
+              else
+>                  ")"  \\
+              endif
+            endif
+            end_of_query_select (order_invert, match_index, value_type, query)
+            match_index += 1
+>                break;
+          endwhile
+>              }
+        else
+>            sprintf (sql, "SELECT $(select) FROM $(table.realname) "                   \\
+          delim = " WHERE ("
+          if value_type = "match"
+            for field
+              get_query_field_value (value_type, field.order?"asc")
+              if field.order ?= "desc"
+>                    "$(delim:)$(realname:) $(invert_sign:)  $(value:)"                 \\
+              else
+>                    "$(delim:)$(realname:) $(sign:)  $(value:)"                        \\
+              endif
+              delim = " AND "
+            endfor
+          endif
+          end_of_query_select (order_invert, 0, value_type, query)
+        endif
+      endfor index
+    endfor dfl.table
+endfunction
+
+function get_query_field_value (value_type, field_order)
+  query_type = value_type
+  if field_order = "desc"
+    if    query_type  = "last"
+        query_type    = "first"
+    elsif query_type  = "first"
+        query_type    = "last"
+    endif
+  endif
+  if type = "textual"
+    if query_type = "last"
+      value  = "'" + ("z" * size?1) + "'"
+    elsif query_type = "first"
+      value = "' '"
+    else
+      value = "'%s'"
+    endif
+  else
+    if query_type = "last"
+      value  = "9" * size?1 
+    elsif query_type = "first"
+      value = "0"
+    else
+      if type = "boolean"
+          value = "%d"
+      elsif decs ?> 0 | type = "timestamp"
+          value = "%f"
+      else
+          value = "%ld"
+      endif
+    endif
+  endif
+endfunction
+
+function end_of_query_select (order_invert, match_index, value_type, query)
+    have_active = 0
+    for dfl.table as dfltable where dfltable.name = table.name
+      for rule where name = "soft delete"
+        for dfltable.field as dflfield where name = rule.what
+          if value_type = "match" | match_index > 0
+              delim = " ) AND"
+          else
+              delim = "WHERE "
+          endif
+          have_active = 1
+>                  "        $(delim) $(dflfield.realname) <> $(rule.value)"               \\
+        endfor
+      endfor
+    endfor
+    if have_active = 0 & (match_index > 0 | value_type = "match")
+>                  " ) " \\
+    endif
+    if defined (query.condition) 
+        if !defined (query.parsed_condition)
+            #  loop for arg1..n
+            arg_index = 1
+            while defined (query.arg$(arg_index))  
+                arg_type = query.arg$(arg_index)_type?"numeric"
+                if arg_type = "textual"
+                    arg$(arg_index) = "'\" & $(arg$(arg_index)) & \"'"
+                else
+                    arg$(arg_index) = "\" & $(arg$(arg_index)) & \""
+                endif
+                arg_index += 1
+            endwhile
+            gsl 'query.parsed_condition = \"$(condition:)\"'
+        endif
+          if value_type = "match" | match_index > 0 | have_active = 1
+              delim = "  AND "
+          else
+              delim = " WHERE "
+          endif
+>                  " $(delim) ($(query.parsed_condition:))"                                \\
+    endif
+    delim = " ORDER BY   "
+    for dfl.table as dfltable where dfltable.name = table.name
+    for dfltable.index where name = "$(query.index?"primary")"
+      if match_index > 0
+        for field
+          if index () = count (index.field)
+            if order_invert = "true"
+              if order ?= "desc"
+                match_order = "ASC"
+              else
+                match_order = "DESC"
+              endif
+             else
+               match_order = field.order?"ASC"
+            endif
+          endif
+        endfor 
+      endif
+    for field
+      if index () <= match_index
+          field_order = match_order
+      else
+        if order_invert = "true"
+          if order ?= "desc"
+            field_order = "ASC"
+          else
+            field_order = "DESC"
+          endif
+        else
+            field_order = field.order?"ASC"
+        endif
+      endif
+>                  "$(delim:)$(realname:) $(FIELD_ORDER)"                           \\
+       delim = "          , "
+    endfor field
+    endfor index
+    endfor dfl.table
+>                  ""
+    for dfl.table as dfltable where dfltable.name = table.name
+      for index where name = "$(query.index?"primary")"
+        if sign = invert_sign
+            for field
+>                  ,$(realname:)
+            endfor
+        elsif nb_field > 1
+          current_index = 0
+            for field
+              if index (field) <= match_index
+>                  ,$(realname:)
+              endif
+            endfor
+            for field
+              if index () > match_index & value_type = "match"
+                last_index = index ()
+                for index.field as pfield 
+                  if index () > match_index & index () <= last_index
+>                  ,$(realname:)
+                  endif
+                endfor
+              endif
+            endfor
+        else
+          if value_type = "match"
+            for field
+>                  ,$(realname:)
+            endfor
+          endif
+        endif
+      endfor index
+    endfor dfl.table
+>                   );
+endfunction
+
+#############################################################################
+function make_table_select
+#############################################################################
+    table.select = ""
+    comma = ""
+    for table.field where calculated ?= 0 by size
+        table.select += comma + realname
+        comma = ", " 
+    endfor
+endfunction

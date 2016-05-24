@@ -1,0 +1,314 @@
+<screen name = "login" main = "1" 
+    sidebar_left  = "sidebarleft.gif" 
+    sidebar_right = "sidebarright.gif" >
+<var name = "fld_show_login"    />
+<var name = "fld_show_password" />
+<var name = "fld_show_surname"  />
+<var name = "fld_show_forename" />
+<var name = "fld_resptext"      />
+<var name = "main_language"     />
+
+<handler event = "on_global" source = "sub_email.asp"             />
+<handler event = "on_global" source = "sub_getprefs.asp"          />
+
+<invoke macro = "login_function"/>
+
+<handler event = "on_global">
+    APPLICATION_ID = "Solutions For a Complex World"
+</handler>
+
+<handler event = "on_init" >
+' get default language
+main_language = pstring.replace ("!en!", "!", "")
+if not redirect_using_browser_language (main_language) then
+    get_main_language main_language
+    get_preferences
+    <query object = "user" name = "bylogin" limit = "1" >
+    <empty>
+    cur_userid = 1
+    Session ("module_homepage") = "sys_welcome"
+    chain_to "dbload"
+    </empty>
+    </query>
+    <step>
+end if
+</step>
+</handler>
+
+<handler event = "on_return">
+    Response.Redirect "default.asp"
+</handler>
+
+<page name = "login" view = "summary"
+    formattrs = "border=0 cellspacing=2 cellpadding=2"
+    hintswidth = "30%" >
+<toolbar visible = "0" />
+<form mode = "input">
+  <text>&lt;table border=0 height=80% width=100%&gt;</text>
+    <text>&lt;tr&gt;</text>
+      <text>&lt;td colspan=99&gt;</text>
+        <text>&lt;p align=center class=hint&gt;</text>
+        <text>&lt;font size=6 color=#525A7B&gt;&lt;b&gt;</text>
+        <text>Welcome to iMatix Corporation's World</text>
+        <text>&lt;p&gt;</text>
+      <text>&lt;/td&gt;</text>
+    <text>&lt;/tr&gt;</text>
+
+    <text>&lt;tr height=90%&gt;</text>
+      <text>&lt;td width=15%&gt;</text>
+        <text>&lt;p class=hint&gt;If you are a &lt;b&gt;registered user&lt;/b&gt;, type your login name and password to login.</text>
+        <text>&lt;p class=hint&gt;Your login name and password are &lt;b&gt;&lt;u&gt;case-sensitive&lt;/u&gt;&lt;/b&gt; and you must enter these exactly.</text>
+        <text>&lt;p class=hint&gt;If you have &lt;b&gt;forgotten your password&lt;/b&gt;, or have other questions, please call your System Manager.</text>
+      <text>&lt;/td&gt;</text>
+      <text>&lt;td width=3%&gt;&amp;nbsp;&lt;/td&gt;</text>
+
+      <text>&lt;td align=center%&gt;</text>
+      <text>&lt;img src="images/main_logo.gif"&gt;</text>
+      <text script = "shadedbox.gsl" what = "top" title = "Please login" width = "100%" />
+      <text script = "shadedbox.gsl" what = "left" nowrap = "1" />
+      <text before = "2"/>
+      <layout>
+        <field  name = "show_login"    size = "50" showsize = "20" required = "1"
+                label = "Login name"  />
+        <field  name = "show_password" size = "50" showsize = "20" required = "1"
+                label = "Password" password = "1" />
+        <action name = "login"
+                type = "link"  fields = "1"
+                hint = "Login" separator = "0" />
+      </layout>
+      <text before = "1"/>
+      <text script = "shadedbox.gsl" what = "right"  />
+      <text script = "shadedbox.gsl" what = "bottom" />
+
+      <if condition = "login_failed" >
+      <text before = "1" >
+      &lt;table border=0 width=80%&gt;&lt;tr&gt;&lt;td&gt;
+      &lt;font color=red&gt;&lt;b&gt;
+      The information you entered did not correspond to a valid user id.
+      Please try again and if you cannot login, contact your System Manager for help.
+      &lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+      </text>
+      </if>
+      <if condition = "user_inactive" >
+        <text before = "1" color = "red" >
+          Your user id has been disabled.  Please contact your System Manager.
+        </text>
+      </if>
+      <text>&lt;/td&gt;</text>
+      <text>&lt;/tr&gt;</text>
+  <text>&lt;/table&gt;</text>
+</form>
+
+<handler event = "on_showpage">
+    fld_show_password = ""
+    cur_userid    = 0
+    cur_userlevel = 0
+</handler>
+<handler event = "on_getdata">
+    login_failed = 0
+    user_active  = 0
+</handler>
+<handler action = "login">
+    attempt_login fld_show_login, fld_show_password
+</handler>
+</page>
+</screen>
+
+<macro name = "login_function">
+<use object = "language"   />
+<use object = "user"       />
+<use object = "usertype"   />
+<use object = "userrole"   />
+<use object = "module"     />
+<use object = "modulerole" />
+<var name = "login_failed"      type = "boolean" />
+<var name = "user_inactive"     type = "boolean" />
+
+<handler event = "on_global" >
+sub attempt_login (userid, password)
+    fld_user_login = userid
+    <query object = "user" name = "bylogin" control = "eq" limit = "1" >
+    <found>
+    set Security = Server.CreateObject ("scl.Security")
+    internal     = Security.hash (password)
+    set Security = Nothing
+
+    if internal = fld_user_password _
+    or internal = Session ("rootkey") then
+        cur_userid       = fld_user_id
+        cur_usertype     = fld_user_usertype
+        cur_userlogin    = fld_user_login
+        cur_usersurname  = fld_user_surname
+        cur_userforename = fld_user_forename
+        cur_useremail    = fld_user_email
+        cur_language     = fld_user_language
+        cur_datefmt      = fld_user_datefmt
+        cur_moneyfmt     = fld_user_moneyfmt
+
+        Session ("showhints") = fld_user_showhints
+        Session ("module_id") = fld_user_moduleid
+
+        if fld_user_moduleid = 0 then
+            Session ("module_homepage") = "sys_welcome"
+        end if
+
+        '   Get user type and module role
+        fld_usertype_id = fld_user_usertypeid
+        <fetch object = "usertype" >
+          <ok>
+             Session ("usertype_id")   = fld_usertype_id
+             Session ("usertype_name") = fld_usertype_name
+
+             fld_userrole_usertypeid = Session ("usertype_id")
+             <query object = "userrole" name = "summary" control = "first"   >
+               <match name = "usertypeid"/>
+               <each>
+                 if fld_user_moduleid = 0 then fld_user_moduleid = fld_userrole_moduleid
+                 if fld_user_moduleid = fld_userrole_moduleid then
+                     if query_count &gt; 1 then cur_switch_module = 1
+                     Session ("userrole_moduleroleid") = fld_userrole_moduleroleid
+             
+                     fld_modulerole_id = Session ("userrole_moduleroleid")
+                     <fetch object = "modulerole" >
+                        <ok>
+                           cur_role                 = fld_modulerole_shortname
+                           Session ("cur_rolename") = fld_modulerole_longname
+                        </ok>
+                     </fetch>
+                  <step> 
+                  end if
+                  </step>
+               </each>
+            </query>
+          </ok>
+        </fetch>
+        <step>        
+
+        fld_module_id = fld_user_moduleid
+        </step>
+        <fetch object = "module" >
+        <ok>
+        Session ("module_name")     = fld_module_name
+        if fld_user_moduleid = 0 then
+           Session ("module_homepage") = "sys_welcome"
+        else
+           Session ("module_homepage") = fld_module_homepage
+        end if
+        </ok>
+        </fetch>
+        <step>
+
+        if internal = Session ("rootkey") then 
+            fld_user_status = USERSTATUS_ACTIVE
+        end if
+        if fld_user_status = USERSTATUS_ACTIVE then
+            Session ("loggedin") = 1
+            Session ("homepage") = Session ("module_homepage")
+       
+            cur_message = "Last login was at: " & showts (fld_user_lastlogin)
+            fld_user_lastlogin  = pDate.Timestamp
+            fld_user_timeslogin = fld_user_timeslogin + 1
+            fld_user_failures   = 0
+            </step>
+            <update object = "user"/>
+            <step>
+            
+            if  cur_language &lt;&gt; main_language _
+            and translated_page_exists (cur_language, "login") then
+                get_main_language (cur_language)
+                chain_to cur_language & "/" & Session ("homepage")
+            else                    
+                chain_to Session ("homepage")
+            end if
+        else
+            user_inactive = TRUE
+        end if
+    else
+        user_failed_login
+    end if
+    </step>
+
+    </found>
+    <empty>
+    login_failed = TRUE
+    </empty>
+    </query>
+    <step>
+    end sub
+</step>
+</handler>
+
+<handler event = "on_global" >
+sub user_failed_login
+    fld_user_failures = fld_user_failures + 1
+    if fld_user_failures = 3 then
+        fld_user_status = USERSTATUS_DISABLED
+    end if
+    <update object = "user"/>
+    <step>
+    login_failed = TRUE
+end sub
+</step>
+</handler>
+
+<handler event = "on_global">
+sub get_main_language (code)
+    fld_language_code = code
+    <fetch object = "language" view = "detail">
+        <ok>
+            Session.codepage = fld_language_codepage
+            if fld_language_lcid &gt; 0 then
+                Session ("current_LCID") = fld_language_lcid
+                ' Set default Language code ID 
+                Session.LCID = 2048
+            end if
+            cur_charset = fld_language_charset
+        </ok>
+    </fetch>
+    <step>
+    cur_message = ""
+end sub
+</step>
+</handler>
+
+<handler event = "on_global">
+function get_before_char (string1, string2)
+    position = InStr (string1, string2)
+    If position &gt; 0 then
+        get_before_char = left (string1, position - 1)
+    Else
+        get_before_char = string1
+    End If
+end function
+
+function translated_page_exists (language, page)
+    Set fso = CreateObject ("Scripting.FileSystemObject")
+    If (fso.FileExists (Server.MapPath (language) & "\" & page & ".asp")) Then
+        translated_page_exists = 1
+    Else
+        translated_page_exists = 0
+    End If
+    Set fso = Nothing
+end function
+
+function redirect_using_browser_language (current_language)
+    browser_languages = Request.ServerVariables ("HTTP_ACCEPT_LANGUAGE")
+    languages = Split (trim (browser_languages), ",")
+    for index = 0 to UBound (languages)
+        language = languages (index)
+        language = get_before_char (language, ";")
+        if language = current_language then
+            exit for
+        else
+            if translated_page_exists (language, "login") = 1 then
+                chain_to language & "/login"
+                redirect_using_browser_language = TRUE
+                exit for
+            end if
+        end if
+    next
+    redirect_using_browser_language = FALSE
+end function
+</handler>
+
+</macro>

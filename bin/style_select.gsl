@@ -1,0 +1,93 @@
+/*  SELECT
+ *
+ *  This style implements a 'lookup' select list screen.  The user can click
+ *  on an item to select it; the selected item is returned to the calling program.
+ *  If the autorun option is set, the screen will automatically return with
+ *  a selected item when the select list contains exactly one item.
+ */
+
+function style_select ()
+    #   Set defaults for called programs
+    screen.view     ?= "summary"
+    screen.query    ?= screen.view
+    screen.emptymsg ?= "There are no $(item) entries to display"
+
+    xml '
+<style>
+<use object = "$(object)" />
+<handler event  = "on_init">
+    autorun = Session ("select_autorun")
+    Session ("select_made")    = 0
+    Session ("select_empty")   = 0
+    Session ("select_autorun") = 0
+    <query name = "$(query)" control = "first">
+      <found>
+        if query_count = 1 and autorun then
+            cur_argval = 1
+            list_on_select_handler
+        end if
+      </found>
+      <empty>
+        cur_message = "$(emptymsg:)"
+        Session ("select_empty") = 1
+        return_to_parent
+      </empty>
+    </query>
+</handler>
+<page title = "Select $(item:)" name = "list" view = "$(view)">
+<toolbar>
+  <action name = "first"    text = "|<"   hint = "Go to the start of the list"  />
+  <action name = "previous" text = "<<"   hint = "Go backwards in the list"     />
+  <action name = "next"     text = ">>"   hint = "Go forwards in the list"      />
+  <action name = "last"     text = ">|"   hint = "Go to the end of the list"    />
+</toolbar>
+<form>
+  <hints>
+  <hint>This screen shows one page of $(item) entries at a time.</hint>
+  <hint>To scroll through the entire list, use the toolbar actions.</hint>
+  <hint>To select a particular $(item), click it.</hint>
+  </hints>
+  <summary>
+  <field name = "*" />
+  </summary>
+  <action name = "next" text = "More..." hint = "Show next page"
+          condition = "query_more" />
+  <action name = "done" />
+</form>
+<handler action = "first"  >
+    <query name = "$(query)" control = "first"    />
+</handler>
+<handler action = "last"   >
+    <query name = "$(query)" control = "last"     />
+</handler>
+<handler action = "next"   >
+    <query name = "$(query)" control = "gt"      >
+    <empty>
+        cur_message = "This is the end of the list.  Click |&lt; to scroll back."
+        <query name = "$(query)" control = "last" />
+    </empty>
+    </query>
+</handler>
+<handler action = "previous">
+    <query name = "$(query)" control = "lt">
+    <empty>
+      <query name = "$(query)" control = "first" />
+    </empty>
+    </query>
+</handler>
+<handler event = "on_select">
+    Session ("select_made") = 1
+    $(object)_pass_item
+    return_to_parent
+</handler>
+<handler action = "done">
+    return_to_parent
+</handler>
+</page>
+<handler event = "on_filter">
+    <query name = "$(query)" />
+</handler>
+</style>
+'
+endfunction
+

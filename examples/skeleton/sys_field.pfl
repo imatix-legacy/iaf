@@ -1,0 +1,193 @@
+<screen object = "field" style = "list"   >
+    <invoke macro = "field"         />
+    <invoke macro = "field_summary" />
+</screen>
+
+<screen object = "field" style = "select" >
+    <invoke macro = "field"         />
+    <invoke macro = "field_summary" />
+</screen>
+
+<screen object = "field" style = "browse" >
+    <invoke macro = "field" />
+</screen>
+
+<screen object = "field" style = "create" >
+    <use object = "field"     />
+    <use object = "fieldrole" />
+    <handler event = "on_init">
+    fld_field_showsize = 20
+    fld_field_maxsize  = 20
+    </handler>
+    <invoke macro = "field" />
+    <invoke macro = "field_validate" />
+    <page><form>
+      <layout>
+        <field  name = "id"       />
+        <field  name = "formid"   />
+        <field  name = "label"    />
+        <field  name = "name"     />
+        <field  name = "order"    />
+        <field  name = "type"     />
+        <field  name = "showsize" />
+        <field  name = "maxsize"  />
+        <field  name = "default"  />
+        <field  name = "mask"     />
+        <field  name = "join"     />
+        <field  name = "break"    />
+        <field  name = "rule"     />
+        <field  name = "lockable" />
+        <field  name = "cursor"   />
+        <field  name = "required" />
+        <field  name = "uppercase"/>
+        <field  name = "blankzero"/>
+      </layout>
+    </form>
+    <handler action = "create">
+      <create>
+        <ok>
+            if fld_field_type = FIELDTYPE_RADIO _
+            or fld_field_type = FIELDTYPE_SELECT then
+                Session ("field_name") = fld_field_name            
+                Session ("field_id")   = fld_field_id    
+                chain_to "fieldvalue_create" 
+            else
+                return_to_parent
+            end if         
+        </ok>
+      </create>
+    </handler>
+    </page>
+    <handler event = "on_return">
+        if cur_called = "fieldvalue_create" and Session ("db_changed") = 1 then
+            chain_to "fieldvalue_create"
+        else
+            return_to_parent
+        end if   
+    </handler>
+</screen>
+
+<screen object = "field" style = "update" >
+    <use object = "field"     />
+    <use object = "fieldrole" />
+    <invoke macro = "field" />
+    <invoke macro = "field_validate" />
+    <page name = "modify">
+        <invoke macro = "field_actions" />
+    </page>
+</screen>
+
+<macro name = "field" >
+<macro_attr name = "object" value = "field"         />
+<macro_attr name = "detail" value = "field_update"  />
+<macro_attr name = "item"   value = "Form Field"    />
+<macro_attr name = "query"  value = "byform"        />
+<var name = "fld_parent_desc"   />
+<var name = "fld_object_desc"   />
+<handler event = "on_init" >
+    fld_parent_desc  = Session ("form_parent_desc")
+    fld_object_desc  = Session ("form_object_desc")
+    fld_field_formid = Session ("form_id")
+</handler>
+<match name = "formid" />
+<page name = "*"><form>
+<layout append = "0" >
+<field name = "parent_desc" label = "Form defined within" size = "50" attr = "plain" />
+<field name = "object_desc" label = "Form applies to"     size = "50" attr = "plain" />
+</layout>
+</form></page>
+</macro>
+
+<macro name = "field_summary" >
+    <page><form>
+    <summary>
+        <field name = "name"                         />
+        <field name = "type"     label = "Type"     />
+        <field name = "label"    label = "Label"    />
+        <field name = "maxsize"  label = "Size"     />
+        <field name = "default"  label = "Default"  />
+        <field name = "required" label = "Required" />
+        <field name = "lockable" label = "Lockable" />
+    </summary>
+    </form></page>
+</macro>
+
+<macro name = "field_validate">
+  <handler event = "on_accept">
+    for index = 1 to len (fld_field_name)
+        namechar = mid (fld_field_name, index, 1)
+        if ascW (namechar) &gt; 127                           _
+        or (namechar &gt;= "a" and namechar &lt;= "z") _
+        or (namechar &gt;= "A" and namechar &lt;= "Z") _
+        or (namechar &gt;= "0" and namechar &lt;= "9") then
+        else
+            fld_field_name = left (fld_field_name, index - 1) & "_" & mid (fld_field_name, index + 1)
+        end if
+    next
+    <!-- Do not use a query limit of 1, else the current item gets
+         squashed if anything is found. -->
+    <query name = "byname" control = "eq" >
+    <found>
+    pxml.item_first_child
+    found_id = Cint (pxml.item_child_value ("id", 0))
+    if found_id &lt;&gt; fld_field_id then
+        cur_message = "A form field with this name already exists"
+        cur_error   = "name"
+        exception_raised = TRUE
+    end if
+    </found>
+    </query>
+  </handler>
+</macro>
+
+<macro name = "field_actions">
+<form>
+  <hints>
+  <hint>Form fields can be free-entry text, date, or numeric fields, in
+  which case the user can type any information that makes sense.</hint>
+  <hint>If the field carries one of a specific set of values, define it as
+  a 'Select' or 'Radio' field, and click on 'Field values' to define the
+  values.</hint>
+  <hint>Select fields appear as drop-down lists, while radio fields appear
+  as a set of options on one line.  Use select fields when there are more
+  than four or five possible values.</hint>
+  </hints>
+  <layout>
+    <field  name = "id"       />
+    <field  name = "formid"   />
+    <field  name = "label"    />
+    <field  name = "name"     />
+    <field  name = "order"    />
+    <field  name = "type"     />
+    <field  name = "showsize" />
+    <field  name = "maxsize"  />
+    <field  name = "default"  />
+    <field  name = "mask"     />
+    <field  name = "join"     />
+    <field  name = "break"    />
+    <field  name = "rule"     />
+    <field  name = "lockable" />
+    <field  name = "cursor"   />
+    <field  name = "required" />
+    <field  name = "uppercase"/>
+    <field  name = "blankzero"/>
+    <action name = "values" text = "Field values" label = "Define" type = "link" />
+    <action name = "rules"  text = "Field rules"  label = ""       type = "link" join = "1" />
+  </layout>
+</form>
+<handler action = "values">
+    Session ("field_name") = fld_field_name
+    Session ("field_id")   = fld_field_id
+    chain_to "fieldvalue_list"
+</handler>
+
+<handler action = "rules">
+    Session ("field_name") = fld_field_name
+    Session ("field_id")   = fld_field_id
+    Session ("field_type") = fld_field_type
+    Session ("form_id")    = fld_field_formid
+    chain_to "fieldrule_list"
+</handler>
+
+</macro>
+

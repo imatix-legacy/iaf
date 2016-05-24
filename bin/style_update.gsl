@@ -1,0 +1,62 @@
+/*  UPDATE
+ *
+ *  This style implements a 'work with' detail screen that is always
+ *  in input mode.
+ */ 
+function style_update ()
+    #   Set defaults for called programs 
+    screen.create ?= "$(object)_create"
+    screen.view   ?= "detail"
+    screen.query  ?= screen.view
+
+    xml '
+<style>
+<use object = "$(object)" />
+<handler event  = "on_init">
+    $(object)_recv_key
+    <fetch view = "$(view)" />
+</handler>
+
+<page title = "$(item:) Details" name = "modify" view = "$(view)">
+<toolbar>
+  <action name = "first"    text = "|<"   hint = "Show the first $(item)"   />
+  <action name = "previous" text = "<<"   hint = "Show the previous $(item)"/>
+  <action name = "next"     text = ">>"   hint = "Show the next $(item)"    />
+  <action name = "last"     text = ">|"   hint = "Show the last $(item)"    />
+  <action name = "delete"   hint = "Delete this $(item)" confirm = "Okay to delete $(item)?" 
+          condition = "$(restrict_delete?:)" />
+</toolbar>
+<form mode = "input">
+  <hints>
+  <hint>You can edit this $(item), or scroll to look at others.  Use the toolbar
+  actions to scroll through the $(item) list.</hint>
+  <hint>To make changes, edit the data shown, and click \'Update\'.</hint>
+  </hints>
+  <layout>
+    <field name = "*" />
+    <action name = "update" toolbar = "1" text = "Ok" fields = "1" hint = "Save your changes now" />
+    <action name = "cancel" join = "1"                             hint = "Lose your changes"     />
+  </layout>
+</form>
+<handler action = "next"    ><query name = "$(query)" control = "gt"    limit = "1" /></handler>
+<handler action = "previous"><query name = "$(query)" control = "lt"    limit = "1" /></handler>
+<handler action = "first"   ><query name = "$(query)" control = "first" limit = "1" /></handler>
+<handler action = "last"    ><query name = "$(query)" control = "last"  limit = "1" /></handler>
+<handler action = "cancel" getdata = "0">
+    return_to_parent
+</handler>
+<handler action = "delete" getdata = "0">
+    <delete>
+        <ok>return_to_parent</ok>
+    </delete>
+</handler>
+<handler action = "update">
+    <update>
+    <ok>return_to_parent</ok>
+    </update>
+</handler>
+</page>
+</style>
+'
+endfunction
+
