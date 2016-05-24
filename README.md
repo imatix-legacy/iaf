@@ -30,7 +30,7 @@ languages were represented in XML.  (A more modern implementation
 would probably have used [YAML](https://en.wikipedia.org/wiki/YAML) or
 perhaps [JSON](https://en.wikipedia.org/wiki/JSON).)
 
-A small example can be found in [the example directory](example/skeleton/).
+A small example can be found in [the examples directory](examples/skeleton/).
 
 More information can be found in the original whitepapers about the
 iMatix Application Framework can be found on the [legacy iMatix
